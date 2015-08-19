@@ -49,7 +49,6 @@
 	<classpathentry kind="lib" path="lib/org.eclipse.birt.runtime_4.2.2.v20130216-1152.jar"/>
 	<classpathentry kind="lib" path="lib/org.jwall.web.audit-0.2.15.jar"/>
 	<classpathentry kind="lib" path="lib/rsyntaxtextarea-2.5.6.jar"/>
-	<classpathentry kind="lib" path="lib/sanselan-0.97-incubator.jar"/>
 	<classpathentry kind="lib" path="lib/simple-odf-0.7-incubating.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.7.2.jar"/>
 	<classpathentry kind="lib" path="lib/soa-model-core-1.4.1.4.jar"/>
@@ -70,5 +69,7 @@
 	<classpathentry kind="lib" path="testlib/simple-5.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/zap-2.4.1.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="lib/metadata-extractor-2.8.1.jar"/>
+	<classpathentry kind="lib" path="lib/xmpcore-5.1.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

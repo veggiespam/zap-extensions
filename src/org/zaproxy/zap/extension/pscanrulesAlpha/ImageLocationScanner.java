@@ -3,7 +3,7 @@
  * Location Scanner class. Passively scans a data stream containing 
  * a jpeg and report if the data contains embedded Exif GPS location.
  * 
- * @author  Jay Ball / github: veggiespam / twitter: @veggiespam / www.veggiespam.com
+ * @author  Jay Ball / github: veggiespam / twitter: @veggiespam / http://www.veggiespam.com/ils/
  * 
  * Licensed under the Apache License, Version 2.0 (the "License"); 
  * you may not use this file except in compliance with the License. 
@@ -39,7 +39,7 @@ import com.veggiespam.imagelocationscanner.ILS;
  * 
  * @author  Jay Ball / github: veggiespam / twitter: @veggiespam / www.veggiespam.com
  * @license Apache License 2.0
- * @version 0.1
+ * @version 0.2
  * @see http://www.veggiespam.com/ils/
  */
 public class ImageLocationScanner extends PluginPassiveScanner {
@@ -77,7 +77,7 @@ public class ImageLocationScanner extends PluginPassiveScanner {
 		 * This should be unique across all active and passive rules.
 		 * The master list is https://github.com/zaproxy/zaproxy/blob/develop/src/doc/alerts.xml
 		 */
-		return 333292; // FIXME TEMP XXX TODO - get a real ID.
+		return 10049;
 	}
 
 	@Override
@@ -106,7 +106,10 @@ public class ImageLocationScanner extends PluginPassiveScanner {
 		logger.debug("\tCT: " + CT + " url: " + url + " fileName: " + fileName + " ext: " + extension);
 
 		if (CT.equalsIgnoreCase("image/jpeg") || CT.equalsIgnoreCase("image/jpg") 
-				|| extension.equalsIgnoreCase("jpeg")  || extension.equalsIgnoreCase("jpg")  ) {
+				|| extension.equalsIgnoreCase("jpg") || extension.equalsIgnoreCase("jpeg")  
+				|| CT.equalsIgnoreCase("image/png")  || extension.equalsIgnoreCase("png")  
+				|| CT.equalsIgnoreCase("image/tiff") || extension.equalsIgnoreCase("tiff") || extension.equalsIgnoreCase("tif")
+				) {
 		
 			String hasGPS = ILS.scanForLocationInImage(msg.getResponseBody().getBytes());
 			
