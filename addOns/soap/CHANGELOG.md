@@ -4,6 +4,45 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+
+## [32] - 2026-08-12
+### Added
+- Allow users to limit the number of SOAP messages to import (`maxMessages`). Ex: If testing authentication, access, etc.
+
+### Changed
+- Maintenance changes.
+
+## [31] - 2026-06-12
+### Changed
+- Update dependency.
+
+### Fixed
+- Fix SOAP requests generated from some WSDLs being incomplete. Requests now correctly include all fields defined in the schema, and requests are no longer broken by certain characters in element or attribute names and values.
+
+## [30] - 2026-04-14
+### Changed
+- The scan rules now have new tags for the OWASP Top 10 2025, and API Top 10 2023.
+- Depends on an updated version of the Common Library add-on.
+
+## [29] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Update dependencies.
+
+## [28] - 2025-09-18
+### Added
+- QA CICD policy tag to active scan rules.
+
+## [27] - 2025-09-10
+### Fixed
+- When parsing WSDL files ensure the dateTime values are generated in UTC.
+
+## [26] - 2025-09-02
+### Added
+- The SOAP Action Spoofing, SOAP XML Injection, and WSDL File Detection scan rules now all have CWE references.
+
+## [25] - 2025-06-20
 ### Added
 - The WSDL passive scan rule has been tagged of interest to Penetration Testers and QA.
 - The included active scan rules have been tagged of interest to Penetration Testers.
@@ -182,6 +221,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First version
 
+[32]: https://github.com/zaproxy/zap-extensions/releases/soap-v32
+[31]: https://github.com/zaproxy/zap-extensions/releases/soap-v31
+[30]: https://github.com/zaproxy/zap-extensions/releases/soap-v30
+[29]: https://github.com/zaproxy/zap-extensions/releases/soap-v29
+[28]: https://github.com/zaproxy/zap-extensions/releases/soap-v28
+[27]: https://github.com/zaproxy/zap-extensions/releases/soap-v27
+[26]: https://github.com/zaproxy/zap-extensions/releases/soap-v26
+[25]: https://github.com/zaproxy/zap-extensions/releases/soap-v25
 [24]: https://github.com/zaproxy/zap-extensions/releases/soap-v24
 [23]: https://github.com/zaproxy/zap-extensions/releases/soap-v23
 [22]: https://github.com/zaproxy/zap-extensions/releases/soap-v22

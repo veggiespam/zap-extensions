@@ -35,7 +35,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -76,9 +75,11 @@ public class AuthenticationData extends AutomationData {
     public static final String PARAM_LOGIN_PAGE_WAIT = "loginPageWait";
     public static final String PARAM_LOGIN_REQUEST_URL = "loginRequestUrl";
     public static final String PARAM_LOGIN_REQUEST_BODY = "loginRequestBody";
+    public static final String PARAM_MIN_WAIT_FOR = "minWaitFor";
     public static final String PARAM_SCRIPT = "script";
     public static final String PARAM_SCRIPT_INLINE = "scriptInline";
     public static final String PARAM_SCRIPT_ENGINE = "scriptEngine";
+    public static final String PARAM_STEP_DELAY = "stepDelay";
 
     // TODO: Plan to change once the core supports dynamic methods better
     protected static final String CLIENT_SCRIPT_BASED_AUTH_METHOD_CLASSNAME =
@@ -90,7 +91,6 @@ public class AuthenticationData extends AutomationData {
     protected static final String FIELD_LOGIN_REQUEST_URL = "loginRequestURL";
 
     private static final String BAD_FIELD_ERROR_MSG = "automation.error.env.auth.field.bad";
-    private static final String PRIVATE_FIELD_SCRIPT = "script";
 
     public static final String VERIFICATION_ELEMENT = "verification";
 
@@ -146,21 +146,22 @@ public class AuthenticationData extends AutomationData {
                         .getClass()
                         .getCanonicalName()
                         .equals(CLIENT_SCRIPT_BASED_AUTH_METHOD_CLASSNAME)) {
-            ScriptWrapper sw =
-                    (ScriptWrapper) JobUtils.getPrivateField(authMethod, PRIVATE_FIELD_SCRIPT);
+            JobUtils.addPrivateField(parameters, PARAM_DIAGNOSTICS, authMethod);
+            ScriptBasedAuthenticationMethod scriptAuthMethod =
+                    (ScriptBasedAuthenticationMethod) authMethod;
+            ScriptWrapper sw = scriptAuthMethod.getScript();
             LOGGER.debug("Matched client script class");
             if (sw != null) {
                 setMethod(METHOD_CLIENT);
-                extractAuthScriptParameters(authMethod, sw, parameters);
+                extractAuthScriptParameters(scriptAuthMethod, sw, parameters);
                 JobUtils.addPrivateField(parameters, PARAM_LOGIN_PAGE_WAIT, authMethod);
+                JobUtils.addPrivateField(parameters, PARAM_MIN_WAIT_FOR, authMethod);
             }
         } else if (authMethod instanceof ScriptBasedAuthenticationMethod scriptAuthMethod) {
-            ScriptWrapper sw =
-                    (ScriptWrapper)
-                            JobUtils.getPrivateField(scriptAuthMethod, PRIVATE_FIELD_SCRIPT);
+            ScriptWrapper sw = scriptAuthMethod.getScript();
             if (sw != null) {
                 setMethod(AuthenticationData.METHOD_SCRIPT);
-                extractAuthScriptParameters(authMethod, sw, parameters);
+                extractAuthScriptParameters(scriptAuthMethod, sw, parameters);
             }
         } else if (authMethod != null
                 && authMethod
@@ -172,6 +173,8 @@ public class AuthenticationData extends AutomationData {
             JobUtils.addPrivateField(parameters, PARAM_LOGIN_PAGE_URL, authMethod);
             JobUtils.addPrivateField(parameters, PARAM_LOGIN_PAGE_WAIT, authMethod);
             JobUtils.addPrivateField(parameters, PARAM_BROWSER_ID, authMethod);
+            JobUtils.addPrivateField(parameters, PARAM_STEP_DELAY, authMethod);
+            JobUtils.addPrivateField(parameters, PARAM_DIAGNOSTICS, authMethod);
 
             try {
                 Method method = authMethod.getClass().getMethod("toMap", Map.class);
@@ -197,16 +200,16 @@ public class AuthenticationData extends AutomationData {
     }
 
     private static void extractAuthScriptParameters(
-            AuthenticationMethod authMethod, ScriptWrapper sw, Map<String, Object> parameters) {
+            ScriptBasedAuthenticationMethod authMethod,
+            ScriptWrapper sw,
+            Map<String, Object> parameters) {
         if (sw.getFile() != null) {
             parameters.put(PARAM_SCRIPT, sw.getFile().getAbsolutePath());
         } else {
             parameters.put(PARAM_SCRIPT_INLINE, sw.getContents());
         }
         parameters.put(PARAM_SCRIPT_ENGINE, sw.getEngineName());
-        @SuppressWarnings("unchecked")
-        Map<String, String> paramValues =
-                (Map<String, String>) JobUtils.getPrivateField(authMethod, "paramValues");
+        Map<String, String> paramValues = authMethod.getParamValues();
         for (Entry<String, String> entry : paramValues.entrySet()) {
             parameters.put(entry.getKey(), entry.getValue());
         }
@@ -302,12 +305,14 @@ public class AuthenticationData extends AutomationData {
                 switch (entry.getKey()) {
                     case PARAM_PORT:
                     case PARAM_LOGIN_PAGE_WAIT:
+                    case PARAM_MIN_WAIT_FOR:
+                    case PARAM_STEP_DELAY:
                         try {
                             Integer.parseInt(entry.getValue().toString());
                         } catch (NumberFormatException e) {
                             progress.error(
                                     Constant.messages.getString(
-                                            BAD_FIELD_ERROR_MSG, PARAM_PORT, data));
+                                            BAD_FIELD_ERROR_MSG, entry.getKey(), data));
                         }
                         break;
                     case PARAM_DIAGNOSTICS:
@@ -432,23 +437,27 @@ public class AuthenticationData extends AutomationData {
                         AuthenticationMethodType clientScriptType =
                                 extAuth.getAuthenticationMethodTypeForIdentifier(8);
                         LOGGER.info("Loaded client script auth method type {}.", clientScriptType);
-                        AuthenticationMethod clientScriptMethod =
-                                clientScriptType.createAuthenticationMethod(context.getId());
+                        ScriptBasedAuthenticationMethod clientScriptMethod =
+                                (ScriptBasedAuthenticationMethod)
+                                        clientScriptType.createAuthenticationMethod(
+                                                context.getId());
 
                         JobUtils.setPrivateField(
                                 clientScriptMethod,
                                 "diagnostics",
                                 parameters.getOrDefault(PARAM_DIAGNOSTICS, false));
 
-                        try {
-                            MethodUtils.invokeMethod(clientScriptMethod, "loadScript", sw);
-                        } catch (Exception e) {
-                            LOGGER.error(e.getMessage(), e);
-                        }
-                        JobUtils.setPrivateField(
-                                clientScriptMethod, "paramValues", getScriptParameters(env));
+                        clientScriptMethod.loadScript(sw);
+                        clientScriptMethod.setParamValues(getScriptParameters(env));
 
-                        setLoginPageWait(clientScriptMethod, getParameters());
+                        setPrivateInteger(
+                                clientScriptMethod,
+                                getParameters(),
+                                AuthenticationData.PARAM_LOGIN_PAGE_WAIT);
+                        setPrivateInteger(
+                                clientScriptMethod,
+                                getParameters(),
+                                AuthenticationData.PARAM_MIN_WAIT_FOR);
 
                         reloadAuthenticationMethod(clientScriptMethod, progress);
                         context.setAuthenticationMethod(clientScriptMethod);
@@ -461,16 +470,12 @@ public class AuthenticationData extends AutomationData {
                                 new ScriptBasedAuthenticationMethodType();
                         LOGGER.debug("Loaded script auth method type");
 
-                        AuthenticationMethod scriptMethod =
-                                scriptType.createAuthenticationMethod(context.getId());
+                        ScriptBasedAuthenticationMethod scriptMethod =
+                                (ScriptBasedAuthenticationMethod)
+                                        scriptType.createAuthenticationMethod(context.getId());
 
-                        try {
-                            MethodUtils.invokeMethod(scriptMethod, "loadScript", sw);
-                        } catch (Exception e) {
-                            LOGGER.error(e.getMessage(), e);
-                        }
-                        JobUtils.setPrivateField(
-                                scriptMethod, "paramValues", getScriptParameters(env));
+                        scriptMethod.loadScript(sw);
+                        scriptMethod.setParamValues(getScriptParameters(env));
 
                         reloadAuthenticationMethod(scriptMethod, progress);
                         context.setAuthenticationMethod(scriptMethod);
@@ -504,7 +509,8 @@ public class AuthenticationData extends AutomationData {
                                     am, AuthenticationData.PARAM_BROWSER_ID, (String) browserIdObj);
                         }
 
-                        setLoginPageWait(am, parameters);
+                        setPrivateInteger(am, parameters, AuthenticationData.PARAM_LOGIN_PAGE_WAIT);
+                        setPrivateInteger(am, parameters, AuthenticationData.PARAM_STEP_DELAY);
 
                         try {
                             Method method = am.getClass().getMethod("fromMap", Map.class);
@@ -606,13 +612,13 @@ public class AuthenticationData extends AutomationData {
         return null;
     }
 
-    private static void setLoginPageWait(Object method, Map<String, Object> parameters) {
-        Object loginPageWaitObj = parameters.get(AuthenticationData.PARAM_LOGIN_PAGE_WAIT);
-        if (loginPageWaitObj instanceof Integer value) {
-            int loginPageWait = JobUtils.unBox(value);
-            if (loginPageWait >= 0) {
-                JobUtils.setPrivateField(
-                        method, AuthenticationData.PARAM_LOGIN_PAGE_WAIT, loginPageWait);
+    private static void setPrivateInteger(
+            Object method, Map<String, Object> parameters, String fieldName) {
+        Object obj = parameters.get(fieldName);
+        if (obj instanceof Integer value) {
+            int i = JobUtils.unBox(value);
+            if (i >= 0) {
+                JobUtils.setPrivateField(method, fieldName, i);
             }
         }
     }

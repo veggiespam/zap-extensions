@@ -4,6 +4,99 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+
+## [76] - 2026-09-25
+### Changed
+- Content Security Policy scan rule analyzes all active CSP headers and META policies together using browser-style intersection (Issue 9403).
+- Update dependency.
+- Update reference to avoid redirect.
+- Updated help entries for the following scan rules, clarifying the data used to supplement their alerts for credit card related findings:
+  - Information Disclosure: Referrer
+  - PII Disclosure
+
+### Fixed
+- User Controllable HTML Element Attribute scan rule: reduce false positives for short parameter values in meta content checks (Issue 9461).
+
+### Removed
+- CSP "Header & Meta" alert (10055-12) is no longer raised.
+
+## [75] - 2026-07-06
+### Changed
+- Maintenance changes.
+- Modern scan rule to refer to the Client Spider.
+
+## [74] - 2026-06-26
+### Changed
+- Update dependency.
+- Updated a reference link for the Sub Resource Integrity Attribute Missing scan rule.
+- Remove reference link which is no longer available for the Script Served From Malicious Domain (polyfill) scan rule.
+- Remove OWASP Top 10 Security Misconfiguration tags from the Modern Web Application scan rule, it only informs about the likely type of the website.
+
+## [73] - 2026-04-14
+### Changed
+- The scan rules now have new tags for the OWASP Top 10 2025.
+- The Charset Mismatch scan rule also now has tags for the Top 10 2021 and 2017.
+- Depends on an updated version of the Common Library add-on.
+- Add alert references to Hash Disclosure scan rule alerts (Issue 9144).
+
+## [72] - 2026-03-31
+### Added
+- Loosely scoped cookie rule to include evidence.
+### Changed
+- Loosely scoped cookie rule to just include cookie names in the "Other Info".
+
+## [71] - 2026-03-02
+### Changed
+- Information Disclosure - Suspicious Comments scan rule:
+  - Attempts to collect comments from JavaScript content using the ANTLR library, which should be more accurate.
+  - Provides more context in the evidence (Issue 9185).
+- The Content Security Policy scan rule leverages an updated version of the htmlunit-csp library that includes support for the trusted-types and require-trusted-types-for directives.
+
+## [70] - 2025-12-15
+### Added
+- The following scan rules were added, having been promoted from Beta:
+  - In Page Banner Information Leak
+  - Java Serialization Object
+  - Sub Resource Integrity Attribute Missing
+
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Address redirection in a reference.
+- Update dependency.
+
+## [69] - 2025-11-04
+### Changed
+- Update dependency.
+- Reduced usage of error level logging.
+- The Charset Mismatch scan rule now includes example alert functionality for documentation generation purposes (Issue 6119) and alert references (Issue 7100).
+
+### Removed
+- The Charset Mismatch scan rule no longer produces an alert with regard to META content-type and older clients.
+
+## [68] - 2025-10-21
+### Added
+- SYSTEMIC tag to selected rules.
+
+### Changed
+- Update dependency.
+- The PII Disclosure scan rule now only evaluates visible text and script blocks in HTML responses at Medium or High alert threshold, while the entire response body is considered at Low alert threshold. To further prevent false positives at Medium or High alert threshold candidate strings with underscore are excluded.
+- Depends on an updated version of the Common Library add-on.
+
+### Fixed
+- ZAP is Out of Date rule to not trigger a CFU request in silent mode (Issue 9096).
+
+## [67] - 2025-09-18
+### Changed
+- Add alert references to HTTP Server Response Header scan rule alerts (Issue 7100, 9050).
+- Update alert references to latest locations to fix 404s and resolve redirections.
+
+## [66] - 2025-07-25
+### Added
+- The Reverse Tabnabbing and Retrieved from Cache scan rules now have CWE references.
+- A ZAP is Out of Date rule.
+
+## [65] - 2025-06-20
 ### Added
 - All rules have been tagged of interest to Penetration Testers, as well as adding tags associated with DEV or QA applicability.
 
@@ -615,6 +708,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
 
+[76]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v76
+[75]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v75
+[74]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v74
+[73]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v73
+[72]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v72
+[71]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v71
+[70]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v70
+[69]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v69
+[68]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v68
+[67]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v67
+[66]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v66
+[65]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v65
 [64]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v64
 [63]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v63
 [62]: https://github.com/zaproxy/zap-extensions/releases/pscanrules-v62

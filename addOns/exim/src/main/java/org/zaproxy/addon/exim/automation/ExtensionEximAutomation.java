@@ -52,7 +52,7 @@ public class ExtensionEximAutomation extends ExtensionAdaptor {
     public void hook(ExtensionHook extensionHook) {
         super.hook(extensionHook);
         ExtensionAutomation extAuto = getExtension(ExtensionAutomation.class);
-        importJob = new ImportJob();
+        importJob = new ImportJob(getExtension(ExtensionExim.class));
         extAuto.registerAutomationJob(importJob);
         exportJob = new ExportJob(getExtension(ExtensionExim.class));
         extAuto.registerAutomationJob(exportJob);

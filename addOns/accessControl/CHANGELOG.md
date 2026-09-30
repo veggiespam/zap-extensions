@@ -4,8 +4,27 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+
+## [13] - 2026-06-26
 ### Changed
-- Update minimum ZAP version to 2.16.0.
+- Formatted JavaScript files for consistency.
+
+### Fixed
+- Discrepancy between Sites tree node name & Access Control recomputed node name made check silently fail and fallback to parent rule.
+
+## [12] - 2026-04-14
+### Changed
+- Maintenance changes.
+- The alerts now have new tags for the OWASP Top 10 2025.
+- Depends on an updated version of the Common Library add-on.
+
+### Fixed
+- Prevent GUI freeze on result selection.
+
+## [11] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
 - Maintenance changes.
 
 ## [10] - 2024-03-25
@@ -79,6 +98,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Initial version
 
+[13]: https://github.com/zaproxy/zap-extensions/releases/accessControl-v13
+[12]: https://github.com/zaproxy/zap-extensions/releases/accessControl-v12
+[11]: https://github.com/zaproxy/zap-extensions/releases/accessControl-v11
 [10]: https://github.com/zaproxy/zap-extensions/releases/accessControl-v10
 [9]: https://github.com/zaproxy/zap-extensions/releases/accessControl-v9
 [8]: https://github.com/zaproxy/zap-extensions/releases/accessControl-v8

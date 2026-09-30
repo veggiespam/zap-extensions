@@ -5,6 +5,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Changed
+- Maintenance changes.
+
+## [1.44.0] - 2026-08-26
+### Added
+- Add standard header for other add-ons to use.
+
+### Changed
+- Update dependencies.
+- Update alert tag URLs to avoid redirects.
+
+## [1.43.0] - 2026-07-14
+### Added
+- UriUtils class for standardising URI checking.
+
+### Changed
+- Update dependencies.
+- Updated Bank Identification Number data from a new source (https://github.com/venelinkochev/bin-list-data/).
+- Added help page documenting the BIN list data and how it is used by scan rules.
+
+## [1.42.0] - 2026-06-12
+### Added
+- Add Sites tree context menus:
+  - A "Get Info" that summarizes the selected node's subtree (total node count, most-recent addition, breakdown by source type) (Issue 3738).
+  - An expand/collapse a node and all its children (previously provided by the TreeTools add-on).
+
+### Changed
+- Update dependencies.
+- Maintenance changes.
+
+### Fixed
+- Prevent performance issues in the output tabs when showing lengthier messages.
+
+## [1.41.0] - 2026-04-15
+### Added
+- Generate Fix Prompt alert menu item.
+
+### Changed
+- Update dependencies.
+
+## [1.40.0] - 2026-03-19
+### Changed
+- Update dependencies.
+- Use a monospaced font for the output panel.
+- Remove Markdown formatting from vulnerabilities' solutions (Issue 8056).
+
+### Added
+- Added OWASP Top 10 2025 and OWASP API Top 10 2023 Alert Tags.
+
+## [1.39.0] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Update dependencies.
+
+## [1.38.0] - 2025-10-21
+### Added
+- SYSTEMIC tag.
+
+### Changed
+- Update dependencies.
+
+## [1.37.0] - 2025-10-07
+### Added
+- Support for alert reference overrides in script scan rule metadata.
+
+## [1.36.0] - 2025-09-18
+### Added
+- QA CICD policy tag.
+
+## [1.35.0] - 2025-09-02
+### Changed
+- Update dependency.
+- Expose constant related to authentication.
+
+## [1.34.0] - 2025-07-04
+### Added
+- Added Alert Tags for PCI DSS and HIPAA standards.
+- Added a help page for the alert tags provided through this add-on.
+
+## [1.33.0] - 2025-06-20
 ### Added
 - Constants related to authentication.
 
@@ -212,6 +292,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 First version.
 
+[1.44.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.44.0
+[1.43.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.43.0
+[1.42.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.42.0
+[1.41.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.41.0
+[1.40.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.40.0
+[1.39.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.39.0
+[1.38.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.38.0
+[1.37.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.37.0
+[1.36.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.36.0
+[1.35.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.35.0
+[1.34.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.34.0
+[1.33.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.33.0
 [1.32.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.32.0
 [1.31.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.31.0
 [1.30.0]: https://github.com/zaproxy/zap-extensions/releases/commonlib-v1.30.0

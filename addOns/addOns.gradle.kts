@@ -1,5 +1,6 @@
 import me.champeau.gradle.japicmp.JapicmpTask
 import org.cyclonedx.gradle.CycloneDxTask
+import org.gradle.api.internal.provider.TransformBackedProvider
 import org.zaproxy.gradle.addon.AddOnPlugin
 import org.zaproxy.gradle.addon.AddOnPluginExtension
 import org.zaproxy.gradle.addon.apigen.ApiClientGenExtension
@@ -18,11 +19,10 @@ import org.zaproxy.gradle.crowdin.CrowdinExtension
 plugins {
     eclipse
     jacoco
-    id("org.cyclonedx.bom") version "2.2.0" apply false
-    id("org.rm3l.datanucleus-gradle-plugin") version "2.0.0" apply false
-    id("org.zaproxy.add-on") version "0.13.1" apply false
-    id("org.zaproxy.crowdin") version "0.6.0" apply false
-    id("me.champeau.gradle.japicmp") version "0.4.6" apply false
+    alias(libs.plugins.cyclonedx) apply false
+    alias(libs.plugins.zaproxy.addon) apply false
+    alias(libs.plugins.zaproxy.crowdin) apply false
+    alias(libs.plugins.japicmp) apply false
 }
 
 description = "Common configuration of the add-ons."
@@ -95,7 +95,6 @@ subprojects {
     apply(plugin = "java-library")
     apply(plugin = "jacoco")
     apply(plugin = "org.cyclonedx.bom")
-    apply(plugin = "org.rm3l.datanucleus-gradle-plugin")
     apply(plugin = "org.zaproxy.add-on")
     apply(plugin = "org.zaproxy.common")
     if (useCrowdin) {
@@ -104,6 +103,10 @@ subprojects {
     if (mavenPublishAddOn) {
         apply(plugin = "maven-publish")
         apply(plugin = "signing")
+
+        tasks.named(LifecycleBasePlugin.CHECK_TASK_NAME) {
+            dependsOn(tasks.named(JavaPlugin.JAVADOC_TASK_NAME))
+        }
     }
     if (japicmpAddOn) {
         apply(plugin = "me.champeau.gradle.japicmp")
@@ -120,6 +123,33 @@ subprojects {
     }
 
     group = "org.zaproxy.addon"
+
+    spotless {
+        format("js") {
+            target(
+                project.fileTree(project.projectDir) {
+                    include("src/**/*.js", "src/**/*.mjs", "src/**/*.cjs")
+                },
+            )
+            targetExclude("**/*.min.js")
+
+            val npmDir =
+                (project.rootProject.tasks.named("npmSetup").get().property("npmDir") as TransformBackedProvider<*, *>)
+                    .get()
+                    .toString()
+            val npmExecutable =
+                if (System.getProperty("os.name").lowercase().contains("windows")) {
+                    "/npm.cmd"
+                } else {
+                    "/bin/npm"
+                }
+            prettier(rootProject.libs.versions.prettier.get()).npmExecutable(npmDir + npmExecutable)
+        }
+
+        tasks.named("spotlessJs").configure {
+            dependsOn(rootProject.tasks.named("nodeSetup"), rootProject.tasks.named("npmSetup"))
+        }
+    }
 
     java {
         // Compile with appropriate Java version when building ZAP releases.
@@ -141,6 +171,26 @@ subprojects {
     tasks.named<JacocoReport>("jacocoTestReport") {
         reports {
             xml.required.set(true)
+        }
+    }
+
+    tasks.withType<Test>().configureEach {
+        inputs.property("ZAP_REMOTE_TESTS", if (System.getenv("ZAP_REMOTE_TESTS") == "1") "1" else "0")
+
+        useJUnitPlatform {
+            excludeTags("weekly")
+        }
+    }
+
+    val sourceSets = extensions.getByName("sourceSets") as SourceSetContainer
+    val testWeekly by tasks.registering(Test::class) {
+
+        testClassesDirs = sourceSets["test"].output.classesDirs
+        classpath = sourceSets["test"].runtimeClasspath
+
+        useJUnitPlatform {
+            includeTags("weekly")
+            excludeTags.clear()
         }
     }
 
@@ -166,9 +216,11 @@ subprojects {
         }
     }
 
-    val zapGav = "org.zaproxy:zap:2.16.0"
+    val zapGav = "org.zaproxy:zap:2.17.0"
     dependencies {
         "zap"(zapGav)
+
+        "testImplementation"(project(":testutilscore"))
     }
 
     val apiGenClasspath = configurations.detachedConfiguration(dependencies.create(zapGav))
@@ -179,7 +231,7 @@ subprojects {
         )
 
         manifest {
-            zapVersion.set("2.16.0")
+            zapVersion.set("2.17.0")
 
             changesFile.set(tasks.named<ConvertMarkdownToHtml>("generateManifestChanges").flatMap { it.html })
             repo.set("https://github.com/zaproxy/zap-extensions/")
@@ -304,8 +356,6 @@ subprojects {
     }
 
     if (mavenPublishAddOn) {
-        val sourceSets = extensions.getByName("sourceSets") as SourceSetContainer
-
         tasks.register<Jar>("javadocJar") {
             from(tasks.named("javadoc"))
             archiveClassifier.set("javadoc")
@@ -322,8 +372,8 @@ subprojects {
         publishing {
             repositories {
                 maven {
-                    val releasesRepoUrl = uri("https://oss.sonatype.org/service/local/staging/deploy/maven2/")
-                    val snapshotsRepoUrl = uri("https://oss.sonatype.org/content/repositories/snapshots/")
+                    val releasesRepoUrl = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
+                    val snapshotsRepoUrl = uri("https://central.sonatype.com/repository/maven-snapshots/")
                     setUrl(provider { if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl })
 
                     if (ossrhUsername != null && ossrhPassword != null) {

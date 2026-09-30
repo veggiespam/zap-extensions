@@ -72,63 +72,105 @@ public class AutomationEnvironment {
 
     public AutomationEnvironment(Map<?, ?> envData, AutomationProgress progress) {
         this(progress);
+
+        readData(envData);
+    }
+
+    void readData(Map<?, ?> envData) {
         if (envData == null) {
             progress.error(Constant.messages.getString("automation.error.env.missing"));
             return;
         }
 
-        LinkedHashMap<?, ?> configVars = (LinkedHashMap<?, ?>) envData.get("vars");
-        if (configVars != null) {
-            for (Entry<?, ?> configVar : configVars.entrySet()) {
-                this.getData()
-                        .getVars()
-                        .put(configVar.getKey().toString(), configVar.getValue().toString());
+        for (Entry<?, ?> entry : envData.entrySet()) {
+            switch (entry.getKey().toString()) {
+                case "vars":
+                    LinkedHashMap<?, ?> configVars = (LinkedHashMap<?, ?>) entry.getValue();
+                    if (configVars != null) {
+                        for (Entry<?, ?> configVar : configVars.entrySet()) {
+                            this.getData()
+                                    .getVars()
+                                    .put(
+                                            configVar.getKey().toString(),
+                                            configVar.getValue().toString());
+                        }
+                    }
+                    break;
+                case "parameters":
+                    LinkedHashMap<?, ?> params = (LinkedHashMap<?, ?>) entry.getValue();
+                    JobUtils.applyParamsToObject(
+                            params,
+                            this.getData().getParameters(),
+                            Constant.messages.getString("automation.env.name"),
+                            null,
+                            progress);
+                    break;
+                case "proxy":
+                    LinkedHashMap<?, ?> proxy = (LinkedHashMap<?, ?>) entry.getValue();
+                    JobUtils.applyParamsToObject(
+                            proxy,
+                            this.getData().getProxy(true),
+                            Constant.messages.getString("automation.env.name"),
+                            null,
+                            progress);
+                    break;
+                case "contexts":
+                    Object contextsObject = entry.getValue();
+                    if (contextsObject == null) {
+                        progress.error(
+                                Constant.messages.getString(
+                                        "automation.error.env.nocontexts", envData));
+                        return;
+                    }
+                    if (!(contextsObject instanceof ArrayList)) {
+                        progress.error(
+                                Constant.messages.getString(
+                                        "automation.error.env.badcontexts", contextsObject));
+                        return;
+                    }
+                    ArrayList<?> contextData = (ArrayList<?>) contextsObject;
+                    for (Object contextObject : contextData.toArray()) {
+                        if (!(contextObject instanceof LinkedHashMap)) {
+                            progress.error(
+                                    Constant.messages.getString(
+                                            "automation.error.env.badcontext", contextObject));
+                            return;
+                        }
+                        this.contexts.add(
+                                new ContextWrapper(
+                                        (LinkedHashMap<?, ?>) contextObject, this, progress));
+                    }
+                    break;
+                case "configs":
+                    LinkedHashMap<?, ?> configs = (LinkedHashMap<?, ?>) entry.getValue();
+                    if (configs != null) {
+                        for (Entry<?, ?> configVar : configs.entrySet()) {
+                            this.getData()
+                                    .getConfigs()
+                                    .put(
+                                            configVar.getKey().toString(),
+                                            configVar.getValue() == null
+                                                    ? null
+                                                    : configVar.getValue().toString());
+                        }
+                    }
+                    break;
+                default:
+                    progress.error(
+                            Constant.messages.getString(
+                                    "automation.error.env.unknown", entry.getKey()));
             }
         }
 
-        LinkedHashMap<?, ?> params = (LinkedHashMap<?, ?>) envData.get("parameters");
-        JobUtils.applyParamsToObject(
-                params,
-                this.getData().getParameters(),
-                Constant.messages.getString("automation.env.name"),
-                null,
-                progress);
-        this.progress.setOutputToStdout(this.getData().getParameters().getProgressToStdout());
+        progress.setOutputToStdout(getData().getParameters().getProgressToStdout());
 
-        LinkedHashMap<?, ?> proxy = (LinkedHashMap<?, ?>) envData.get("proxy");
-        JobUtils.applyParamsToObject(
-                proxy,
-                this.getData().getProxy(true),
-                Constant.messages.getString("automation.env.name"),
-                null,
-                progress);
-
-        Object contextsObject = envData.get("contexts");
-        if (contextsObject == null) {
+        if (this.contexts.isEmpty()) {
             progress.error(Constant.messages.getString("automation.error.env.nocontexts", envData));
-            return;
-        }
-        if (!(contextsObject instanceof ArrayList)) {
-            progress.error(
-                    Constant.messages.getString(
-                            "automation.error.env.badcontexts", contextsObject));
-            return;
-        }
-        ArrayList<?> contextData = (ArrayList<?>) contextsObject;
-        for (Object contextObject : contextData.toArray()) {
-            if (!(contextObject instanceof LinkedHashMap)) {
-                progress.error(
-                        Constant.messages.getString(
-                                "automation.error.env.badcontext", contextObject));
-                return;
-            }
-            this.contexts.add(
-                    new ContextWrapper((LinkedHashMap<?, ?>) contextObject, this, progress));
         }
     }
 
     public void addContext(Context context) {
-        this.contexts.add(new ContextWrapper(context));
+        this.contexts.add(new ContextWrapper(context, this));
     }
 
     private static ExtensionNetwork getExtensionNetwork() {
@@ -424,6 +466,10 @@ public class AutomationEnvironment {
                         || (isFailOnWarning() && progress.hasWarnings()));
     }
 
+    public int getMaxDuration() {
+        return this.getData().getParameters().getMaxDuration();
+    }
+
     public void showDialog() {
         new EnvironmentDialog(this).setVisible(true);
     }
@@ -440,6 +486,7 @@ public class AutomationEnvironment {
         private Parameters parameters;
         private Proxy proxy;
         private Map<String, String> vars = new LinkedHashMap<>();
+        private Map<String, String> configs = new LinkedHashMap<>();
 
         public Data() {
             setParameters(new Parameters());
@@ -486,6 +533,14 @@ public class AutomationEnvironment {
         public void setVars(Map<String, String> vars) {
             this.vars = vars;
         }
+
+        public Map<String, String> getConfigs() {
+            return configs;
+        }
+
+        public void setConfigs(Map<String, String> configs) {
+            this.configs = configs;
+        }
     }
 
     public static class Parameters extends AutomationData {
@@ -493,6 +548,7 @@ public class AutomationEnvironment {
         private boolean failOnWarning;
         private boolean progressToStdout = true;
         private boolean continueOnFailure = false;
+        private int maxDuration;
 
         public Parameters() {}
 
@@ -524,6 +580,10 @@ public class AutomationEnvironment {
             return progressToStdout;
         }
 
+        public int getMaxDuration() {
+            return maxDuration;
+        }
+
         public void setFailOnError(boolean failOnError) {
             this.failOnError = failOnError;
         }
@@ -538,6 +598,10 @@ public class AutomationEnvironment {
 
         public void setProgressToStdout(boolean progressToStdout) {
             this.progressToStdout = progressToStdout;
+        }
+
+        public void setMaxDuration(int maxDuration) {
+            this.maxDuration = Math.max(0, maxDuration);
         }
     }
 

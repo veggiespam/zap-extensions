@@ -33,6 +33,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -201,6 +202,11 @@ public class ExtensionReports extends ExtensionAdaptor {
     public static boolean isIncluded(ReportData reportData, AlertNode alertNode) {
         Alert alert = alertNode.getUserObject();
         if (alert == null) {
+            return false;
+        }
+        // Mirrors core ExtensionAlert#isInvalid: alerts without an HttpMessage or URI are
+        // not well-formed and break templates that reference message fields directly.
+        if (alert.getMessage() == null || alert.getUri().isEmpty()) {
             return false;
         }
         String uri = alert.getUri();
@@ -392,10 +398,13 @@ public class ExtensionReports extends ExtensionAdaptor {
                 }
             }
 
+            Instant currentDateTime = Instant.now();
             synchronized (SIMPLE_DATE_FORMAT) {
                 context.setVariable(
-                        "generatedString", SIMPLE_DATE_FORMAT.format(System.currentTimeMillis()));
+                        "generatedString",
+                        SIMPLE_DATE_FORMAT.format(currentDateTime.toEpochMilli()));
             }
+            context.setVariable("created", currentDateTime.toString());
             context.setVariable("zapVersion", Constant.PROGRAM_VERSION);
             context.setVariable("programName", Constant.PROGRAM_NAME_SHORT);
 
@@ -445,8 +454,7 @@ public class ExtensionReports extends ExtensionAdaptor {
                 reportFilename += ".pdf";
                 File pdfFile = new File(reportFilename);
                 try (OutputStream outputStream = new FileOutputStream(pdfFile)) {
-                    ITextRenderer renderer = new ITextRenderer();
-                    renderer.setDocument(file);
+                    ITextRenderer renderer = new ITextRenderer(file);
                     renderer.layout();
                     try {
                         renderer.createPDF(outputStream);

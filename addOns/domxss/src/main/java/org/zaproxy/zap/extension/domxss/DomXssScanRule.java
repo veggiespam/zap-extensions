@@ -132,6 +132,7 @@ public class DomXssScanRule extends AbstractAppParamPlugin {
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A07_XSS,
                                 CommonAlertTag.WSTG_V42_CLNT_01_DOM_XSS));
@@ -222,7 +223,9 @@ public class DomXssScanRule extends AbstractAppParamPlugin {
         return browser == Browser.FIREFOX
                 || browser == Browser.FIREFOX_HEADLESS
                 || browser == Browser.CHROME
-                || browser == Browser.CHROME_HEADLESS;
+                || browser == Browser.CHROME_HEADLESS
+                || browser == Browser.EDGE
+                || browser == Browser.EDGE_HEADLESS;
     }
 
     Browser getBrowser() {

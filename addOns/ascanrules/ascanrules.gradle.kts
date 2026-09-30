@@ -13,7 +13,7 @@ zapAddOn {
         dependencies {
             addOns {
                 register("commonlib") {
-                    version.set(">= 1.32.0 & < 2.0.0")
+                    version.set(">= 1.40.0 & < 2.0.0")
                 }
                 register("network") {
                     version.set(">= 0.3.0")
@@ -32,7 +32,7 @@ zapAddOn {
                 dependencies {
                     addOns {
                         register("custompayloads") {
-                            version.set(">= 0.9.0 & < 1.0.0")
+                            version.set(">= 0.15.0 & < 1.0.0")
                         }
                     }
                 }
@@ -41,17 +41,14 @@ zapAddOn {
     }
 }
 
-tasks.named("compileJava") {
-    mustRunAfter(parent!!.childProjects.get("oast")!!.tasks.named("enhance"))
-}
-
 dependencies {
     zapAddOn("commonlib")
     zapAddOn("custompayloads")
     zapAddOn("network")
     zapAddOn("oast")
 
-    implementation("org.bitbucket.mstrobel:procyon-compilertools:0.6.0")
+    implementation(libs.ascanrules.procyonCompilerTools)
+    implementation(libs.ascanrules.rhino)
 
     testImplementation(parent!!.childProjects.get("commonlib")!!.sourceSets.test.get().output)
     testImplementation(project(":testutils"))

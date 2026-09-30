@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.script.ScriptEngine;
@@ -43,8 +44,10 @@ import javax.swing.JToolBar;
 import net.htmlparser.jericho.Source;
 import net.sf.json.JSONObject;
 import org.apache.commons.httpclient.URI;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.openqa.selenium.WebDriver;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.control.Control.Mode;
@@ -77,7 +80,9 @@ import org.zaproxy.zap.extension.zest.internal.DefaultRequestValueReplacer;
 import org.zaproxy.zap.extension.zest.internal.NoopRequestValueReplacer;
 import org.zaproxy.zap.extension.zest.internal.RequestValueReplacer;
 import org.zaproxy.zap.extension.zest.internal.ScriptReorderer;
+import org.zaproxy.zap.extension.zest.internal.ZestScriptMerger;
 import org.zaproxy.zap.extension.zest.menu.ZestMenuManager;
+import org.zaproxy.zap.utils.ThreadUtils;
 import org.zaproxy.zap.utils.ZapXmlConfiguration;
 import org.zaproxy.zap.view.ZapToggleButton;
 import org.zaproxy.zest.core.v1.ZestActionFail;
@@ -112,6 +117,11 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
 
     public static final String HTTP_HEADER_X_SECURITY_PROXY = "X-Security-Proxy";
     public static final String VALUE_RECORD = "record";
+
+    private static final String ERROR_CLIENT = "zest.dialog.script.error.client";
+    private static final String THREAD_PREFIX = "ZAP-client-browser-";
+
+    private static final int ZEST_CLIENT_RECORDER_INITIATOR = -73;
 
     private static final Logger LOGGER = LogManager.getLogger(ExtensionZest.class);
 
@@ -153,8 +163,8 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
     private ScriptReorderer scriptReorderer;
 
     private ExtensionNetwork extensionNetwork;
-    private Method displayScriptMethod;
-    private Method selectNodeMethod;
+
+    private int threadId = 1;
 
     public ExtensionZest() {
         super(NAME);
@@ -226,25 +236,6 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
             this.getExtScript().getScriptUI().addRenderer(ZestElementWrapper.class, renderer);
             this.getExtScript().getScriptUI().addRenderer(ZestScriptWrapper.class, renderer);
             this.getExtScript().getScriptUI().disableScriptDialog(ZestScriptWrapper.class);
-        }
-        try {
-            displayScriptMethod =
-                    this.getExtScript()
-                            .getScriptUI()
-                            .getClass()
-                            .getDeclaredMethod("displayScript", ScriptWrapper.class, boolean.class);
-        } catch (Exception e) {
-            LOGGER.debug("Unable to find displayScript method with allowFocus", e);
-        }
-        try {
-            selectNodeMethod =
-                    this.getExtScript()
-                            .getScriptUI()
-                            .getClass()
-                            .getDeclaredMethod(
-                                    "selectNode", ScriptNode.class, boolean.class, boolean.class);
-        } catch (Exception e) {
-            LOGGER.debug("Unable to find selectNode method with allowFocus", e);
         }
     }
 
@@ -346,7 +337,7 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
         // Convert zest scripts into "plain" scripts
         for (ScriptType type : this.getExtScript().getScriptTypes()) {
             for (ScriptWrapper script : this.getExtScript().getScripts(type)) {
-                if (script.getEngineName().equals(ZestScriptEngineFactory.NAME)) {
+                if (ZestScriptEngineFactory.NAME.equals(script.getEngineName())) {
                     ScriptNode node = this.getExtScript().getTreeModel().getNodeForScript(script);
                     if (script instanceof ZestScriptWrapper) {
                         ZestScriptWrapper zsw = (ZestScriptWrapper) script;
@@ -591,7 +582,7 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
     public void display(
             ZestScriptWrapper script, ScriptNode node, boolean expand, boolean allowFocus) {
         if (View.isInitialised() && this.getExtScript().getScriptUI() != null) {
-            selectNode(node, expand, allowFocus);
+            getExtScript().getScriptUI().selectNode(node, expand, allowFocus);
             displayScript(script, allowFocus);
         }
     }
@@ -631,28 +622,7 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
     }
 
     private void displayScript(ZestScriptWrapper sw, boolean allowFocus) {
-        if (displayScriptMethod != null) {
-            try {
-                displayScriptMethod.invoke(this.getExtScript().getScriptUI(), sw, allowFocus);
-                return;
-            } catch (Exception e) {
-                LOGGER.debug("Error while invoking displayScript Method with allowFocus", e);
-            }
-        }
-        this.getExtScript().getScriptUI().displayScript(sw);
-    }
-
-    private void selectNode(ScriptNode node, boolean expand, boolean allowFocus) {
-        if (selectNodeMethod != null) {
-            try {
-                selectNodeMethod.invoke(
-                        this.getExtScript().getScriptUI(), node, expand, allowFocus);
-                return;
-            } catch (Exception e) {
-                LOGGER.debug("Error while invoking selectNode Method with allowFocus", e);
-            }
-        }
-        this.getExtScript().getScriptUI().selectNode(node, expand);
+        getExtScript().getScriptUI().displayScript(sw, allowFocus);
     }
 
     public List<ScriptNode> getAllZestScriptNodes() {
@@ -1588,6 +1558,9 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
     }
 
     public ZestElement convertStringToElement(String string) {
+        if (StringUtils.isBlank(string)) {
+            return null;
+        }
         return "YAML".equals(getParam().getScriptFormat())
                 ? ZestYaml.fromString(string)
                 : ZestJSON.fromString(string);
@@ -1597,6 +1570,47 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
         return "YAML".equals(getParam().getScriptFormat())
                 ? ZestYaml.toString(element)
                 : ZestJSON.toString(element);
+    }
+
+    /**
+     * @since 48.8.0
+     */
+    public void startClientRecording(ScriptNode scriptNode, String browserName, String uri) {
+        if (!isClientAccessible()) {
+            View.getSingleton().showWarningDialog(Constant.messages.getString(ERROR_CLIENT));
+            return;
+        }
+        this.addToParent(
+                scriptNode,
+                new ZestClientLaunch(
+                        ZestStatementFromJson.WINDOW_HANDLE_BROWSER_EXTENSION,
+                        browserName,
+                        uri.toLowerCase(Locale.ROOT),
+                        false),
+                false,
+                false);
+        this.startClientRecording(uri);
+        Thread browserThread =
+                new Thread(() -> launchBrowser(uri, browserName), THREAD_PREFIX + threadId++);
+        browserThread.start();
+    }
+
+    private void launchBrowser(String url, String browserName) {
+        ExtensionSelenium extSelenium =
+                Control.getSingleton().getExtensionLoader().getExtension(ExtensionSelenium.class);
+        try {
+            WebDriver wd =
+                    extSelenium.getProxiedBrowserByName(
+                            ZEST_CLIENT_RECORDER_INITIATOR, browserName, null);
+            wd.get(url);
+        } catch (RuntimeException e) {
+            String msg =
+                    extSelenium.getWarnMessageFailedToStart(
+                            browserName.toLowerCase(Locale.ROOT), e);
+            cancelScriptRecording();
+            stopClientRecording();
+            View.getSingleton().showWarningDialog(msg);
+        }
     }
 
     public void startClientRecording(String uri) {
@@ -1728,6 +1742,37 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
         return zestClientHelper.isClientActive();
     }
 
+    /**
+     * Returns a single script wrapper that, when invoked, runs the given chain of scripts. Callers
+     * (e.g. scripts automation) use this so they do not need to know how the chain is executed;
+     * this implementation builds one runnable script from the chain (shared browser session).
+     * Accepts {@code ScriptWrapper} so callers can invoke via reflection without a hard dependency
+     * on Zest.
+     *
+     * <p><strong>Internal integration method:</strong> this is not part of Zest's public API and
+     * may change without notice.
+     *
+     * @param scripts list of Zest script wrappers in chain order (must be {@link
+     *     ZestScriptWrapper})
+     * @param runName name for the chain script (e.g. for logging)
+     * @return a script wrapper that runs the chain when invoked
+     * @throws IllegalArgumentException if scripts is null, empty, or contains non-Zest wrappers
+     */
+    public ScriptWrapper getChainScript(List<ScriptWrapper> scripts, String runName) {
+        if (scripts == null || scripts.isEmpty()) {
+            throw new IllegalArgumentException("Scripts list must not be null or empty");
+        }
+        List<ZestScriptWrapper> zestWrappers = new ArrayList<>(scripts.size());
+        for (ScriptWrapper sw : scripts) {
+            if (!(sw instanceof ZestScriptWrapper)) {
+                throw new IllegalArgumentException(
+                        "All scripts must be ZestScriptWrapper: " + sw.getName());
+            }
+            zestWrappers.add((ZestScriptWrapper) sw);
+        }
+        return ZestScriptMerger.mergeScripts(zestWrappers, runName, this::convertElementToString);
+    }
+
     /**/
     @Override
     public void preInvoke(ScriptWrapper script) {
@@ -1799,11 +1844,14 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
 
             this.getZestTreeModel().addScript(parentNode, zsw);
 
-            if (display && View.isInitialised()) {
-                this.updated(parentNode);
-                this.display(zsw, parentNode, true);
-                this.dialogManager.showZestEditScriptDialog(parentNode, zsw, false);
-                this.getZestResultsPanel().getModel().clear();
+            if (display && hasView()) {
+                ThreadUtils.invokeAndWaitHandled(
+                        () -> {
+                            this.updated(parentNode);
+                            this.display(zsw, parentNode, true);
+                            this.dialogManager.showZestEditScriptDialog(parentNode, zsw, false);
+                            this.getZestResultsPanel().getModel().clear();
+                        });
             }
         }
     }

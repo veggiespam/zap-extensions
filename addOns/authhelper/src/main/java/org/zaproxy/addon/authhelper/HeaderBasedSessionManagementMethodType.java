@@ -23,6 +23,7 @@ import java.awt.GridBagLayout;
 import java.lang.reflect.Method;
 import java.net.HttpCookie;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.sf.json.JSONObject;
-import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.Cookie;
@@ -414,13 +414,14 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
                 (HeaderBasedSessionManagementMethod) sessionMethod;
 
         List<String> list = new ArrayList<>();
+        Base64.Encoder encoder = Base64.getEncoder();
         for (Pair<String, String> pair : method.headerConfigs) {
             list.add(
-                    Base64.encodeBase64String(pair.first.getBytes())
+                    encoder.encodeToString(pair.first.getBytes())
                             + ":"
                             + (pair.second == null
                                     ? ""
-                                    : Base64.encodeBase64String(pair.second.getBytes())));
+                                    : encoder.encodeToString(pair.second.getBytes())));
         }
         config.setProperty(CONTEXT_CONFIG_SESSION_MGMT_HEADER, list);
     }
@@ -437,14 +438,15 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
                 (HeaderBasedSessionManagementMethod) sessionMethod;
 
         List<Pair<String, String>> headerConfigs = new ArrayList<>();
+        Base64.Decoder decoder = Base64.getDecoder();
         for (Object entry : config.getList(CONTEXT_CONFIG_SESSION_MGMT_HEADER)) {
             String str = entry.toString();
             int cIndex = str.indexOf(":");
             if (cIndex > 0) {
                 headerConfigs.add(
                         new Pair<>(
-                                new String(Base64.decodeBase64(str.substring(0, cIndex))),
-                                new String(Base64.decodeBase64(str.substring(cIndex + 1)))));
+                                new String(decoder.decode(str.substring(0, cIndex))),
+                                new String(decoder.decode(str.substring(cIndex + 1)))));
             }
         }
         method.setHeaderConfigs(headerConfigs);
@@ -456,7 +458,7 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
     @Override
     public ApiDynamicActionImplementor getSetMethodForContextApiAction() {
         return new ApiDynamicActionImplementor(
-                API_METHOD_NAME, new String[] {PARAM_HEADERS}, null) {
+                API_METHOD_NAME, new String[0], new String[] {PARAM_HEADERS}) {
 
             @Override
             public void handleAction(JSONObject params) throws ApiException {
@@ -464,9 +466,12 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
                         ApiUtils.getContextByParamId(params, SessionManagementAPI.PARAM_CONTEXT_ID);
                 HeaderBasedSessionManagementMethod smm =
                         createSessionManagementMethod(context.getId());
-                // Headers are newline separated key: value pairs
-                String[] headerArray = params.getString(PARAM_HEADERS).split("\n");
-                smm.setHeaderConfigs(getHeaderPairs(headerArray));
+                String headersStr = params.optString(PARAM_HEADERS, "");
+                if (!headersStr.isBlank()) {
+                    // Headers are newline separated key: value pairs
+                    String[] headerArray = headersStr.split("\n");
+                    smm.setHeaderConfigs(getHeaderPairs(headerArray));
+                }
                 context.setSessionManagementMethod(smm);
             }
         };
@@ -517,11 +522,6 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
                             Constant.messages.getString(
                                     "authhelper.session.method.header.error.value"));
                 }
-            }
-            if (headers.isEmpty()) {
-                throw new IllegalStateException(
-                        Constant.messages.getString(
-                                "authhelper.session.method.header.error.headers"));
             }
         }
 

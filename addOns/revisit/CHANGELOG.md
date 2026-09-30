@@ -5,8 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 ### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [6] - 2025-06-20
+### Changed
 - Update minimum ZAP version to 2.16.0.
 - Maintenance changes.
+- Minor fix in help content.
 
 ## [5] - 2023-10-23
 ### Changed
@@ -38,5 +43,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First version
 
+[6]: https://github.com/zaproxy/zap-extensions/releases/revisit-v6
 [5]: https://github.com/zaproxy/zap-extensions/releases/revisit-v5
 [4]: https://github.com/zaproxy/zap-extensions/releases/revisit-v4

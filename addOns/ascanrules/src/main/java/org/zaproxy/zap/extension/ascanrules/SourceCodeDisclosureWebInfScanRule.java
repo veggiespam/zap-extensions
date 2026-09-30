@@ -24,6 +24,7 @@ import com.strobel.decompiler.DecompilerSettings;
 import com.strobel.decompiler.PlainTextOutput;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
@@ -64,6 +65,7 @@ public class SourceCodeDisclosureWebInfScanRule extends AbstractHostPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG,
                                 CommonAlertTag.WSTG_V42_CONF_05_ENUMERATE_INFRASTRUCTURE));
@@ -267,8 +269,8 @@ public class SourceCodeDisclosureWebInfScanRule extends AbstractHostPlugin
                 javaClassesFound.remove(classname);
                 javaClassesHandled.add(classname);
             }
-        } catch (Exception e) {
-            LOGGER.error(
+        } catch (IOException e) {
+            LOGGER.debug(
                     "Error scanning a Host for Source Code Disclosure via the WEB-INF folder: {}",
                     e.getMessage(),
                     e);

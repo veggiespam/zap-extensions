@@ -24,19 +24,38 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.StringLayout;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Configurator;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.logging.log4j.core.config.Property;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.parosproxy.paros.Constant;
 import org.zaproxy.addon.commonlib.Constants;
+import org.zaproxy.zap.extension.selenium.Browser;
 import org.zaproxy.zap.utils.I18N;
 import org.zaproxy.zap.utils.ZapXmlConfiguration;
 
@@ -61,6 +80,11 @@ class AjaxSpiderParamUnitTest {
         param = new AjaxSpiderParam();
         configuration = new ZapXmlConfiguration();
         param.load(configuration);
+    }
+
+    @AfterEach
+    void cleanUp() throws Exception {
+        Configurator.reconfigure(getClass().getResource("/log4j2-test.properties").toURI());
     }
 
     @Test
@@ -198,6 +222,85 @@ class AjaxSpiderParamUnitTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldUpdateLogoutAvoidanceKeyOnConfigUpdate(boolean logoutAvoidance) {
+        // Given
+        configuration = new ZapXmlConfiguration();
+        configuration.setProperty("ajaxSpider[@version]", 6);
+        configuration.setProperty("logoutAvoidance", logoutAvoidance);
+        // When
+        param.load(configuration);
+        // Then
+        assertThat(param.isLogoutAvoidance(), is(equalTo(logoutAvoidance)));
+        assertThat(configuration.getProperty("logoutAvoidance"), is(nullValue()));
+        assertThat(
+                configuration.getBoolean("ajaxSpider.logoutAvoidance"),
+                is(equalTo(logoutAvoidance)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldLoadLogoutAvoidanceFromConfig(boolean logoutAvoidance) {
+        // Given
+        configuration.setProperty("ajaxSpider.logoutAvoidance", logoutAvoidance);
+        // When
+        param.load(configuration);
+        // Then
+        assertThat(param.isLogoutAvoidance(), is(equalTo(logoutAvoidance)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldSetAndPersistLogoutAvoidance(boolean logoutAvoidance) throws Exception {
+        // Given / When
+        param.setLogoutAvoidance(logoutAvoidance);
+        // Then
+        assertThat(param.isLogoutAvoidance(), is(equalTo(logoutAvoidance)));
+        assertThat(
+                configuration.getBoolean("ajaxSpider.logoutAvoidance"),
+                is(equalTo(logoutAvoidance)));
+    }
+
+    @ParameterizedTest
+    @EnumSource(Browser.class)
+    void shouldLoadKnownBrowserIds(Browser configBrowser) {
+        // Given
+        String browserId = configBrowser.getId();
+        configuration.setProperty("ajaxSpider.browserId", browserId);
+        List<String> warns = registerLogEvents(Level.WARN);
+        // When
+        param.load(configuration);
+        // Then
+        assertThat(param.getBrowserId(), is(equalTo(browserId)));
+        assertThat(warns, is(empty()));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    void shouldUseDefaultBrowserIdWithNoneOrEmpty(String configBrowserId) {
+        // Given
+        configuration.setProperty("ajaxSpider.browserId", configBrowserId);
+        List<String> warns = registerLogEvents(Level.WARN);
+        // When
+        param.load(configuration);
+        // Then
+        assertThat(param.getBrowserId(), is(equalTo(AjaxSpiderParam.DEFAULT_BROWSER_ID)));
+        assertThat(warns, is(empty()));
+    }
+
+    @Test
+    void shouldUseDefaultBrowserIdWithUnknown() {
+        // Given
+        configuration.setProperty("ajaxSpider.browserId", "Unknown");
+        List<String> warns = registerLogEvents(Level.WARN);
+        // When
+        param.load(configuration);
+        // Then
+        assertThat(param.getBrowserId(), is(equalTo(AjaxSpiderParam.DEFAULT_BROWSER_ID)));
+        assertThat(warns, contains(startsWith("Unknown browser")));
+    }
+
     private void persistAllowedResource(int idx, String regex, Boolean enabled) {
         var baseKey = "ajaxSpider.allowedResources.allowedResource(" + idx + ").";
         if (regex != null) {
@@ -215,5 +318,48 @@ class AjaxSpiderParamUnitTest {
 
     private static AllowedResource allowedResource(String regex, boolean enabled) {
         return new AllowedResource(AllowedResource.createDefaultPattern(regex), enabled);
+    }
+
+    private static List<String> registerLogEvents(Level level) {
+        List<String> logEvents = new ArrayList<>();
+        TestLogAppender logAppender = new TestLogAppender(logEvents::add);
+        LoggerContext context = LoggerContext.getContext();
+        LoggerConfig rootLoggerconfig = context.getConfiguration().getRootLogger();
+        rootLoggerconfig.getAppenders().values().forEach(context.getRootLogger()::removeAppender);
+        rootLoggerconfig.addAppender(logAppender, null, null);
+        rootLoggerconfig.setLevel(level);
+        context.updateLoggers();
+        return logEvents;
+    }
+
+    private static class TestLogAppender extends AbstractAppender {
+
+        private static final Property[] NO_PROPERTIES = {};
+
+        private final Consumer<String> logConsumer;
+
+        public TestLogAppender(Consumer<String> logConsumer) {
+            this("%m%n", logConsumer);
+        }
+
+        public TestLogAppender(String pattern, Consumer<String> logConsumer) {
+            super(
+                    "TestLogAppender",
+                    null,
+                    PatternLayout.newBuilder()
+                            .withDisableAnsi(true)
+                            .withCharset(StandardCharsets.UTF_8)
+                            .withPattern(pattern)
+                            .build(),
+                    true,
+                    NO_PROPERTIES);
+            this.logConsumer = logConsumer;
+            start();
+        }
+
+        @Override
+        public void append(LogEvent event) {
+            logConsumer.accept(((StringLayout) getLayout()).toSerializable(event));
+        }
     }
 }

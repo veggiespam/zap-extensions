@@ -54,7 +54,13 @@ class DirectoryBrowsingScanRuleUnitTest extends ActiveScannerTest<DirectoryBrows
         // Then
         assertThat(cwe, is(equalTo(548)));
         assertThat(wasc, is(equalTo(48)));
-        assertThat(tags.size(), is(equalTo(6)));
+        assertThat(tags.size(), is(equalTo(10)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.API_2023_API8_SEC_MISCONFIG.getTag()),
+                is(equalTo(true)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A01_BROKEN_AC.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A01_BROKEN_AC.getTag()),
                 is(equalTo(true)));
@@ -62,15 +68,25 @@ class DirectoryBrowsingScanRuleUnitTest extends ActiveScannerTest<DirectoryBrows
                 tags.containsKey(CommonAlertTag.OWASP_2017_A05_BROKEN_AC.getTag()),
                 is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.API.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(PolicyTag.QA_CICD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_STD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_FULL.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.PENTEST.getTag()), is(equalTo(true)));
+        assertThat(
+                tags.get(CommonAlertTag.API_2023_API8_SEC_MISCONFIG.getTag()),
+                is(equalTo(CommonAlertTag.API_2023_API8_SEC_MISCONFIG.getValue())));
+        assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A01_BROKEN_AC.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A01_BROKEN_AC.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A01_BROKEN_AC.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A01_BROKEN_AC.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2017_A05_BROKEN_AC.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2017_A05_BROKEN_AC.getValue())));
+        assertThat(
+                tags.get(CommonAlertTag.SYSTEMIC.getTag()),
+                is(equalTo(CommonAlertTag.SYSTEMIC.getValue())));
     }
 
     @Test
@@ -81,18 +97,15 @@ class DirectoryBrowsingScanRuleUnitTest extends ActiveScannerTest<DirectoryBrows
         assertThat(alerts.size(), is(equalTo(1)));
         Alert alert = alerts.get(0);
         Map<String, String> tags = alert.getTags();
-        assertThat(tags.size(), is(equalTo(7)));
+        assertThat(tags.size(), is(equalTo(11)));
         assertThat(tags, hasKey("CWE-548"));
         assertThat(tags, hasKey(CommonAlertTag.OWASP_2021_A01_BROKEN_AC.getTag()));
+        assertThat(tags, hasKey(CommonAlertTag.OWASP_2025_A01_BROKEN_AC.getTag()));
+        assertThat(tags, hasKey(CommonAlertTag.API_2023_API8_SEC_MISCONFIG.getTag()));
         assertThat(tags, hasKey(CommonAlertTag.OWASP_2017_A05_BROKEN_AC.getTag()));
+        assertThat(tags, hasKey(CommonAlertTag.SYSTEMIC.getTag()));
         assertThat(alert.getRisk(), is(equalTo(Alert.RISK_MEDIUM)));
         assertThat(alert.getConfidence(), is(equalTo(Alert.CONFIDENCE_MEDIUM)));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 
     @Test

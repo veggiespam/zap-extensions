@@ -1,13 +1,27 @@
 import net.ltgt.gradle.errorprone.errorprone
 import org.zaproxy.gradle.spotless.ValidateImports
 
+buildscript {
+    dependencies {
+        constraints {
+            classpath("com.fasterxml.jackson:jackson-bom") {
+                version {
+                    // Match org.zaproxy.add-on version.
+                    require("2.18.2")
+                }
+                because("prevents JAR hell between org.zaproxy.add-on and com.github.node-gradle.node")
+            }
+        }
+    }
+}
+
 plugins {
-    id("com.diffplug.spotless")
-    id("org.zaproxy.common") version "0.5.0" apply false
-    id("com.github.ben-manes.versions") version "0.52.0"
-    id("org.sonarqube") version "4.3.0.3225"
-    id("net.ltgt.errorprone") version "4.1.0"
-    id("io.freefair.lombok") version "8.12.2"
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.zaproxy.common) apply false
+    alias(libs.plugins.sonarqube)
+    alias(libs.plugins.errorprone)
+    alias(libs.plugins.lombok)
+    alias(libs.plugins.node.gradle)
 }
 
 apply(from = "$rootDir/gradle/ci.gradle.kts")
@@ -17,12 +31,20 @@ val validateImports =
         mapOf(
             "import org.apache.commons.lang." to
                 "Import/use classes from Commons Lang 3, instead of Lang 2.",
+            "import org.apache.commons.codec.binary.Base64" to
+                "Use java.util.Base64 instead.",
+            "import org.apache.commons.codec.binary.Hex" to
+                "Use java.util.HexFormat instead.",
         ),
     )
 
+node {
+    version = libs.versions.node.get()
+    download = true
+}
+
 allprojects {
     apply(plugin = "com.diffplug.spotless")
-    apply(plugin = "com.github.ben-manes.versions")
     apply(plugin = "net.ltgt.errorprone")
     apply(plugin = "io.freefair.lombok")
 
@@ -45,12 +67,12 @@ allprojects {
 
     project.plugins.withType(JavaPlugin::class) {
         dependencies {
-            "errorprone"("com.google.errorprone:error_prone_core:2.36.0")
+            "errorprone"("com.google.errorprone:error_prone_core:2.42.0")
 
             // Include annotations used by Log4j2 Core library to avoid compiler warnings.
-            "compileOnly"("biz.aQute.bnd:biz.aQute.bnd.annotation:6.4.1")
+            "compileOnly"("biz.aQute.bnd:biz.aQute.bnd.annotation:7.4.0")
             "compileOnly"("com.google.code.findbugs:findbugs-annotations:3.0.1")
-            "testCompileOnly"("biz.aQute.bnd:biz.aQute.bnd.annotation:6.4.1")
+            "testCompileOnly"("biz.aQute.bnd:biz.aQute.bnd.annotation:7.4.0")
             "testCompileOnly"("com.google.code.findbugs:findbugs-annotations:3.0.1")
         }
 

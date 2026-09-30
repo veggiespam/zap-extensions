@@ -19,6 +19,7 @@
  */
 package org.zaproxy.zap.extension.ascanrulesBeta;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,6 +57,7 @@ public class BackupFileDisclosureScanRule extends AbstractAppPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2017_A03_DATA_EXPOSED,
                                 CommonAlertTag.WSTG_V42_CONF_04_BACKUP_FILES));
@@ -392,8 +394,8 @@ public class BackupFileDisclosureScanRule extends AbstractAppPlugin
                 LOGGER.debug(
                         "The URI has no filename component, so there is not much point in looking for a corresponding backup file!");
             }
-        } catch (Exception e) {
-            LOGGER.error(
+        } catch (IOException e) {
+            LOGGER.debug(
                     "Error scanning a request for Backup File Disclosure: {}", e.getMessage(), e);
         }
     }
@@ -441,7 +443,7 @@ public class BackupFileDisclosureScanRule extends AbstractAppPlugin
         return response.length == 0;
     }
 
-    private void findBackupFile(HttpMessage originalMessage) throws Exception {
+    private void findBackupFile(HttpMessage originalMessage) throws IOException {
 
         try {
             boolean gives404s = true;
@@ -796,8 +798,8 @@ public class BackupFileDisclosureScanRule extends AbstractAppPlugin
                 }
             }
 
-        } catch (Exception e) {
-            LOGGER.error(
+        } catch (IOException e) {
+            LOGGER.debug(
                     "Some error occurred when looking for a backup file for '{}'",
                     originalMessage.getRequestHeader().getURI(),
                     e);

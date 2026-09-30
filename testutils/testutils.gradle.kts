@@ -5,8 +5,6 @@ plugins {
 
 description = "Common test utilities for the add-ons."
 
-val nanohttpdVersion = "2.3.1"
-
 configurations {
     "compileClasspath" {
         exclude(group = "log4j")
@@ -19,15 +17,22 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 dependencies {
-    compileOnly("org.zaproxy:zap:2.16.0")
+    compileOnly(libs.testutils.zap)
+
+    implementation(project(":testutilscore"))
     implementation(project(":addOns:network"))
-    implementation("org.apache.httpcomponents.client5:httpclient5:5.2.1")
+    implementation(libs.testutils.httpclient5)
 
-    api("org.hamcrest:hamcrest-library:2.2")
-    api("org.junit.jupiter:junit-jupiter:5.10.1")
-    runtimeOnly("org.junit.platform:junit-platform-launcher")
-    api("org.mockito:mockito-junit-jupiter:5.7.0")
+    api(libs.testutils.nanohttpd.webserver)
+    api(libs.testutils.nanohttpd.websocket)
+}
 
-    api("org.nanohttpd:nanohttpd-webserver:$nanohttpdVersion")
-    api("org.nanohttpd:nanohttpd-websocket:$nanohttpdVersion")
+tasks.withType<Test>().configureEach {
+    systemProperties.putAll(
+        mapOf(
+            "wdm.chromeDriverVersion" to "108.0.5359.71",
+            "wdm.geckoDriverVersion" to "0.36.0",
+            "wdm.forceCache" to "true",
+        ),
+    )
 }

@@ -24,9 +24,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.parosproxy.paros.Constant;
 import org.zaproxy.zap.common.VersionedAbstractParam;
 import org.zaproxy.zap.extension.api.ZapApiIgnore;
-import org.zaproxy.zap.extension.quickstart.ajaxspider.AjaxSpiderExplorer;
+import org.zaproxy.zap.extension.selenium.Browser;
+import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
 
 public class QuickStartParam extends VersionedAbstractParam {
 
@@ -50,7 +52,10 @@ public class QuickStartParam extends VersionedAbstractParam {
 
     private static final String BLANK_START_PAGE = "BLANK";
 
-    private static final String DEFAULT_BROWSER = "Firefox"; // The default default ;)
+    // The default default ;)
+    private static final String DEFAULT_BROWSER_ID = Browser.FIREFOX.getId();
+
+    private static final String DEFAULT_SPIDER_BROWSER_ID = Browser.FIREFOX_HEADLESS.getId();
 
     private static final String PARAM_AJAX_BASE_KEY = PARAM_BASE_KEY + ".ajax";
 
@@ -61,7 +66,13 @@ public class QuickStartParam extends VersionedAbstractParam {
     private static final String PARAM_AJAX_SPIDER_DEFAULT_BROWSER =
             PARAM_AJAX_BASE_KEY + ".browser";
 
+    private static final String PARAM_MODERN_BASE_KEY = PARAM_BASE_KEY + ".modern";
+
+    private static final String PARAM_MODERN_SPIDER_TYPE = PARAM_MODERN_BASE_KEY + ".type";
+
     private static final String PARAM_CLEARED_NEWS_ITEM = PARAM_BASE_KEY + ".clearedNews";
+
+    private static final String PARAM_SCAN_POLICY_NAME = PARAM_BASE_KEY + ".scanPolicyName";
 
     /**
      * The current version of the configurations. Used to keep track of configuration changes
@@ -72,7 +83,7 @@ public class QuickStartParam extends VersionedAbstractParam {
      * @see #CONFIG_VERSION_KEY
      * @see #updateConfigsImpl(int)
      */
-    private static final int CURRENT_CONFIG_VERSION = 1;
+    private static final int CURRENT_CONFIG_VERSION = 3;
 
     /**
      * The configuration key to read/write the version of the configurations.
@@ -85,11 +96,13 @@ public class QuickStartParam extends VersionedAbstractParam {
     private List<Object> recentUrls = new ArrayList<>(0);
     private int maxRecentUrls;
     private String launchStartPage;
-    private String launchDefaultBrowser = DEFAULT_BROWSER;
+    private String launchDefaultBrowser = DEFAULT_BROWSER_ID;
 
     private String ajaxSpiderSelection;
     private String ajaxSpiderDefaultBrowser;
+    private String modernSpiderType;
     private String clearedNewsItem;
+    private String scanPolicyName;
 
     @Override
     protected void parseImpl() {
@@ -114,7 +127,7 @@ public class QuickStartParam extends VersionedAbstractParam {
             LOGGER.error("Failed to load the \"Start Page\" configuration", e);
         }
         try {
-            launchDefaultBrowser = getConfig().getString(PARAM_DEFAULT_BROWSER, DEFAULT_BROWSER);
+            launchDefaultBrowser = getConfig().getString(PARAM_DEFAULT_BROWSER, DEFAULT_BROWSER_ID);
         } catch (Exception e) {
             LOGGER.error("Failed to load the \"Default Browser\" configuration", e);
         }
@@ -123,18 +136,35 @@ public class QuickStartParam extends VersionedAbstractParam {
                     getConfig()
                             .getString(
                                     PARAM_AJAX_SPIDER_SELECTION,
-                                    AjaxSpiderExplorer.Select.MODERN.name());
+                                    ModernSpiderPanel.Select.MODERN.name());
         } catch (Exception e) {
             LOGGER.error("Failed to load the ajax spider selection", e);
         }
         try {
             ajaxSpiderDefaultBrowser =
-                    getConfig().getString(PARAM_AJAX_SPIDER_DEFAULT_BROWSER, DEFAULT_BROWSER);
+                    getConfig()
+                            .getString(
+                                    PARAM_AJAX_SPIDER_DEFAULT_BROWSER, DEFAULT_SPIDER_BROWSER_ID);
         } catch (Exception e) {
             LOGGER.error("Failed to load the Ajax \"Default Browser\" configuration", e);
         }
         try {
+            modernSpiderType =
+                    getConfig()
+                            .getString(
+                                    PARAM_MODERN_SPIDER_TYPE,
+                                    Constant.messages.getString(
+                                            "quickstart.modern.option.clientspider"));
+        } catch (Exception e) {
+            LOGGER.error("Failed to load the modern spider type configuration", e);
+        }
+        try {
             clearedNewsItem = getConfig().getString(PARAM_CLEARED_NEWS_ITEM, "");
+        } catch (Exception e) {
+            LOGGER.error("Failed to load the cleared news item configuration", e);
+        }
+        try {
+            scanPolicyName = getConfig().getString(PARAM_SCAN_POLICY_NAME, "");
         } catch (Exception e) {
             LOGGER.error("Failed to load the cleared news item configuration", e);
         }
@@ -153,14 +183,45 @@ public class QuickStartParam extends VersionedAbstractParam {
     }
 
     @Override
+    @SuppressWarnings("fallthrough")
     protected void updateConfigsImpl(int fileVersion) {
         switch (fileVersion) {
             case -1:
                 // Previously unversioned
                 getConfig().clearProperty(PARAM_AJAX_SPIDER_ENABLED);
                 break;
+            case 1:
+                getConfig()
+                        .setProperty(
+                                PARAM_MODERN_SPIDER_TYPE,
+                                Constant.messages.getString(
+                                        "quickstart.modern.option.clientspider"));
+            // $FALL-THROUGH$
+            case 2:
+                migrateBrowserNameToId(PARAM_DEFAULT_BROWSER);
+                migrateBrowserNameToId(PARAM_AJAX_SPIDER_DEFAULT_BROWSER);
+                break;
             default:
         }
+    }
+
+    private void migrateBrowserNameToId(String configKey) {
+        String value = getConfig().getString(configKey, null);
+        if (value == null || value.isEmpty()) {
+            return;
+        }
+        for (Browser browser : Browser.values()) {
+            if (value.equals(browser.getId())) {
+                return;
+            }
+        }
+        for (Browser browser : Browser.values()) {
+            if (value.equals(ExtensionSelenium.getName(browser))) {
+                getConfig().setProperty(configKey, browser.getId());
+                return;
+            }
+        }
+        getConfig().clearProperty(configKey);
     }
 
     public String getLaunchStartPage() {
@@ -196,10 +257,16 @@ public class QuickStartParam extends VersionedAbstractParam {
         getConfig().setProperty(PARAM_START_PAGE, str);
     }
 
+    /**
+     * @return the id of the default browser for Manual Explore.
+     */
     public String getLaunchDefaultBrowser() {
         return launchDefaultBrowser;
     }
 
+    /**
+     * @param defaultBrowser the id of the default browser.
+     */
     public void setLaunchDefaultBrowser(String defaultBrowser) {
         this.launchDefaultBrowser = defaultBrowser;
         getConfig().setProperty(PARAM_DEFAULT_BROWSER, defaultBrowser);
@@ -225,13 +292,29 @@ public class QuickStartParam extends VersionedAbstractParam {
         QuickStartHelper.raiseOptionsChangedEvent();
     }
 
+    /**
+     * @return the id of the default browser for the Ajax/Client Spider.
+     */
     public String getAjaxSpiderDefaultBrowser() {
         return ajaxSpiderDefaultBrowser;
     }
 
+    /**
+     * @param ajaxSpiderDefaultBrowser the id of the default browser.
+     */
     public void setAjaxSpiderDefaultBrowser(String ajaxSpiderDefaultBrowser) {
         this.ajaxSpiderDefaultBrowser = ajaxSpiderDefaultBrowser;
         getConfig().setProperty(PARAM_AJAX_SPIDER_DEFAULT_BROWSER, ajaxSpiderDefaultBrowser);
+        QuickStartHelper.raiseOptionsChangedEvent();
+    }
+
+    public String getModernSpiderType() {
+        return modernSpiderType;
+    }
+
+    public void setModernSpiderType(String modernSpiderType) {
+        this.modernSpiderType = modernSpiderType;
+        getConfig().setProperty(PARAM_MODERN_SPIDER_TYPE, modernSpiderType);
         QuickStartHelper.raiseOptionsChangedEvent();
     }
 
@@ -248,6 +331,15 @@ public class QuickStartParam extends VersionedAbstractParam {
         }
         getConfig().setProperty(PARAM_RECENT_URLS, this.recentUrls);
         QuickStartHelper.raiseOptionsChangedEvent();
+    }
+
+    public String getScanPolicyName() {
+        return scanPolicyName;
+    }
+
+    public void setScanPolicyName(String scanPolicyName) {
+        this.scanPolicyName = scanPolicyName;
+        getConfig().setProperty(PARAM_SCAN_POLICY_NAME, scanPolicyName);
     }
 
     public String getClearedNewsItem() {

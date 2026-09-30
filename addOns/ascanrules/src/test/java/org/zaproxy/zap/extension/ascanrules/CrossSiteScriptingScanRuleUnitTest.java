@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.commons.text.StringEscapeUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -76,7 +77,10 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
         // Then
         assertThat(cwe, is(equalTo(79)));
         assertThat(wasc, is(equalTo(8)));
-        assertThat(tags.size(), is(equalTo(10)));
+        assertThat(tags.size(), is(equalTo(14)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A05_INJECTION.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A03_INJECTION.getTag()),
                 is(equalTo(true)));
@@ -84,12 +88,19 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
         assertThat(
                 tags.containsKey(CommonAlertTag.WSTG_V42_INPV_01_REFLECTED_XSS.getTag()),
                 is(equalTo(true)));
+        assertThat(tags.containsKey(CommonAlertTag.HIPAA.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(CommonAlertTag.PCI_DSS.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(PolicyTag.DEV_CICD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.DEV_STD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.DEV_FULL.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(PolicyTag.QA_CICD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_STD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_FULL.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.SEQUENCE.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.PENTEST.getTag()), is(equalTo(true)));
+        assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A05_INJECTION.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A05_INJECTION.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A03_INJECTION.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A03_INJECTION.getValue())));
@@ -107,12 +118,6 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
         List<Alert> alerts = rule.getExampleAlerts();
         // Then
         assertThat(alerts.size(), is(equalTo(1)));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 
     @Test
@@ -375,6 +380,46 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
     }
 
     @Test
+    void shouldReportXssInCommentWithFilteredScriptsAndOnerror()
+            throws NullPointerException, IOException {
+        String test = "/test/";
+        this.nano.addHandler(
+                new NanoServerHandler(test) {
+                    @Override
+                    protected Response serve(IHTTPSession session) {
+                        String name = getFirstParamValue(session, "name");
+                        String response;
+                        if (name != null) {
+                            // Strip out 'script' or 'onerror' ignoring the case
+                            name = name.replaceAll("(?i)script|onerror", "");
+                            response =
+                                    getHtml("InputInComment.html", new String[][] {{"name", name}});
+                        } else {
+                            response = getHtml("NoInput.html");
+                        }
+                        return newFixedLengthResponse(response);
+                    }
+                });
+
+        HttpMessage msg = this.getHttpMessage(test + "?name=test");
+
+        this.rule.init(msg, this.parent);
+
+        this.rule.scan();
+
+        assertThat(alertsRaised.size(), equalTo(1));
+        assertThat(
+                alertsRaised.get(0).getEvidence(),
+                equalTo("-->" + CrossSiteScriptingScanRule.B_MOUSE_ALERT + "<!--"));
+        assertThat(alertsRaised.get(0).getParam(), equalTo("name"));
+        assertThat(
+                alertsRaised.get(0).getAttack(),
+                equalTo("-->" + CrossSiteScriptingScanRule.B_MOUSE_ALERT + "<!--"));
+        assertThat(alertsRaised.get(0).getRisk(), equalTo(Alert.RISK_HIGH));
+        assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_MEDIUM));
+    }
+
+    @Test
     void shouldNotReportXssInFilteredComment() throws NullPointerException, IOException {
         String test = "/shouldNotReportXssInFilteredComment/";
 
@@ -442,6 +487,44 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
         assertThat(
                 alertsRaised.get(0).getAttack(),
                 equalTo(CrossSiteScriptingScanRule.GENERIC_SCRIPT_ALERT));
+        assertThat(alertsRaised.get(0).getRisk(), equalTo(Alert.RISK_HIGH));
+        assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_MEDIUM));
+    }
+
+    @Test
+    void shouldReportXssInBodyWithFilteredScripts() throws NullPointerException, IOException {
+        String test = "/test/";
+
+        this.nano.addHandler(
+                new NanoServerHandler(test) {
+                    @Override
+                    protected Response serve(IHTTPSession session) {
+                        String name = getFirstParamValue(session, "name");
+                        String response;
+                        if (name != null) {
+                            // Strip out 'script' and `onerror` ignoring the case
+                            name = name.replaceAll("(?i)script|onerror", "");
+                            response = getHtml("InputInBody.html", new String[][] {{"name", name}});
+                        } else {
+                            response = getHtml("NoInput.html");
+                        }
+                        return newFixedLengthResponse(response);
+                    }
+                });
+
+        HttpMessage msg = this.getHttpMessage(test + "?name=test");
+
+        this.rule.init(msg, this.parent);
+
+        this.rule.scan();
+
+        assertThat(alertsRaised.size(), equalTo(1));
+        assertThat(
+                alertsRaised.get(0).getEvidence(),
+                equalTo(CrossSiteScriptingScanRule.B_MOUSE_ALERT));
+        assertThat(alertsRaised.get(0).getParam(), equalTo("name"));
+        assertThat(
+                alertsRaised.get(0).getAttack(), equalTo(CrossSiteScriptingScanRule.B_MOUSE_ALERT));
         assertThat(alertsRaised.get(0).getRisk(), equalTo(Alert.RISK_HIGH));
         assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_MEDIUM));
     }
@@ -519,6 +602,50 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
         assertThat(
                 alertsRaised.get(0).getAttack(),
                 equalTo("</span>" + CrossSiteScriptingScanRule.GENERIC_SCRIPT_ALERT + "<span>"));
+        assertThat(alertsRaised.get(0).getRisk(), equalTo(Alert.RISK_HIGH));
+        assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_MEDIUM));
+    }
+
+    @Test
+    void shouldReportXssInSpanContentWhenBypassingTagCloseAttacksAtLowThreshold()
+            throws NullPointerException, IOException {
+        String test = "/test/";
+
+        this.nano.addHandler(
+                new NanoServerHandler(test) {
+                    @Override
+                    protected Response serve(IHTTPSession session) {
+                        String name = getFirstParamValue(session, "name");
+                        // Filter script and span so that we hit the image payload and ignore
+                        // ZAP's attempt to close the span tag
+                        if (name.contains("script") || name.contains("span")) {
+                            name = "";
+                        }
+                        String response;
+                        if (!StringUtils.isBlank(name)) {
+                            response = getHtml("InputInSpan.html", new String[][] {{"name", name}});
+                        } else {
+                            response = getHtml("NoInput.html");
+                        }
+                        return newFixedLengthResponse(response);
+                    }
+                });
+
+        HttpMessage msg = this.getHttpMessage(test + "?name=test");
+
+        this.rule.setAlertThreshold(AlertThreshold.LOW);
+        this.rule.init(msg, this.parent);
+
+        this.rule.scan();
+
+        assertThat(alertsRaised.size(), equalTo(1));
+        assertThat(
+                alertsRaised.get(0).getEvidence(),
+                equalTo(CrossSiteScriptingScanRule.GENERIC_ONERROR_ALERT));
+        assertThat(alertsRaised.get(0).getParam(), equalTo("name"));
+        assertThat(
+                alertsRaised.get(0).getAttack(),
+                equalTo(CrossSiteScriptingScanRule.GENERIC_ONERROR_ALERT));
         assertThat(alertsRaised.get(0).getRisk(), equalTo(Alert.RISK_HIGH));
         assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_MEDIUM));
     }
@@ -767,8 +894,44 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
     }
 
     @Test
-    void shouldReportXssInAttribute() throws NullPointerException, IOException {
-        String test = "/shouldReportXssInAttribute/";
+    void shouldReportXssInAttributeUnfiltered() throws NullPointerException, IOException {
+        String test = "/test/";
+
+        this.nano.addHandler(
+                new NanoServerHandler(test) {
+                    @Override
+                    protected Response serve(IHTTPSession session) {
+                        String color = getFirstParamValue(session, "color");
+                        String response;
+                        if (color != null) {
+                            response =
+                                    getHtml(
+                                            "InputInAttribute.html",
+                                            new String[][] {{"color", color}});
+                        } else {
+                            response = getHtml("NoInput.html");
+                        }
+                        return newFixedLengthResponse(response);
+                    }
+                });
+
+        HttpMessage msg = this.getHttpMessage(test + "?color=red");
+
+        this.rule.init(msg, this.parent);
+
+        this.rule.scan();
+
+        assertThat(alertsRaised.size(), equalTo(1));
+        assertThat(alertsRaised.get(0).getEvidence(), equalTo("\"><scrIpt>alert(1);</scRipt>"));
+        assertThat(alertsRaised.get(0).getParam(), equalTo("color"));
+        assertThat(alertsRaised.get(0).getAttack(), equalTo("\"><scrIpt>alert(1);</scRipt>"));
+        assertThat(alertsRaised.get(0).getRisk(), equalTo(Alert.RISK_HIGH));
+        assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_MEDIUM));
+    }
+
+    @Test
+    void shouldReportXssInAttributeAngleBracketFiltered() throws NullPointerException, IOException {
+        String test = "/shouldReportXssInAttributeAngleBracketFiltered/";
 
         this.nano.addHandler(
                 new NanoServerHandler(test) {
@@ -907,6 +1070,42 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
         assertThat(
                 alertsRaised.get(0).getEvidence(),
                 equalTo("tag accesskey='x' onclick='alert(1)' b"));
+        assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_MEDIUM));
+    }
+
+    @Test
+    void shouldReportXssInHtmlEscapedElementName() throws HttpMalformedHeaderException {
+        String test = "/test/";
+
+        this.nano.addHandler(
+                new NanoServerHandler(test) {
+                    @Override
+                    protected Response serve(IHTTPSession session) {
+                        String q = getFirstParamValue(session, "q");
+                        String response;
+                        if (q != null) {
+                            q = htmlEscape(q);
+                            if (!q.equals("button onclick='alert(1)'/") && !q.equals("0W45pz4p")) {
+                                q = "";
+                            }
+                            response =
+                                    getHtml("InputInElementName.html", new String[][] {{"q", q}});
+                        } else {
+                            response =
+                                    getHtml("InputInElementName.html", new String[][] {{"q", ""}});
+                        }
+                        return newFixedLengthResponse(response);
+                    }
+                });
+
+        HttpMessage msg = this.getHttpMessage(test + "?q=sample");
+
+        this.rule.init(msg, parent);
+
+        this.rule.scan();
+
+        assertThat(alertsRaised.size(), equalTo(1));
+        assertThat(alertsRaised.get(0).getEvidence(), equalTo("button onclick='alert(1)'/"));
         assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_MEDIUM));
     }
 
@@ -2152,8 +2351,7 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
                         } else {
                             response = getHtml("NoInput.html");
                         }
-                        Response resp = newFixedLengthResponse(response);
-                        return resp;
+                        return newFixedLengthResponse(response);
                     }
                 });
 
@@ -2326,7 +2524,7 @@ class CrossSiteScriptingScanRuleUnitTest extends ActiveScannerTest<CrossSiteScri
                     @Override
                     protected Response serve(IHTTPSession session) {
                         String name = getFirstParamValue(session, "name");
-                        if (!StringUtils.containsIgnoreCase(name, "0W45pz4p")
+                        if (!Strings.CI.contains(name, "0W45pz4p")
                                 && !name.equals("%3CscrIpt%3Ealert%281%29%3B%3C%2FscRipt%3E")) {
                             name = "something else";
                         }

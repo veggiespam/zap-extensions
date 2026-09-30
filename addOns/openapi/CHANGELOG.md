@@ -4,7 +4,90 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Changed
+- Update reference to avoid redirect.
+- Dependency update.
 
+## [58] - 2026-08-12
+### Changed
+- Allow users to limit the number of OpenAPI messages to import (`maxMessages`). Ex: If testing authentication, access, etc.
+- Dependency update.
+
+### Fixed
+- Import dialogue file functionality now uses the selected User (previously only URL import did).
+
+## [57] - 2026-07-06
+### Changed
+- Maintenance changes.
+- Dependency update.
+
+### Fixed
+- Bug where values were used for objects, instead of just for primitives.
+
+## [56] - 2026-05-06
+### Changed
+- Dependency update.
+- Exceptions caught by the Automation Framework job now include the exception message.
+- Improved Swagger Secret Detector Script with false positive scenarios and ensuring correct Swagger version flagging.
+- Formatted JavaScript files for consistency.
+
+## [55] - 2026-04-21
+### Changed
+- Dependency update.
+
+### Fixed
+- Address exception importing definition with indirect `additionalProperties` referencing an `oneOf` (Issue 9305).
+
+## [54] - 2026-04-14
+### Changed
+- Dependency update to fix stack overflows when importing the definitions.
+- The scan rule script now has new tags for the OWASP Top 10 2025, and API Top 10 2023.
+- Depends on an updated version of the Common Library add-on.
+
+## [53] - 2026-03-19
+### Changed
+- Dependency update.
+
+### Fixed
+- Issue with data generation for arrays in OpenAPI 3.1 definitions (Issue 9261).
+
+## [52] - 2026-02-11
+### Changed
+- Enable Swagger Secret Detector Script Scan Rule, the JS Engine memory leak has been addressed (Issue 9230).
+
+## [51] - 2026-01-28
+### Changed
+- Disable Swagger Secret Detector Script Scan Rule by default due to JS Engine memory leak (Issue 9230).
+
+## [50] - 2026-01-21
+### Added
+- Swagger Secret Detector Script Scan Rule.
+
+## [49] - 2026-01-12
+### Added
+- Added an optional LLM extension for importing OpenAPI definitions.
+- Initial support for OpenAPI 3.1 definitions.
+
+### Changed
+- Dependency update.
+
+## [48] - 2025-12-15
+### Changed
+- Dependency updates.
+- Update minimum ZAP version to 2.17.0.
+
+## [47] - 2025-11-04
+### Changed
+- Dependency updates.
+
+### Fixed
+- Include URLs from context verbatim.
+
+## [46] - 2025-09-10
+
+### Fixed
+- Warn logs to always include stack trace.
+- Correct generation of empty object.
 
 ## [45] - 2025-03-24
 ### Fixed
@@ -341,6 +424,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First Version
 
+[58]: https://github.com/zaproxy/zap-extensions/releases/openapi-v58
+[57]: https://github.com/zaproxy/zap-extensions/releases/openapi-v57
+[56]: https://github.com/zaproxy/zap-extensions/releases/openapi-v56
+[55]: https://github.com/zaproxy/zap-extensions/releases/openapi-v55
+[54]: https://github.com/zaproxy/zap-extensions/releases/openapi-v54
+[53]: https://github.com/zaproxy/zap-extensions/releases/openapi-v53
+[52]: https://github.com/zaproxy/zap-extensions/releases/openapi-v52
+[51]: https://github.com/zaproxy/zap-extensions/releases/openapi-v51
+[50]: https://github.com/zaproxy/zap-extensions/releases/openapi-v50
+[49]: https://github.com/zaproxy/zap-extensions/releases/openapi-v49
+[48]: https://github.com/zaproxy/zap-extensions/releases/openapi-v48
+[47]: https://github.com/zaproxy/zap-extensions/releases/openapi-v47
+[46]: https://github.com/zaproxy/zap-extensions/releases/openapi-v46
 [45]: https://github.com/zaproxy/zap-extensions/releases/openapi-v45
 [44]: https://github.com/zaproxy/zap-extensions/releases/openapi-v44
 [43]: https://github.com/zaproxy/zap-extensions/releases/openapi-v43

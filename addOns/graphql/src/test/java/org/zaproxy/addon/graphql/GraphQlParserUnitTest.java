@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -37,14 +38,19 @@ import org.mockito.ArgumentCaptor;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.core.scanner.Alert;
+import org.zaproxy.addon.commonlib.DefaultValueProvider;
+import org.zaproxy.addon.commonlib.ExtensionCommonlib;
 import org.zaproxy.zap.extension.alert.ExtensionAlert;
+import org.zaproxy.zap.extension.stats.InMemoryStats;
 import org.zaproxy.zap.testutils.StaticContentServerHandler;
 import org.zaproxy.zap.testutils.TestUtils;
 import org.zaproxy.zap.utils.I18N;
+import org.zaproxy.zap.utils.Stats;
 
 class GraphQlParserUnitTest extends TestUtils {
 
-    String endpointUrl;
+    private String endpointUrl;
+    private InMemoryStats stats;
 
     @BeforeEach
     void setup() throws Exception {
@@ -52,6 +58,8 @@ class GraphQlParserUnitTest extends TestUtils {
         startServer();
         endpointUrl = "http://localhost:" + nano.getListeningPort();
         Constant.messages = new I18N(Locale.ENGLISH);
+        stats = new InMemoryStats();
+        Stats.addListener(stats);
     }
 
     @AfterEach
@@ -100,6 +108,9 @@ class GraphQlParserUnitTest extends TestUtils {
         GraphQlParser gqp = new GraphQlParser(endpointUrl);
         var extAlert = mock(ExtensionAlert.class);
         Control.getSingleton().getExtensionLoader().addExtension(extAlert);
+        var extCommonLib = mock(ExtensionCommonlib.class);
+        when(extCommonLib.getValueProvider()).thenReturn(new DefaultValueProvider());
+        Control.getSingleton().getExtensionLoader().addExtension(extCommonLib);
         // When
         gqp.introspect(true);
         // Then
@@ -111,7 +122,7 @@ class GraphQlParserUnitTest extends TestUtils {
     }
 
     @Test
-    void shouldImportIntrospectionResponse() throws Exception {
+    void shouldImportIntrospectionResponseFromFile() throws Exception {
         // Given
         GraphQlParser gqp = spy(new GraphQlParser(endpointUrl));
         var schemaCaptor = ArgumentCaptor.forClass(String.class);
@@ -119,10 +130,78 @@ class GraphQlParserUnitTest extends TestUtils {
                 "type Query {\n"
                         + "  searchSongsByLyrics(lyrics: String = \"Never gonna give you up\"): String\n"
                         + "}";
+        var extCommonLib = mock(ExtensionCommonlib.class);
+        when(extCommonLib.getValueProvider()).thenReturn(new DefaultValueProvider());
+        Control.getSingleton().getExtensionLoader().addExtension(extCommonLib);
         // When
         gqp.importFile(getResourcePath("introspectionResponse.json").toString());
         // Then
         verify(gqp).parse(schemaCaptor.capture());
         assertThat(schemaCaptor.getValue(), containsString(expectedSchema));
+    }
+
+    @Test
+    void shouldImportIntrospectionResponseFromUrl() throws Exception {
+        // Given
+        String introspectionResponse = getHtml("introspectionResponse.json");
+        nano.addHandler(new StaticContentServerHandler("/schema.json", introspectionResponse));
+        GraphQlParser gqp = spy(new GraphQlParser(endpointUrl));
+        var schemaCaptor = ArgumentCaptor.forClass(String.class);
+        String expectedSchema =
+                "type Query {\n"
+                        + "  searchSongsByLyrics(lyrics: String = \"Never gonna give you up\"): String\n"
+                        + "}";
+        var extCommonLib = mock(ExtensionCommonlib.class);
+        when(extCommonLib.getValueProvider()).thenReturn(new DefaultValueProvider());
+        Control.getSingleton().getExtensionLoader().addExtension(extCommonLib);
+        // When
+        gqp.importUrl(endpointUrl + "/schema.json");
+        // Then
+        verify(gqp).parse(schemaCaptor.capture());
+        assertThat(schemaCaptor.getValue(), containsString(expectedSchema));
+    }
+
+    @Test
+    void shouldIncrementIntrospectionStatOnSuccess() throws Exception {
+        // Given
+        String introspectionResponse =
+                "{\"data\":{\"__schema\":{\"queryType\":{\"name\":\"Root\"},\"types\":[{\"kind\":\"OBJECT\",\"name\":\"Root\",\"fields\":[{\"name\":\"zap\",\"args\":[],\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}]}]}}}";
+        nano.addHandler(new StaticContentServerHandler("/", introspectionResponse));
+        GraphQlParser gqp = new GraphQlParser(endpointUrl);
+        var extCommonLib = mock(ExtensionCommonlib.class);
+        when(extCommonLib.getValueProvider()).thenReturn(new DefaultValueProvider());
+        Control.getSingleton().getExtensionLoader().addExtension(extCommonLib);
+        // When
+        gqp.introspect();
+        // Then
+        assertThat(stats.getStat(GraphQlStats.INTROSPECTION_URL_IMPORTED), is(1L));
+    }
+
+    @Test
+    void shouldIncrementImportUrlStatOnSuccess() throws Exception {
+        // Given
+        String schema = "type Query { test: String }";
+        nano.addHandler(new StaticContentServerHandler("/schema.graphql", schema));
+        GraphQlParser gqp = new GraphQlParser(endpointUrl);
+        var extCommonLib = mock(ExtensionCommonlib.class);
+        when(extCommonLib.getValueProvider()).thenReturn(new DefaultValueProvider());
+        Control.getSingleton().getExtensionLoader().addExtension(extCommonLib);
+        // When
+        gqp.importUrl(endpointUrl + "/schema.graphql");
+        // Then
+        assertThat(stats.getStat(GraphQlStats.SCHEMA_URL_IMPORTED), is(1L));
+    }
+
+    @Test
+    void shouldIncrementImportFileStatOnSuccess() throws Exception {
+        // Given
+        GraphQlParser gqp = new GraphQlParser(endpointUrl);
+        var extCommonLib = mock(ExtensionCommonlib.class);
+        when(extCommonLib.getValueProvider()).thenReturn(new DefaultValueProvider());
+        Control.getSingleton().getExtensionLoader().addExtension(extCommonLib);
+        // When
+        gqp.importFile(getResourcePath("introspectionResponse.json").toString());
+        // Then
+        assertThat(stats.getStat(GraphQlStats.SCHEMA_FILE_IMPORTED), is(1L));
     }
 }

@@ -4,6 +4,10 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [10] - 2025-06-20
 ### Fixed
 - The content length is now properly set on responses which have been modified (Issue 8947).
 
@@ -52,6 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First release as an add-on, previously bundled with ZAP core.
 
+[10]: https://github.com/zaproxy/zap-extensions/releases/reveal-v10
 [9]: https://github.com/zaproxy/zap-extensions/releases/reveal-v9
 [8]: https://github.com/zaproxy/zap-extensions/releases/reveal-v8
 [7]: https://github.com/zaproxy/zap-extensions/releases/reveal-v7

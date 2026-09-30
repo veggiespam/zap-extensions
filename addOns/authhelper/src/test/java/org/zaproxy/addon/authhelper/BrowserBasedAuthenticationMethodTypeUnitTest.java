@@ -23,28 +23,39 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import net.sf.json.JSONObject;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.openqa.selenium.WebDriver;
 import org.parosproxy.paros.db.RecordContext;
 import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.model.Session;
 import org.zaproxy.addon.authhelper.BrowserBasedAuthenticationMethodType.BrowserBasedAuthenticationMethod;
+import org.zaproxy.zap.authentication.AuthenticationHelper;
 import org.zaproxy.zap.authentication.AuthenticationMethod;
 import org.zaproxy.zap.extension.api.ApiDynamicActionImplementor;
 import org.zaproxy.zap.extension.api.ApiResponse;
 import org.zaproxy.zap.model.Context;
+import org.zaproxy.zap.users.User;
 import org.zaproxy.zap.utils.ZapXmlConfiguration;
 
 class BrowserBasedAuthenticationMethodTypeUnitTest {
+
+    private static final String LOGIN_PAGE_URL = "https://example.org/login";
 
     @AfterAll
     static void cleanUp() {
@@ -69,6 +80,7 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
         params.put("loginPageUrl", "https://www.example.com");
         params.put("browserId", "example");
         params.put("loginPageWait", "7");
+        params.put("stepDelay", "2");
 
         // When
         api.handleAction(params);
@@ -79,6 +91,7 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
         BrowserBasedAuthenticationMethod bba = (BrowserBasedAuthenticationMethod) method;
         assertThat(bba.getLoginPageUrl(), is(equalTo("https://www.example.com")));
         assertThat(bba.getLoginPageWait(), is(equalTo(7)));
+        assertThat(bba.getStepDelay(), is(equalTo(2)));
         assertThat(bba.getBrowserId(), is(equalTo("example")));
     }
 
@@ -89,6 +102,7 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
                 new BrowserBasedAuthenticationMethodType().createAuthenticationMethod(0);
         method.setLoginPageUrl("https://www.example.com");
         method.setLoginPageWait(7);
+        method.setStepDelay(1);
         method.setBrowserId("example");
 
         // When
@@ -97,7 +111,7 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
         // The
         String expectedResponse =
                 """
-                {"method":{"browserId":"example","loginPageWait":7,"loginPageUrl":"https://www.example.com"}}""";
+                {"method":{"browserId":"example","loginPageWait":7,"loginPageUrl":"https://www.example.com","stepDelay":1}}""";
         assertThat(response.toJSON().toString(), is(equalTo(expectedResponse)));
     }
 
@@ -109,6 +123,7 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
         BrowserBasedAuthenticationMethod method2 = type.createAuthenticationMethod(1);
         method1.setLoginPageUrl("https://www.example.com");
         method1.setLoginPageWait(7);
+        method1.setStepDelay(3);
         method1.setBrowserId("example");
         ZapXmlConfiguration config = new ZapXmlConfiguration();
 
@@ -119,7 +134,25 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
         // Then
         assertThat(method2.getLoginPageUrl(), is(equalTo("https://www.example.com")));
         assertThat(method2.getLoginPageWait(), is(equalTo(7)));
+        assertThat(method2.getStepDelay(), is(equalTo(3)));
         assertThat(method2.getBrowserId(), is(equalTo("example")));
+    }
+
+    @Test
+    void shouldLoadContextExportV0() {
+        // Given
+        String loginUrl = "https://www.example.com";
+        BrowserBasedAuthenticationMethodType type = new BrowserBasedAuthenticationMethodType();
+        BrowserBasedAuthenticationMethod method1 = type.createAuthenticationMethod(0);
+        ZapXmlConfiguration config = new ZapXmlConfiguration();
+        config.setProperty("context.authentication.browser.loginpageurl", loginUrl);
+        config.setProperty("context.authentication.browser.loginpagewait", 2);
+        // When
+        assertDoesNotThrow(() -> method1.getType().importData(config, method1));
+        // Then
+        assertThat(method1.getLoginPageUrl(), is(equalTo(loginUrl)));
+        assertThat(method1.getLoginPageWait(), is(equalTo(2)));
+        assertThat(method1.getStepDelay(), is(equalTo(0)));
     }
 
     @Test
@@ -130,11 +163,13 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
         BrowserBasedAuthenticationMethod method2 = type.createAuthenticationMethod(1);
         method1.setLoginPageUrl("https://www.example.com");
         method1.setLoginPageWait(7);
+        method1.setStepDelay(2);
         method1.setBrowserId("example");
         Session session = mock(Session.class);
         ArgumentCaptor<String> valueCapture1 = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> valueCapture2 = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> valueCapture3 = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> valueCapture4 = ArgumentCaptor.forClass(String.class);
 
         doNothing()
                 .when(session)
@@ -154,6 +189,12 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
                         anyInt(),
                         eq(RecordContext.TYPE_AUTH_METHOD_FIELD_3),
                         valueCapture3.capture());
+        doNothing()
+                .when(session)
+                .setContextData(
+                        anyInt(),
+                        eq(RecordContext.TYPE_AUTH_METHOD_FIELD_5),
+                        valueCapture4.capture());
 
         method1.getType().persistMethodToSession(session, 1, method1);
 
@@ -169,6 +210,9 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
         when(session.getContextDataString(1, RecordContext.TYPE_AUTH_METHOD_FIELD_3, ""))
                 .thenReturn(valueCapture3.getValue());
 
+        when(session.getContextDataString(1, RecordContext.TYPE_AUTH_METHOD_FIELD_5, ""))
+                .thenReturn(valueCapture4.getValue());
+
         // When
         method2 =
                 (BrowserBasedAuthenticationMethod)
@@ -178,5 +222,127 @@ class BrowserBasedAuthenticationMethodTypeUnitTest {
         assertThat(method2.getLoginPageUrl(), is(equalTo("https://www.example.com")));
         assertThat(method2.getLoginPageWait(), is(equalTo(7)));
         assertThat(method2.getBrowserId(), is(equalTo("example")));
+        assertThat(method2.getStepDelay(), is(equalTo(2)));
+    }
+
+    @Test
+    void shouldNotifyFailureWhenNotConfiguredOnWebDriverAuth() {
+        // Given
+        BrowserBasedAuthenticationMethod method =
+                new BrowserBasedAuthenticationMethodType().createAuthenticationMethod(0);
+
+        WebDriver wd = mock();
+        User user = mock();
+
+        try (MockedStatic<AuthenticationHelper> authMock = mockStatic()) {
+            // When
+            boolean result = method.authenticate(wd, user);
+            // Then
+            assertThat(result, is(false));
+            authMock.verify(() -> AuthenticationHelper.notifyOutputAuthFailure(any()));
+        }
+    }
+
+    @Test
+    void shouldNotifySuccessWhenAuthSucceedsOnWebDriverAuth() {
+        // Given
+        BrowserBasedAuthenticationMethod method =
+                new BrowserBasedAuthenticationMethodType().createAuthenticationMethod(0);
+        method.setLoginPageUrl(LOGIN_PAGE_URL);
+
+        WebDriver wd = mock();
+        User user = mock();
+
+        try (MockedStatic<AuthUtils> authUtilsMock = mockStatic();
+                MockedStatic<AuthenticationHelper> authMock = mockStatic()) {
+            authUtilsMock
+                    .when(
+                            () ->
+                                    AuthUtils.authenticateAsUser(
+                                            anyBoolean(),
+                                            eq(wd),
+                                            eq(user),
+                                            eq(LOGIN_PAGE_URL),
+                                            anyInt(),
+                                            anyInt(),
+                                            any()))
+                    .thenReturn(true);
+            authUtilsMock
+                    .when(() -> AuthUtils.getFallbackUnknownAuthUrl(LOGIN_PAGE_URL, user))
+                    .thenReturn(LOGIN_PAGE_URL);
+            // When
+            boolean result = method.authenticate(wd, user);
+            // Then
+            assertThat(result, is(true));
+            authMock.verify(() -> AuthenticationHelper.notifyOutputAuthSuccessful(any()));
+        }
+    }
+
+    @Test
+    void shouldNotifyFailureWhenAuthFailsOnWebDriverAuth() {
+        // Given
+        BrowserBasedAuthenticationMethod method =
+                new BrowserBasedAuthenticationMethodType().createAuthenticationMethod(0);
+        method.setLoginPageUrl(LOGIN_PAGE_URL);
+
+        WebDriver wd = mock();
+        User user = mock();
+
+        try (MockedStatic<AuthUtils> authUtilsMock = mockStatic();
+                MockedStatic<AuthenticationHelper> authMock = mockStatic()) {
+            authUtilsMock
+                    .when(
+                            () ->
+                                    AuthUtils.authenticateAsUser(
+                                            anyBoolean(),
+                                            eq(wd),
+                                            eq(user),
+                                            eq(LOGIN_PAGE_URL),
+                                            anyInt(),
+                                            anyInt(),
+                                            any()))
+                    .thenReturn(false);
+            authUtilsMock
+                    .when(() -> AuthUtils.getFallbackUnknownAuthUrl(LOGIN_PAGE_URL, user))
+                    .thenReturn(LOGIN_PAGE_URL);
+            // When
+            boolean result = method.authenticate(wd, user);
+            // Then
+            assertThat(result, is(false));
+            authMock.verify(() -> AuthenticationHelper.notifyOutputAuthFailure(any()));
+        }
+    }
+
+    @Test
+    void shouldNotifyFailureAndRethrowWhenAuthThrowsOnWebDriverAuth() {
+        // Given
+        BrowserBasedAuthenticationMethod method =
+                new BrowserBasedAuthenticationMethodType().createAuthenticationMethod(0);
+        method.setLoginPageUrl(LOGIN_PAGE_URL);
+
+        WebDriver wd = mock();
+        User user = mock();
+
+        try (MockedStatic<AuthUtils> authUtilsMock = mockStatic();
+                MockedStatic<AuthenticationHelper> authMock = mockStatic()) {
+            authUtilsMock
+                    .when(
+                            () ->
+                                    AuthUtils.authenticateAsUser(
+                                            anyBoolean(),
+                                            eq(wd),
+                                            eq(user),
+                                            eq(LOGIN_PAGE_URL),
+                                            anyInt(),
+                                            anyInt(),
+                                            any()))
+                    .thenThrow(new IllegalArgumentException("auth error"));
+            authUtilsMock
+                    .when(() -> AuthUtils.getFallbackUnknownAuthUrl(LOGIN_PAGE_URL, user))
+                    .thenReturn(LOGIN_PAGE_URL);
+            // When / Then
+            assertThrows(IllegalArgumentException.class, () -> method.authenticate(wd, user));
+            authMock.verify(() -> AuthenticationHelper.notifyOutputAuthFailure(any()));
+        }
     }
 }

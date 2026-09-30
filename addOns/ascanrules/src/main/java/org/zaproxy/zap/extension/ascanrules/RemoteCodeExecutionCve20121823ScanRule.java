@@ -19,6 +19,7 @@
  */
 package org.zaproxy.zap.extension.ascanrules;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -80,6 +81,8 @@ public class RemoteCodeExecutionCve20121823ScanRule extends AbstractAppPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A03_SUPPLY_CHAIN,
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A06_VULN_COMP,
                                 CommonAlertTag.OWASP_2017_A09_VULN_COMP,
                                 CommonAlertTag.WSTG_V42_INPV_12_COMMAND_INJ));
@@ -178,8 +181,8 @@ public class RemoteCodeExecutionCve20121823ScanRule extends AbstractAppPlugin
                 buildAlert(payload, responseBody).setMessage(attackmsg).raise();
                 return true;
             }
-        } catch (Exception e) {
-            LOGGER.error(
+        } catch (IOException e) {
+            LOGGER.debug(
                     "Error scanning a URL for Remote Code Execution via CVE-2012-1823: {}",
                     e.getMessage(),
                     e);

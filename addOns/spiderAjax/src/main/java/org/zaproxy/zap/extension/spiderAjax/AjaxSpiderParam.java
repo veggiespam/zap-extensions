@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.apache.commons.configuration.ConversionException;
 import org.apache.commons.configuration.HierarchicalConfiguration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -83,7 +84,7 @@ public class AjaxSpiderParam extends VersionedAbstractParam {
      * @see #CONFIG_VERSION_KEY
      * @see #updateConfigsImpl(int)
      */
-    private static final int CURRENT_CONFIG_VERSION = 6;
+    private static final int CURRENT_CONFIG_VERSION = 7;
 
     private static final String AJAX_SPIDER_BASE_KEY = "ajaxSpider";
 
@@ -208,7 +209,7 @@ public class AjaxSpiderParam extends VersionedAbstractParam {
                     new AllowedResource(
                             AllowedResource.createDefaultPattern("^http.*\\.css(?:\\?.*)?$")));
 
-    private static final String LOGOUT_AVOIDANCE_KEY = ".logoutAvoidance";
+    private static final String LOGOUT_AVOIDANCE_KEY = AJAX_SPIDER_BASE_KEY + ".logoutAvoidance";
 
     private int numberOfBrowsers;
     private int maxCrawlDepth;
@@ -269,15 +270,7 @@ public class AjaxSpiderParam extends VersionedAbstractParam {
         this.eventWait = getInt(EVENT_WAIT_TIME_KEY, DEFAULT_EVENT_WAIT_TIME);
         this.reloadWait = getInt(RELOAD_WAIT_TIME_KEY, DEFAULT_RELOAD_WAIT_TIME);
 
-        browserId = getString(BROWSER_ID_KEY, DEFAULT_BROWSER_ID);
-
-        try {
-            Browser.getBrowserWithId(browserId);
-        } catch (IllegalArgumentException e) {
-            LOGGER.warn(
-                    "Unknown browser [{}] using default [{}].", browserId, DEFAULT_BROWSER_ID, e);
-            browserId = DEFAULT_BROWSER_ID;
-        }
+        browserId = readBrowserId(DEFAULT_BROWSER_ID);
 
         this.clickDefaultElems = getBoolean(CLICK_DEFAULT_ELEMS_KEY, DEFAULT_CLICK_DEFAULT_ELEMS);
         this.clickElemsOnce = getBoolean(CLICK_ELEMS_ONCE_KEY, DEFAULT_CLICK_ELEMS_ONCE);
@@ -343,6 +336,19 @@ public class AjaxSpiderParam extends VersionedAbstractParam {
         logoutAvoidance = getBoolean(LOGOUT_AVOIDANCE_KEY, DEFAULT_LOGOUT_AVOIDANCE);
     }
 
+    private String readBrowserId(String defaultBrowser) {
+        String browser = getString(BROWSER_ID_KEY, defaultBrowser);
+        if (StringUtils.isBlank(browser)) {
+            return defaultBrowser;
+        }
+
+        if (Browser.getBrowserWithIdNoFailSafe(browser) == null) {
+            LOGGER.warn("Unknown browser [{}] using default [{}].", browser, defaultBrowser);
+            return defaultBrowser;
+        }
+        return browser;
+    }
+
     @SuppressWarnings({"fallthrough"})
     @Override
     protected void updateConfigsImpl(int fileVersion) {
@@ -387,6 +393,10 @@ public class AjaxSpiderParam extends VersionedAbstractParam {
                 if (!getConfig().getKeys(ALL_ALLOWED_RESOURCES_KEY).hasNext()) {
                     setAllowedResources(DEFAULT_ALLOWED_RESOURCES);
                 }
+            case 6:
+                boolean oldLogoutAvoidance = getBoolean("logoutAvoidance", false);
+                getConfig().setProperty(LOGOUT_AVOIDANCE_KEY, oldLogoutAvoidance);
+                getConfig().clearProperty("logoutAvoidance");
         }
     }
 

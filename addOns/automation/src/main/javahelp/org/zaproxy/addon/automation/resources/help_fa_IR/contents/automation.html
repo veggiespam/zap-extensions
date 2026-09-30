@@ -17,6 +17,7 @@ It provides the following command line options:
 <li>-autogenmin &lt;filename&gt;	Generate template automation file with the key parameters.
 <li>-autogenmax &lt;filename&gt;	Generate template automation file with all parameters.
 <li>-autogenconf &lt;filename&gt;	Generate template automation file using the current configuration.
+<li>-autocheck &lt;source&gt;	Check the specified automation plan in the file or from the URL.
 </ul>
 
 <H3><a name="exit-codes">Exit Codes</a></H3>
@@ -55,10 +56,14 @@ The <a href="options.html">Automation Options</a> screen allows you to configure
 <H2><a name="api">API</a></H2>
 The following API endpoints are provided by this add-on:
 <ul>
+<li>Action: endDelayJob() - ends the currently running delay job, if any</li>
 <li>Action: runPlan(filePath) - loads and asynchronously runs the plan in the specified file, returning a planId</li>
+<li>Action: stopPlan(planId) - stops the running plan identified by the planId</li>
 <li>View: planProgress(planId) - returns the progress details for the specified planId</li>
 </ul>
 If the ZAP desktop is being used then the plan will also be shown in the GUI to make it easier to diagnose any problems.
+<p>
+Note that some jobs may not stop immediately, for example if authentication is being handled.
 
 <H2><a name="environment">Environment</a></H2>
 The <a href="environment.html">environment</a> section of the file defines the applications which the rest of the jobs can act on.
@@ -68,7 +73,6 @@ All file and directory paths can either be absolute or relative to the directory
 Relative paths are recommended for portability.
 
 <H2><a name="jobs">Jobs</a></H2>
-The jobs can be enabled/disabled through the GUI and the automation plan, with the <code>enabled</code> flag. Jobs are enabled by default.
 <p>
 The following automation jobs are supported by this add-on:
 <ul>
@@ -79,6 +83,15 @@ The following automation jobs are supported by this add-on:
 <li><a href="job-requestor.html">requestor</a> - crafts specific requests to send to the corresponding targets</li>
 <li><a href="job-ascan.html">activeScan</a> - runs the active scanner</li>
 <li><a href="job-exitstatus.html">exitStatus</a> - sets ZAP's exit code based on scan results</li>
+</ul>
+
+<H3><a name="gen-options">General Job Options</a></H3>
+
+The following options can be applied to all jobs, via the automation plan or the <a href="gui.html">GUI</a>:
+
+<ul>
+<li><code>enabled</code> - only jobs that are enabled will run.
+<li><code>alwaysRun</code> - enabled jobs with this option will run even if the plan exits early.
 </ul>
 
 <H3>Importance of Job Order</H3>

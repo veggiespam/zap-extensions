@@ -61,9 +61,14 @@ public class ExpressionLanguageInjectionScanRule extends AbstractAppParamPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.API_2023_API10_UNSAFE_CONSUMPTION,
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A01_INJECTION,
-                                CommonAlertTag.WSTG_V42_INPV_11_CODE_INJ));
+                                CommonAlertTag.WSTG_V42_INPV_11_CODE_INJ,
+                                CommonAlertTag.HIPAA,
+                                CommonAlertTag.PCI_DSS));
+        alertTags.put(PolicyTag.QA_CICD.getTag(), "");
         alertTags.put(PolicyTag.QA_STD.getTag(), "");
         alertTags.put(PolicyTag.QA_FULL.getTag(), "");
         alertTags.put(PolicyTag.API.getTag(), "");
@@ -187,7 +192,7 @@ public class ExpressionLanguageInjectionScanRule extends AbstractAppParamPlugin
         } catch (IOException ex) {
             // Do not try to internationalise this.. we need an error message in any event..
             // if it's in English, it's still better than not having it at all.
-            LOGGER.error(
+            LOGGER.debug(
                     "Expression Language Injection vulnerability check failed for parameter [{}] and payload [{}] due to an I/O error",
                     paramName,
                     payload,

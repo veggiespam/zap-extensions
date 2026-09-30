@@ -5,6 +5,110 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 ### Added
+- Allow to define for how long a plan can run.
+- Add support for the HTTP method in the authentication verification (on newer ZAP versions).
+
+### Changed
+- Adjust columns in plan display after loading a plan.
+- Include cause of invalid URL in error message.
+- Plan profiles to use clientSpider instead of ajaxSpider.
+
+### Fixed
+- Correct technology related warning message.
+
+### Removed
+- The Params automation support was moved into the Params add-on (Issue 9210).
+
+## [0.60.0] - 2026-05-08
+### Fixed
+- Fix exception during forced shutdown in the Active Scan job.
+
+## [0.59.0] - 2026-04-02
+### Added
+- Allow to load a plan from the contents of the clipboard.
+- Access to the progress of long running jobs
+
+### Changed
+- Move the Automation panel to the workspace window.
+- Use the main output panel for plan output messages.
+- Add a status panel to inform users about the panel relocation.
+
+### Fixed
+- Correct error message.
+
+## [0.58.0] - 2025-12-15
+### Added
+- Support for a "soft" stop which allows "always run" jobs to run.
+
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [0.57.0] - 2025-12-03
+### Added
+- Allow to specify the defaults for the alert threshold and attack strength of the active scan policy.
+
+### Changed
+- Maintenance changes.
+- Make the "pass" output of Monitor Tests consistent with the "fail" output.
+
+### Fixed
+- Restore default standard output on absent `env` `parameters`.
+- Delay Scan Policy validation to runtime phase in the `activeScan` job, the Scan Policy might be created dynamically by other jobs.
+
+## [0.56.0] - 2025-11-07
+### Added
+- Command line -autocheck option which checks if the specified yaml plan has the right format.
+
+### Changed
+- Include in Context regular expressions when creating the plan from a context.
+
+## [0.55.0] - 2025-11-05
+### Changed
+- Use CWD for relative file names if plan loaded from a URL.
+
+## [0.54.0] - 2025-10-27
+### Added
+- Setting arbitrary config values
+
+### Changed
+- Reinstate the validation of the Scan Policy in the `activeScan` job.
+- Adjust the text for the plan load warning/error dialog text to be clear which output panel it's referring to.
+- Maintenance changes.
+- Depend on newer version of Common Library add-on.
+
+## [0.53.0] - 2025-09-18
+### Fixed
+- Correct Session Management script's path validation with variables.
+- Correct default value for Active Scan option `handleAntiCSRFTokens` in templates and help.
+
+## [0.52.0] - 2025-09-02
+### Added
+- Support for step delay in Browser Based Authentication.
+- Support for min wait for in Client Script Authentication.
+- Support for url in activeScan job.
+- Support for stopping plans and jobs.
+- Allow selecting rules in policy definitions using alert tags.
+
+### Changed
+- Refer to output panel for errors.
+
+### Fixed
+- Bug in handling headers with colons in the values.
+- Use default authentication poll frequency when none specified, if the value is less than one a progress warning occurs.
+- Do not warn if "enabled" or "alwaysRun" properties specified.
+- Use the authentication method's diagnostics state when creating a plan from a context.
+
+## [0.51.0] - 2025-07-17
+### Added
+- Support for exclude regexes to active scan config job.
+- Always run option for all jobs.
+- Support for data driven nodes in plan (not yet in the UI).
+
+### Changed
+- Job remains selected when moved in the GUI.
+
+## [0.50.0] - 2025-06-20
+### Added
 - Add support for the wait time of the Client Script Based Authentication.
 - Allow to inline scripts for Script and Client Script Based Authentication.
 
@@ -506,6 +610,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First version.
 
+[0.60.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.60.0
+[0.59.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.59.0
+[0.58.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.58.0
+[0.57.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.57.0
+[0.56.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.56.0
+[0.55.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.55.0
+[0.54.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.54.0
+[0.53.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.53.0
+[0.52.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.52.0
+[0.51.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.51.0
+[0.50.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.50.0
 [0.49.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.49.0
 [0.48.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.48.0
 [0.47.0]: https://github.com/zaproxy/zap-extensions/releases/automation-v0.47.0

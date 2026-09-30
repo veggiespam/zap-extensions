@@ -19,8 +19,10 @@
  */
 package org.zaproxy.addon.client.automation;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.configuration.XMLConfiguration;
@@ -30,18 +32,20 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
+import org.parosproxy.paros.core.scanner.Plugin.AlertThreshold;
 import org.zaproxy.addon.automation.AutomationData;
 import org.zaproxy.addon.automation.AutomationEnvironment;
 import org.zaproxy.addon.automation.AutomationJob;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.ContextWrapper;
+import org.zaproxy.addon.automation.JobResultData;
 import org.zaproxy.addon.automation.jobs.JobData;
 import org.zaproxy.addon.automation.jobs.JobUtils;
-import org.zaproxy.addon.client.ClientOptions;
-import org.zaproxy.addon.client.ClientOptions.ScopeCheck;
+import org.zaproxy.addon.automation.jobs.PassiveScanJobResultData;
 import org.zaproxy.addon.client.ExtensionClientIntegration;
 import org.zaproxy.addon.client.spider.ClientSpider;
-import org.zaproxy.addon.commonlib.Constants;
+import org.zaproxy.addon.client.spider.ClientSpiderOptions;
+import org.zaproxy.addon.client.spider.ClientSpiderOptions.ScopeCheck;
 import org.zaproxy.zap.users.User;
 
 public class ClientSpiderJob extends AutomationJob {
@@ -50,10 +54,13 @@ public class ClientSpiderJob extends AutomationJob {
 
     private static final String JOB_NAME = "spiderClient";
 
+    private static final int MODERN_WEB_DETECTION_RULE_ID = 10109;
+
     private ExtensionClientIntegration extSpider;
 
     private Data data;
     private Parameters parameters = new Parameters();
+    private boolean forceStop;
 
     public ClientSpiderJob() {
         this.data = new Data(this, parameters);
@@ -106,6 +113,12 @@ public class ClientSpiderJob extends AutomationJob {
         }
         uriStr = env.replaceVars(uriStr);
 
+        if (Boolean.TRUE.equals(this.getParameters().getRunOnlyIfModern())
+                && !isModernApp(progress)) {
+            return;
+        }
+
+        forceStop = false;
         int scanId = -1;
         try {
             scanId =
@@ -113,7 +126,9 @@ public class ClientSpiderJob extends AutomationJob {
                             .startScan(
                                     uriStr, paramsToOptions(), context.getContext(), user, false);
         } catch (URIException e) {
-            progress.error(Constant.messages.getString("automation.error.context.badurl", uriStr));
+            progress.error(
+                    Constant.messages.getString(
+                            "automation.error.context.badurl", uriStr, e.getLocalizedMessage()));
             return;
         } catch (Exception e) {
             progress.error(
@@ -134,12 +149,11 @@ public class ClientSpiderJob extends AutomationJob {
         }
 
         // Wait for the client spider to finish
-        boolean forceStop = false;
 
         while (true) {
             this.sleep(500);
 
-            if (!spider.isRunning()) {
+            if (!spider.isRunning() || forceStop) {
                 break;
             }
             if (!this.runMonitorTests(progress) || System.currentTimeMillis() > endTime) {
@@ -153,8 +167,46 @@ public class ClientSpiderJob extends AutomationJob {
         }
     }
 
-    protected ClientOptions paramsToOptions() {
-        ClientOptions options = new ClientOptions();
+    @Override
+    public void stop() {
+        forceStop = true;
+    }
+
+    @SuppressWarnings("removal")
+    private boolean isModernApp(AutomationProgress progress) {
+        JobResultData resultData = progress.getJobResultData(PassiveScanJobResultData.KEY);
+        if (resultData == null) {
+            // They haven't run the passive scan wait job
+            progress.warn(Constant.messages.getString("client.automation.error.nopscanresults"));
+            return true;
+        }
+        if (!(resultData instanceof PassiveScanJobResultData pscanResultData)) {
+            progress.error(
+                    Constant.messages.getString(
+                            "client.automation.error.badresultdata",
+                            resultData.getClass().getCanonicalName()));
+            return true;
+        }
+        List<PassiveScanJobResultData.RuleData> modernRuleData =
+                pscanResultData.getAllRuleData().stream()
+                        .filter(r -> r.getId() == MODERN_WEB_DETECTION_RULE_ID)
+                        .collect(Collectors.toList());
+        if (modernRuleData.isEmpty()
+                || AlertThreshold.OFF.equals(modernRuleData.get(0).getThreshold())) {
+            // Rule is not present or turned off
+            progress.warn(Constant.messages.getString("client.automation.error.nomodernrule"));
+            return true;
+        }
+        if (pscanResultData.getAlertData(MODERN_WEB_DETECTION_RULE_ID) == null) {
+            progress.info(Constant.messages.getString("client.automation.info.notmodern"));
+            return false;
+        }
+        progress.info(Constant.messages.getString("client.automation.info.modern"));
+        return true;
+    }
+
+    protected ClientSpiderOptions paramsToOptions() {
+        ClientSpiderOptions options = new ClientSpiderOptions();
         options.load(new XMLConfiguration());
 
         if (!StringUtils.isBlank(this.parameters.getBrowserId())) {
@@ -180,6 +232,15 @@ public class ClientSpiderJob extends AutomationJob {
         }
         if (this.parameters.getShutdownTime() != null) {
             options.setShutdownTimeInSecs(this.parameters.getShutdownTime());
+        }
+        if (parameters.getLogoutAvoidance() != null) {
+            options.setLogoutAvoidance(parameters.getLogoutAvoidance());
+        }
+        if (parameters.getActionWaitTime() != null) {
+            options.setActionWaitTimeInSecs(parameters.getActionWaitTime());
+        }
+        if (!StringUtils.isBlank(parameters.getScopeCheck())) {
+            options.setScopeCheck(parameters.getScopeCheck());
         }
         return options;
     }
@@ -279,13 +340,16 @@ public class ClientSpiderJob extends AutomationJob {
         private String url = "";
         private Integer maxDuration;
         private Integer maxChildren;
-        private Integer maxCrawlDepth = ClientOptions.DEFAULT_MAX_DEPTH;
-        private Integer numberOfBrowsers = Constants.getDefaultThreadCount() / 2;
+        private Integer maxCrawlDepth = ClientSpiderOptions.DEFAULT_MAX_DEPTH;
+        private Integer numberOfBrowsers = ClientSpiderOptions.getDefaultThreadCount();
         private String browserId;
-        private Integer initialLoadTime = ClientOptions.DEFAULT_INITIAL_LOAD_TIME;
-        private Integer pageLoadTime = ClientOptions.DEFAULT_PAGE_LOAD_TIME;
-        private Integer shutdownTime = ClientOptions.DEFAULT_SHUTDOWN_TIME;
+        private Integer initialLoadTime = ClientSpiderOptions.DEFAULT_INITIAL_LOAD_TIME;
+        private Integer pageLoadTime = ClientSpiderOptions.DEFAULT_PAGE_LOAD_TIME;
+        private Integer shutdownTime = ClientSpiderOptions.DEFAULT_SHUTDOWN_TIME;
         private String scopeCheck = ScopeCheck.getDefault().toString();
+        private Boolean logoutAvoidance = ClientSpiderOptions.DEFAULT_LOGOUT_AVOIDANCE;
+        private Integer actionWaitTime = ClientSpiderOptions.DEFAULT_ACTION_WAIT_TIME;
+        private Boolean runOnlyIfModern = Boolean.FALSE;
 
         public Parameters() {}
     }

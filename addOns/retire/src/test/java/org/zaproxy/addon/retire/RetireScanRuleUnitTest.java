@@ -25,8 +25,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
@@ -53,13 +53,13 @@ class RetireScanRuleUnitTest extends PassiveScannerTest<RetireScanRule> {
 
     @Override
     protected RetireScanRule createScanner() {
-        RetireScanRule rsr = new RetireScanRule();
         try {
-            rsr.setRepo(new Repo("/org/zaproxy/addon/retire/testrepository.json"));
+            Repo testRepo = new Repo("/org/zaproxy/addon/retire/testrepository.json");
+            return new RetireScanRule(testRepo);
         } catch (IOException e) {
             // Nothing to do
         }
-        return rsr;
+        return new RetireScanRule(null);
     }
 
     @Test
@@ -176,7 +176,7 @@ class RetireScanRuleUnitTest extends PassiveScannerTest<RetireScanRule> {
         assertThat(alertsRaised.get(0).getRisk(), is(equalTo(Alert.RISK_MEDIUM)));
         assertEquals("* Bootstrap v3.3.7", alertsRaised.get(0).getEvidence());
         assertRefs(alertsRaised.get(0));
-        assertEquals(7, alertsRaised.get(0).getTags().size());
+        assertEquals(8, alertsRaised.get(0).getTags().size());
     }
 
     @Test
@@ -247,7 +247,10 @@ class RetireScanRuleUnitTest extends PassiveScannerTest<RetireScanRule> {
         int cweId = rule.getExampleAlerts().get(0).getCweId();
         // Then
         assertThat(cweId, is(equalTo(1395)));
-        assertThat(tags.size(), is(equalTo(5)));
+        assertThat(tags.size(), is(equalTo(6)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A03_SUPPLY_CHAIN.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A06_VULN_COMP.getTag()),
                 is(equalTo(true)));
@@ -257,6 +260,9 @@ class RetireScanRuleUnitTest extends PassiveScannerTest<RetireScanRule> {
         assertThat(tags.containsKey(PolicyTag.PENTEST.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.DEV_STD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_STD.getTag()), is(equalTo(true)));
+        assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A03_SUPPLY_CHAIN.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A03_SUPPLY_CHAIN.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A06_VULN_COMP.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A06_VULN_COMP.getValue())));
@@ -285,18 +291,12 @@ class RetireScanRuleUnitTest extends PassiveScannerTest<RetireScanRule> {
         assertRefs(example);
     }
 
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
-    }
-
     private static void assertRefs(Alert alert) {
         assertThat(
                 alert.getReference(),
                 is(
                         equalTo(
-                                "https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/")));
+                                "https://owasp.org/Top10/2021/A06_2021-Vulnerable_and_Outdated_Components/")));
     }
 
     private static HttpMessage createMessage(String url, String body) {
@@ -332,6 +332,21 @@ class RetireScanRuleUnitTest extends PassiveScannerTest<RetireScanRule> {
         scanRule.setConfig(mock(HierarchicalConfiguration.class));
         RetireScanRule copiedScanRule = (RetireScanRule) scanRule.copy();
 
+        assertSame(scanRule.getRepo(), copiedScanRule.getRepo());
+    }
+
+    @Test
+    void shouldShareRepoInCopy() throws IOException {
+        // Given
+        Repo testRepo = new Repo("/org/zaproxy/addon/retire/testrepository.json");
+        RetireScanRule scanRule = new RetireScanRule(testRepo);
+        scanRule.setConfig(mock(HierarchicalConfiguration.class));
+
+        // When
+        RetireScanRule copiedScanRule = (RetireScanRule) scanRule.copy();
+
+        // Then
+        assertSame(testRepo, copiedScanRule.getRepo());
         assertSame(scanRule.getRepo(), copiedScanRule.getRepo());
     }
 }

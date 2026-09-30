@@ -20,14 +20,15 @@
 package org.zaproxy.addon.authhelper;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.parosproxy.paros.network.HttpHeader;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpRequestHeader;
 import org.parosproxy.paros.network.HttpSender;
 import org.zaproxy.addon.authhelper.VerificationRequestDetails.VerificationComparator;
+import org.zaproxy.addon.commonlib.http.HttpFieldsNames;
 import org.zaproxy.zap.authentication.AuthenticationMethod;
 import org.zaproxy.zap.authentication.AuthenticationMethod.AuthCheckingStrategy;
 import org.zaproxy.zap.model.Context;
@@ -38,6 +39,17 @@ public class VerificationDetectionProcessor implements Runnable {
     private static final VerificationComparator COMPARATOR =
             VerificationRequestDetails.getComparator();
     private static final Logger LOGGER = LogManager.getLogger(VerificationDetectionProcessor.class);
+
+    private static final List<String> DEFAULT_VERIFICATION_HEADERS =
+            // These are ordered based on likely browser order, not alphabetically.
+            List.of(
+                    HttpFieldsNames.USER_AGENT,
+                    HttpFieldsNames.ACCEPT,
+                    HttpFieldsNames.ACCEPT_LANGUAGE,
+                    HttpFieldsNames.CONTENT_TYPE,
+                    HttpFieldsNames.REFERER,
+                    HttpFieldsNames.ORIGIN,
+                    HttpFieldsNames.CONNECTION);
 
     private final Context context;
     private final VerificationDetectionScanRule rule;
@@ -99,22 +111,27 @@ public class VerificationDetectionProcessor implements Runnable {
                 }
             }
             if (goodVerifReq) {
-                String loggedInIndicator = Pattern.quote(details.getEvidence());
+                String loggedInIndicator = details.getEvidence();
                 String loggedOutIndicator = "";
 
                 if (details.getResponseCode() != firstNonAuthVrd.getResponseCode()) {
                     // The response code details are better to use than specific user names
                     String okCode = getResponseCodeDetails(details.getMsg());
-                    loggedInIndicator = Pattern.quote(okCode);
+                    loggedInIndicator = okCode;
                     loggedOutIndicator =
                             Pattern.quote(getResponseCodeDetails(firstNonAuthVrd.getMsg()));
                     if (!details.isContainsUserDetails()) {
                         details.setEvidence(okCode);
                     }
                 }
-                rule.getAlert(details).raise();
 
-                updateContext(loggedInIndicator, loggedOutIndicator);
+                if (!loggedInIndicator.isEmpty()) {
+                    loggedInIndicator = Pattern.quote(loggedInIndicator);
+
+                    rule.getAlert(details).raise();
+
+                    updateContext(loggedInIndicator, loggedOutIndicator);
+                }
             }
         } catch (IOException e) {
             LOGGER.debug(e.getMessage(), e);
@@ -131,17 +148,30 @@ public class VerificationDetectionProcessor implements Runnable {
         // Update the context
         AuthenticationMethod authMethod = context.getAuthenticationMethod();
         authMethod.setAuthCheckingStrategy(AuthCheckingStrategy.POLL_URL);
+        AuthUtils.setPollMethod(context, details.getMsg().getRequestHeader().getMethod());
         authMethod.setPollUrl(details.getMsg().getRequestHeader().getURI().toString());
         authMethod.setLoggedInIndicatorPattern(loggedInIndicator);
         authMethod.setLoggedOutIndicatorPattern(loggedOutIndicator);
         authMethod.setPollData(details.getMsg().getRequestBody().toString());
 
-        String contentType = details.getMsg().getRequestHeader().getHeader(HttpHeader.CONTENT_TYPE);
-        if (contentType != null) {
-            authMethod.setPollHeaders(HttpHeader.CONTENT_TYPE + ": " + contentType);
+        StringBuilder sb = new StringBuilder();
+        DEFAULT_VERIFICATION_HEADERS.forEach(
+                e -> appendHeader(sb, details.getMsg().getRequestHeader(), e));
+        if (!sb.isEmpty()) {
+            authMethod.setPollHeaders(sb.toString());
         }
         AuthUtils.setVerificationDetailsForContext(context.getId(), details);
         Stats.incCounter("stats.auth.configure.verification");
+    }
+
+    private void appendHeader(StringBuilder sb, HttpRequestHeader reqHeader, String headerName) {
+        String headerValue = reqHeader.getHeader(headerName);
+        if (headerValue != null) {
+            sb.append(headerName);
+            sb.append(": ");
+            sb.append(headerValue);
+            sb.append("\n");
+        }
     }
 
     private VerificationRequestDetails repeatRequest(VerificationRequestDetails vrd, boolean auth)
@@ -157,10 +187,8 @@ public class VerificationDetectionProcessor implements Runnable {
                                     origReqHeader.getMethod(),
                                     origReqHeader.getURI(),
                                     origReqHeader.getVersion()));
-            msg.getRequestHeader()
-                    .setHeader(
-                            HttpRequestHeader.CONTENT_TYPE,
-                            origReqHeader.getHeader(HttpRequestHeader.CONTENT_TYPE));
+            DEFAULT_VERIFICATION_HEADERS.forEach(
+                    e -> msg.getRequestHeader().setHeader(e, origReqHeader.getHeader(e)));
 
             msg.getRequestBody().setBody(vrd.getMsg().getRequestBody().getBytes());
             msg.getRequestHeader().setContentLength(msg.getRequestBody().length());

@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 ### Changed
+- Include cause of invalid URL in error message of Replacer job.
+
+## [22] - 2026-03-19
+### Added
+- Method parameter matcher to allow rules to apply to specific HTTP methods (Issue 9016).
+
+### Changed
+- Support multiline replacements in GUI.
+
+### Fixed
+- Correct error message which was shown as missing.
+
+## [21] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
 - Maintenance changes.
 
 ## [20] - 2025-01-10
@@ -128,6 +143,8 @@ the dialogue when other match types are selected.
 
 - First version
 
+[22]: https://github.com/zaproxy/zap-extensions/releases/replacer-v22
+[21]: https://github.com/zaproxy/zap-extensions/releases/replacer-v21
 [20]: https://github.com/zaproxy/zap-extensions/releases/replacer-v20
 [19]: https://github.com/zaproxy/zap-extensions/releases/replacer-v19
 [18]: https://github.com/zaproxy/zap-extensions/releases/replacer-v18

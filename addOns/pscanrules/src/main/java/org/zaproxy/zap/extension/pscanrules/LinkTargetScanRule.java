@@ -60,6 +60,7 @@ public class LinkTargetScanRule extends PluginPassiveScanner implements CommonPa
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A06_INSECURE_DESIGN,
                                 CommonAlertTag.OWASP_2021_A04_INSECURE_DESIGN,
                                 CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG));
         alertTags.put(PolicyTag.PENTEST.getTag(), "");
@@ -156,7 +157,9 @@ public class LinkTargetScanRule extends PluginPassiveScanner implements CommonPa
                 .setDescription(Constant.messages.getString(MESSAGE_PREFIX + "desc"))
                 .setSolution(Constant.messages.getString(MESSAGE_PREFIX + "soln"))
                 .setReference(Constant.messages.getString(MESSAGE_PREFIX + "refs"))
-                .setEvidence(evidence);
+                .setEvidence(evidence)
+                // CWE-1022: Use of Web Link to Untrusted Target with window.opener Access
+                .setCweId(1022);
     }
 
     @Override

@@ -37,11 +37,34 @@ zapAddOn {
                     }
                 }
             }
+            register("org.zaproxy.zap.extension.openapi.llm.ExtensionOpenApiLlm") {
+                classnames {
+                    allowed.set(listOf("org.zaproxy.zap.extension.openapi.llm"))
+                }
+                dependencies {
+                    addOns {
+                        register("llm")
+                    }
+                }
+            }
+            register("org.zaproxy.zap.extension.openapi.scripts.ExtensionOpenApiScripts") {
+                classnames {
+                    allowed.set(listOf("org.zaproxy.zap.extension.openapi.scripts"))
+                }
+                dependencies {
+                    addOns {
+                        register("scripts") {
+                            version.set(">=45.15.0")
+                        }
+                        register("graaljs")
+                    }
+                }
+            }
         }
         dependencies {
             addOns {
                 register("commonlib") {
-                    version.set(">= 1.29.0 & < 2.0.0")
+                    version.set(">= 1.43.0 & < 2.0.0")
                 }
             }
         }
@@ -63,16 +86,17 @@ configurations {
 dependencies {
     zapAddOn("automation")
     zapAddOn("commonlib")
+    zapAddOn("llm")
     zapAddOn("spider")
 
-    implementation("io.swagger.parser.v3:swagger-parser:2.1.23") {
+    implementation(libs.openapi.swagger.parser) {
         // Provided by commonlib add-on:
         exclude(group = "com.fasterxml.jackson")
         exclude(group = "com.fasterxml.jackson.core")
         exclude(group = "com.fasterxml.jackson.dataformat")
         exclude(group = "com.fasterxml.jackson.datatype")
     }
-    implementation("io.swagger:swagger-compat-spec-parser:1.0.71") {
+    implementation(libs.openapi.swagger.compatSpecParser) {
         // Provided by commonlib add-on:
         exclude(group = "com.fasterxml.jackson")
         exclude(group = "com.fasterxml.jackson.core")
@@ -82,9 +106,13 @@ dependencies {
         exclude(group = "com.github.java-json-tools", module = "json-schema-validator")
         exclude(group = "org.apache.httpcomponents", module = "httpclient")
     }
+    implementation("org.apache.commons:commons-lang3:3.18.0")
     implementation(libs.log4j.slf4j2)
 
     testImplementation(parent!!.childProjects.get("commonlib")!!.sourceSets.test.get().output)
+    testImplementation(parent!!.childProjects.get("graaljs")!!.sourceSets.test.get().output)
     testImplementation(libs.log4j.core)
     testImplementation(project(":testutils"))
+    testImplementation(project(":addOns:graaljs"))
+    testImplementation(project(":addOns:scripts"))
 }

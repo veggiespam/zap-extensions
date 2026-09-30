@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 
+## [0.23.0] - 2026-07-13
+### Added
+- SSE stats to telemetry.
+
+## [0.22.0] - 2026-06-26
+### Removed
+- Stop collecting "stats.auth.detect.session.*".
+
+## [0.21.0] - 2026-04-02
+### Added
+- MCP stats to telemetry.
+
+## [0.20.0] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [0.19.0] - 2025-11-25
+### Changed
+- Include the exceptions's file/line in logger statistics.
+
+## [0.18.0] - 2025-11-10
+### Added
+- Postman stats to telemetry.
+- Forced browse stats to telemetry.
+
+### Changed
+- Include the exception name in logger statistics.
+
+## [0.17.0] - 2025-11-04
+### Added
+- AJAX Spider stats to telemetry.
+
+## [0.16.0] - 2025-10-22
+### Added
+- Add statistics for the number of fatal/warn/error logged.
+
+## [0.15.0] - 2025-09-02
+### Added
+- LLM, and Value Generator (Form Handler) stats to telemetry.
+
 ## [0.14.0] - 2025-01-09
 ### Changed
 - Update minimum ZAP version to 2.16.0.
@@ -95,6 +135,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First version supports Check for Updates and News calls.
 
+[0.23.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.23.0
+[0.22.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.22.0
+[0.21.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.21.0
+[0.20.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.20.0
+[0.19.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.19.0
+[0.18.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.18.0
+[0.17.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.17.0
+[0.16.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.16.0
+[0.15.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.15.0
 [0.14.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.14.0
 [0.13.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.13.0
 [0.12.0]: https://github.com/zaproxy/zap-extensions/releases/callhome-v0.12.0

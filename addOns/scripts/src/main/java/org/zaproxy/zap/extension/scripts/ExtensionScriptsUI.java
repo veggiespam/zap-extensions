@@ -36,6 +36,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
+import org.parosproxy.paros.db.Database;
+import org.parosproxy.paros.db.DatabaseException;
+import org.parosproxy.paros.db.DatabaseUnsupportedException;
 import org.parosproxy.paros.extension.Extension;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
@@ -50,12 +53,16 @@ import org.zaproxy.zap.extension.ascan.ExtensionActiveScan;
 import org.zaproxy.zap.extension.authentication.ExtensionAuthentication;
 import org.zaproxy.zap.extension.help.ExtensionHelp;
 import org.zaproxy.zap.extension.script.ExtensionScript;
+import org.zaproxy.zap.extension.script.ProxyScript;
 import org.zaproxy.zap.extension.script.ScriptEngineWrapper;
 import org.zaproxy.zap.extension.script.ScriptEventListener;
 import org.zaproxy.zap.extension.script.ScriptNode;
 import org.zaproxy.zap.extension.script.ScriptType;
 import org.zaproxy.zap.extension.script.ScriptUI;
 import org.zaproxy.zap.extension.script.ScriptWrapper;
+import org.zaproxy.zap.extension.scripts.internal.HttpSenderScriptListener;
+import org.zaproxy.zap.extension.scripts.internal.ProxyListenerScript;
+import org.zaproxy.zap.extension.scripts.internal.db.TableJdo;
 import org.zaproxy.zap.extension.scripts.scanrules.ActiveScriptSynchronizer;
 import org.zaproxy.zap.extension.scripts.scanrules.PassiveScriptSynchronizer;
 import org.zaproxy.zap.extension.stdmenus.PopupContextMenuItemFactory;
@@ -70,6 +77,9 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
     public static final String NAME = "ExtensionScripts";
     private static ImageIcon icon;
     public static final String SCRIPT_EXT_TYPE = "extender";
+    public static final String TYPE_HTTP_SENDER = "httpsender";
+    public static final String TYPE_PROXY = "proxy";
+    public static final String TYPE_TARGETED = "targeted";
 
     /**
      * Capability used to indicate that while scripts of the associated type can be edited in the
@@ -87,6 +97,9 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
     private static final Logger LOGGER = LogManager.getLogger(ExtensionScriptsUI.class);
 
     private ScriptType extScriptType;
+    private ScriptType scriptTypeProxy;
+    private ScriptType scriptTypeTargeted;
+    private ScriptType scriptTypeHttpSender;
     private ExtenderScriptHelper helper;
     private Map<String, ExtenderScript> installedExtenderScripts = new HashMap<>();
     private ScriptEngineWrapper nullEngineWrapper = null;
@@ -117,6 +130,8 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
 
     private final Map<ScriptWrapper, ScriptOutputSource> outputSources = new HashMap<>();
 
+    private TableJdo tableJdo;
+
     // private ZapMenuItem menuEnableScripts = null;
 
     public ExtensionScriptsUI() {
@@ -131,6 +146,28 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
         }
         activeScriptSynchronizer = new ActiveScriptSynchronizer();
         passiveScriptSynchronizer = new PassiveScriptSynchronizer();
+    }
+
+    @Override
+    public boolean supportsDb(String type) {
+        return true;
+    }
+
+    @Override
+    public void databaseOpen(Database db) throws DatabaseException, DatabaseUnsupportedException {
+        try {
+            tableJdo = new TableJdo(db);
+        } catch (Exception e) {
+            LOGGER.warn(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void destroy() {
+        if (tableJdo != null) {
+            tableJdo.unload();
+            tableJdo = null;
+        }
     }
 
     public static ImageIcon getIcon() {
@@ -159,6 +196,47 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
                         true,
                         true);
         this.getExtScript().registerScriptType(extScriptType);
+
+        if (ProxyScript.class.getAnnotation(Deprecated.class) != null) {
+            scriptTypeProxy =
+                    new ScriptType(
+                            TYPE_PROXY,
+                            "scripts.type.proxy",
+                            hasView()
+                                    ? new ImageIcon(
+                                            ExtensionScriptsUI.class.getResource(
+                                                    "/org/zaproxy/zap/extension/scripts/resources/icons/script-proxy.png"))
+                                    : null,
+                            true);
+            extScript.registerScriptType(scriptTypeProxy);
+
+            scriptTypeTargeted =
+                    new ScriptType(
+                            TYPE_TARGETED,
+                            "scripts.type.targeted",
+                            hasView()
+                                    ? new ImageIcon(
+                                            ExtensionScriptsUI.class.getResource(
+                                                    "/org/zaproxy/zap/extension/scripts/resources/icons/script-targeted.png"))
+                                    : null,
+                            false);
+            extScript.registerScriptType(scriptTypeTargeted);
+
+            scriptTypeHttpSender =
+                    new ScriptType(
+                            TYPE_HTTP_SENDER,
+                            "scripts.type.httpsender",
+                            hasView()
+                                    ? new ImageIcon(
+                                            ExtensionScriptsUI.class.getResource(
+                                                    "/org/zaproxy/zap/extension/scripts/resources/icons/script-httpsender.png"))
+                                    : null,
+                            true);
+            extScript.registerScriptType(scriptTypeHttpSender);
+
+            extensionHook.addProxyListener(new ProxyListenerScript(getExtScript()));
+            extensionHook.addHttpSenderListener(new HttpSenderScriptListener(getExtScript()));
+        }
 
         nullEngineWrapper = new NullScriptEngineWrapper();
         this.getExtScript().registerScriptEngineWrapper(nullEngineWrapper);
@@ -309,6 +387,11 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
                 }
             }
             extScript.removeScriptType(extScriptType);
+            if (scriptTypeProxy != null) {
+                extScript.removeScriptType(scriptTypeProxy);
+                extScript.removeScriptType(scriptTypeTargeted);
+                extScript.removeScriptType(scriptTypeHttpSender);
+            }
         }
 
         if (nullEngineWrapper != null) {
@@ -573,7 +656,22 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
                         this.getConsolePanel().setTabFocus();
                     });
         }
-        this.getExtScript().invokeTargetedScript(script, msg);
+        try {
+            org.zaproxy.zap.extension.script.TargetedScript s =
+                    getExtScript()
+                            .getInterface(
+                                    script, org.zaproxy.zap.extension.script.TargetedScript.class);
+
+            if (s != null) {
+                ExtensionScript.recordScriptCalledStats(script);
+                s.invokeWith(msg);
+            } else {
+                extScript.handleFailedScriptInterface(
+                        script, Constant.messages.getString("scripts.interface.targeted.error"));
+            }
+        } catch (Exception e) {
+            extScript.handleScriptException(script, e);
+        }
     }
 
     @Override
@@ -699,15 +797,13 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
     @Override
     public void scriptError(ScriptWrapper script) {
         if (hasView()) {
-            if (script.getLastException() != null) {
-                getView()
-                        .getOutputPanel()
-                        .append(
-                                extractScriptExceptionMessage(script.getLastException()),
-                                script.getName());
-            } else {
-                getView().getOutputPanel().append(script.getLastErrorDetails(), script.getName());
-            }
+            getView()
+                    .getOutputPanel()
+                    .appendAsync(
+                            script.getLastException() != null
+                                    ? extractScriptExceptionMessage(script.getLastException())
+                                    : script.getLastErrorDetails(),
+                            script.getName());
         }
     }
 

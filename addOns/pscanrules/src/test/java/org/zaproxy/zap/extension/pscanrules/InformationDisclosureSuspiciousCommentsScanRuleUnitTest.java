@@ -20,19 +20,25 @@
 package org.zaproxy.zap.extension.pscanrules;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.URIException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.core.scanner.Alert;
@@ -78,7 +84,10 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
         // Given / When
         Map<String, String> tags = rule.getAlertTags();
         // Then
-        assertThat(tags.size(), is(equalTo(4)));
+        assertThat(tags.size(), is(equalTo(5)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A01_BROKEN_AC.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A01_BROKEN_AC.getTag()),
                 is(equalTo(true)));
@@ -89,6 +98,9 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
                 tags.containsKey(CommonAlertTag.WSTG_V42_INFO_05_CONTENT_LEAK.getTag()),
                 is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.PENTEST.getTag()), is(equalTo(true)));
+        assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A01_BROKEN_AC.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A01_BROKEN_AC.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A01_BROKEN_AC.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A01_BROKEN_AC.getValue())));
@@ -142,8 +154,8 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
 
         // Then
         assertEquals(1, alertsRaised.size());
-        assertEquals(Alert.CONFIDENCE_LOW, alertsRaised.get(0).getConfidence());
-        assertEquals("FIXME", alertsRaised.get(0).getEvidence());
+        assertEquals(Alert.CONFIDENCE_MEDIUM, alertsRaised.get(0).getConfidence());
+        assertThat(alertsRaised.get(0).getEvidence(), containsString("FIXME"));
         assertEquals(
                 wrapEvidenceOtherInfo("\\bFIXME\\b", comment, 1),
                 alertsRaised.get(0).getOtherInfo());
@@ -169,7 +181,7 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
     }
 
     @Test
-    void shouldCreateOneAlertforMultipleAndEqualSuspiciousComments()
+    void shouldCreateOneAlertforMultipleAndEqualSuspiciousCommentsJs()
             throws HttpMalformedHeaderException, URIException {
 
         // Given
@@ -187,11 +199,39 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
 
         // Then
         assertEquals(1, alertsRaised.size());
-        assertEquals(Alert.CONFIDENCE_LOW, alertsRaised.get(0).getConfidence());
-        assertEquals("FIXME", alertsRaised.get(0).getEvidence());
+        assertEquals(Alert.CONFIDENCE_MEDIUM, alertsRaised.get(0).getConfidence());
+        assertThat(alertsRaised.get(0).getEvidence(), containsString("FIXME"));
         // detected 2 times, the first in the element
         assertEquals(
-                wrapEvidenceOtherInfo("\\bFIXME\\b", comment, 1),
+                wrapEvidenceOtherInfo("\\bFIXME\\b", comment, 2),
+                alertsRaised.get(0).getOtherInfo());
+    }
+
+    @Test
+    void shouldCreateOneAlertforMultipleAndEqualSuspiciousCommentsHtml()
+            throws HttpMalformedHeaderException, URIException {
+
+        // Given
+        String comment = "<!-- FIXME: foo bar -->";
+        String body =
+                """
+                Some text %s
+                %s <H1>Heading</H1>
+                """
+                        .formatted(comment, comment);
+        HttpMessage msg = createHttpMessageWithRespBody(body, "text/html");
+
+        assertTrue(msg.getResponseHeader().isText());
+
+        // When
+        scanHttpResponseReceive(msg);
+
+        // Then
+        assertEquals(1, alertsRaised.size());
+        assertEquals(Alert.CONFIDENCE_MEDIUM, alertsRaised.get(0).getConfidence());
+        assertThat(alertsRaised.get(0).getEvidence(), containsString("FIXME"));
+        assertEquals(
+                wrapEvidenceOtherInfo("\\bFIXME\\b", comment, 2),
                 alertsRaised.get(0).getOtherInfo());
     }
 
@@ -231,7 +271,7 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
 
         // Then
         assertEquals(1, alertsRaised.size());
-        assertEquals(Alert.CONFIDENCE_LOW, alertsRaised.get(0).getConfidence());
+        assertEquals(Alert.CONFIDENCE_MEDIUM, alertsRaised.get(0).getConfidence());
         assertEquals(
                 wrapEvidenceOtherInfo("\\bTODO\\b", comment, 1),
                 alertsRaised.get(0).getOtherInfo());
@@ -333,9 +373,9 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
     }
 
     @Test
-    void shouldAlertOnSuspiciousValuesInJavascriptSingleLineComment()
+    void shouldNotAlertOnSuspiciousValuesInJavascriptSingleLineComment()
             throws HttpMalformedHeaderException, URIException {
-        shouldAlertOnSuspiciousCommentInJavascriptContent(
+        shouldNotAlertOnSuspiciousCommentInJavascriptContent(
                 """
                 function fooFunction() {
                   var bar = 'Some text // ADMINISTRATOR fake comment';
@@ -344,9 +384,9 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
     }
 
     @Test
-    void shouldAlertOnSuspiciousValuesInJavascriptBlockComment()
+    void shouldNotAlertOnSuspiciousValuesInJavascriptBlockComment()
             throws HttpMalformedHeaderException, URIException {
-        shouldAlertOnSuspiciousCommentInJavascriptContent(
+        shouldNotAlertOnSuspiciousCommentInJavascriptContent(
                 """
                 function fooFunction() {
                   var bar = 'Some text /* ADMINISTRATOR fake comment */';
@@ -354,7 +394,7 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
                 """);
     }
 
-    private void shouldAlertOnSuspiciousCommentInJavascriptContent(String body)
+    private void shouldNotAlertOnSuspiciousCommentInJavascriptContent(String body)
             throws URIException, HttpMalformedHeaderException {
         // Given
         HttpMessage msg = createHttpMessageWithRespBody(body, "application/javascript");
@@ -362,8 +402,7 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
                 () -> InformationDisclosureSuspiciousCommentsScanRule.DEFAULT_PAYLOADS);
         // When
         scanHttpResponseReceive(msg);
-        // Then - Alert since we aren't yet actually parsing the JS
-        assertThat(alertsRaised.size(), is(equalTo(1)));
+        assertThat(alertsRaised, is(empty()));
     }
 
     @Test
@@ -432,6 +471,60 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
         assertEquals(0, alertsRaised.size());
     }
 
+    /**
+     * These cases could be a false positives or false negatives.
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Comments
+     * @see
+     *     https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Deprecated_and_obsolete_features#html_comments
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                // Example of a CDataComment within an HTML script block
+                """
+            <script>
+            <![CDATA[
+            var x = 10;
+            if (x > 5) {
+            // ... some code ...
+            }
+            ]]>
+            </script>
+            """,
+                // Example of a HTMLComment within an HTML script block
+                """
+            <script><!--
+            const x = "Not FixMe which would be a FP.";
+            --></script>
+            """,
+                // This example is a FN, at least the last HTML comment should be caught
+                """
+            <script>
+            <!-- TODO comment
+            console.log("a"); <!-- TODO comment
+            console.log("b");
+            --> TODO comment
+            <!-- TODO comment -->
+            </script>
+            """
+            })
+    void shouldNotAlertOnSuspiciousCommentInNonJsCommentWithinScriptBlock(String body)
+            throws HttpMalformedHeaderException, URIException {
+
+        // Given
+        HttpMessage msg = createHttpMessageWithRespBody(body, "text/html;charset=ISO-8859-1");
+
+        assertTrue(msg.getResponseHeader().isText());
+        assertFalse(ResourceIdentificationUtils.isJavaScript(msg));
+
+        // When
+        scanHttpResponseReceive(msg);
+
+        // Then
+        assertThat(alertsRaised, is(empty()));
+    }
+
     @Test
     void shouldHaveExpectedExample() {
         // Given / When
@@ -451,19 +544,14 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
         assertThat(alert.getEvidence(), is(equalTo("FixMe")));
         assertThat(alert.getCweId(), is(equalTo(615)));
         Map<String, String> tags = alert.getTags();
-        assertThat(tags.size(), is(equalTo(6)));
+        assertThat(tags.size(), is(equalTo(7)));
         assertThat(tags, hasKey("CWE-615"));
+        assertThat(tags, hasKey(CommonAlertTag.OWASP_2025_A01_BROKEN_AC.getTag()));
         assertThat(tags, hasKey(CommonAlertTag.OWASP_2021_A01_BROKEN_AC.getTag()));
         assertThat(tags, hasKey(CommonAlertTag.OWASP_2017_A03_DATA_EXPOSED.getTag()));
         assertThat(tags, hasKey(CommonAlertTag.WSTG_V42_INFO_05_CONTENT_LEAK.getTag()));
         assertThat(tags, hasKey(CommonAlertTag.CUSTOM_PAYLOADS.getTag()));
         assertThat(tags, hasKey(PolicyTag.PENTEST.getTag()));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 
     private static String wrapEvidenceOtherInfo(String evidence, String info, int count) {
@@ -481,5 +569,30 @@ class InformationDisclosureSuspiciousCommentsScanRuleUnitTest
                 + " times, the first in likely comment: \""
                 + info
                 + "\", see evidence field for the suspicious comment/snippet.";
+    }
+
+    static Stream<Arguments> contextualEvidenceData() {
+        return Stream.of(
+                arguments("// FIXME", "// FIXME"),
+                arguments("// FIXME         1         2|", "// FIXME         1         2"),
+                arguments("// |2         1         FIXME", "2         1         FIXME"),
+                arguments(
+                        "// |2         1         FIXME         1         2|",
+                        "2         1         FIXME         1         2"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("contextualEvidenceData")
+    void shouldProvideContextualEvidenceAroundMatch(String comment, String evidence)
+            throws HttpMalformedHeaderException, URIException {
+        // Given
+        HttpMessage msg = createHttpMessageWithRespBody(comment, "application/javascript");
+
+        // When
+        scanHttpResponseReceive(msg);
+
+        // Then
+        assertEquals(1, alertsRaised.size());
+        assertThat(alertsRaised.get(0).getEvidence(), is(equalTo(evidence)));
     }
 }

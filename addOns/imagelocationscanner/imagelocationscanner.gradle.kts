@@ -13,7 +13,7 @@ zapAddOn {
         dependencies {
             addOns {
                 register("commonlib") {
-                    version.set(">= 1.32.0 & < 2.0.0")
+                    version.set(">= 1.40.0 & < 2.0.0")
                 }
             }
         }
@@ -23,7 +23,7 @@ zapAddOn {
 dependencies {
     zapAddOn("commonlib")
 
-    implementation("com.drewnoakes:metadata-extractor:2.19.0")
+    implementation(libs.imagelocationscanner.metadataExtractor)
 
     testImplementation(project(":testutils"))
 }

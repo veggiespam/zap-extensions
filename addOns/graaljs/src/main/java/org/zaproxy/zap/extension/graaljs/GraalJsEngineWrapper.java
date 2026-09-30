@@ -77,10 +77,11 @@ public class GraalJsEngineWrapper extends DefaultEngineWrapper {
                         .option("js.load", "true")
                         .option("js.print", "true")
                         .option("js.nashorn-compat", "true")
+                        .option("js.ecmascript-version", "2024")
                         .allowAllAccess(true)
                         .hostClassLoader(hostClassLoader);
 
-        return GraalJSScriptEngine.create(engine, contextBuilder);
+        return new ScriptEngineCleaner(GraalJSScriptEngine.create(engine, contextBuilder));
     }
 
     @Override

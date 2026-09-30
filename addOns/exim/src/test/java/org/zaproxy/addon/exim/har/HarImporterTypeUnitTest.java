@@ -21,6 +21,7 @@ package org.zaproxy.addon.exim.har;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,8 +29,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.parosproxy.paros.network.HttpMessage;
+import org.zaproxy.addon.exim.ImporterOptions;
 
 /** Unit test for {@link HarImporterType}. */
 class HarImporterTypeUnitTest {
@@ -50,7 +57,8 @@ class HarImporterTypeUnitTest {
         // Given
         Reader reader = reader("");
         // When / Then
-        IOException e = assertThrows(IOException.class, () -> importer.begin(reader));
+        IOException e =
+                assertThrows(IOException.class, () -> importer.importData(reader, msg -> {}));
         assertThat(e.getMessage(), is(equalTo("Unexpected token null, expected: START_OBJECT")));
     }
 
@@ -59,7 +67,8 @@ class HarImporterTypeUnitTest {
         // Given
         Reader reader = reader("{}");
         // When / Then
-        IOException e = assertThrows(IOException.class, () -> importer.begin(reader));
+        IOException e =
+                assertThrows(IOException.class, () -> importer.importData(reader, msg -> {}));
         assertThat(
                 e.getMessage(), is(equalTo("Unexpected token END_OBJECT, expected: FIELD_NAME")));
     }
@@ -69,7 +78,8 @@ class HarImporterTypeUnitTest {
         // Given
         Reader reader = reader("{\"not_log\":{}}");
         // When / Then
-        IOException e = assertThrows(IOException.class, () -> importer.begin(reader));
+        IOException e =
+                assertThrows(IOException.class, () -> importer.importData(reader, msg -> {}));
         assertThat(e.getMessage(), is(equalTo("Unexpected name not_log, expected: log")));
     }
 
@@ -78,7 +88,8 @@ class HarImporterTypeUnitTest {
         // Given
         Reader reader = reader("{\"log\":[]}");
         // When / Then
-        IOException e = assertThrows(IOException.class, () -> importer.begin(reader));
+        IOException e =
+                assertThrows(IOException.class, () -> importer.importData(reader, msg -> {}));
         assertThat(
                 e.getMessage(),
                 is(equalTo("Unexpected token START_ARRAY, expected: START_OBJECT")));
@@ -89,7 +100,8 @@ class HarImporterTypeUnitTest {
         // Given
         Reader reader = reader("{\"log\":{}}");
         // When / Then
-        IOException e = assertThrows(IOException.class, () -> importer.begin(reader));
+        IOException e =
+                assertThrows(IOException.class, () -> importer.importData(reader, msg -> {}));
         assertThat(e.getMessage(), is(equalTo("Failed to find entries property in HAR log.")));
     }
 
@@ -98,7 +110,8 @@ class HarImporterTypeUnitTest {
         // Given
         Reader reader = reader("{\"log\":{\"entries\":{}}}");
         // When / Then
-        IOException e = assertThrows(IOException.class, () -> importer.begin(reader));
+        IOException e =
+                assertThrows(IOException.class, () -> importer.importData(reader, msg -> {}));
         assertThat(
                 e.getMessage(),
                 is(equalTo("Unexpected token START_OBJECT, expected: START_ARRAY")));
@@ -109,14 +122,35 @@ class HarImporterTypeUnitTest {
         // Given
         Reader reader = reader("{\"log\":{\"entries\":[]}}");
         // When / Then
-        assertDoesNotThrow(() -> importer.begin(reader));
+        assertDoesNotThrow(() -> importer.importData(reader, msg -> {}));
     }
 
     @Test
-    void shouldNotThrowWhenReadingEnd() {
+    void shouldLimitMessagesWhenMaxMessagesSet() throws Exception {
         // Given
-        Reader reader = reader("…");
-        // When / Then
-        assertDoesNotThrow(() -> importer.end(reader));
+        HttpMessage msg1 =
+                new HttpMessage("GET /1 HTTP/1.1", new byte[0], "HTTP/1.1 200 OK", new byte[0]);
+        HttpMessage msg2 =
+                new HttpMessage("GET /2 HTTP/1.1", new byte[0], "HTTP/1.1 200 OK", new byte[0]);
+        byte[] har =
+                HarUtils.toJsonAsBytes(
+                        HarUtils.createZapHarLog()
+                                .entries(
+                                        List.of(
+                                                HarUtils.createHarEntry(msg1),
+                                                HarUtils.createHarEntry(msg2)))
+                                .build());
+        List<HttpMessage> imported = new ArrayList<>();
+        ImporterOptions options =
+                ImporterOptions.builder()
+                        .setInputFile(Path.of("unused.har"))
+                        .setMessageHandler(imported::add)
+                        .setMaxMessages(1)
+                        .build();
+        // When
+        importer.importData(
+                reader(new String(har, StandardCharsets.UTF_8)), imported::add, options);
+        // Then
+        assertThat(imported, hasSize(1));
     }
 }

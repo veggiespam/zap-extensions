@@ -91,6 +91,7 @@ import org.zaproxy.zest.core.v1.ZestExpressionRegex;
 import org.zaproxy.zest.core.v1.ZestExpressionResponseTime;
 import org.zaproxy.zest.core.v1.ZestExpressionStatusCode;
 import org.zaproxy.zest.core.v1.ZestExpressionURL;
+import org.zaproxy.zest.core.v1.ZestJSON;
 import org.zaproxy.zest.core.v1.ZestLoopClientElements;
 import org.zaproxy.zest.core.v1.ZestLoopFile;
 import org.zaproxy.zest.core.v1.ZestLoopInteger;
@@ -102,6 +103,7 @@ import org.zaproxy.zest.core.v1.ZestRuntime;
 import org.zaproxy.zest.core.v1.ZestScript;
 import org.zaproxy.zest.core.v1.ZestStatement;
 import org.zaproxy.zest.core.v1.ZestVariables;
+import org.zaproxy.zest.core.v1.ZestYaml;
 
 public class ZestZapUtils {
 
@@ -1034,7 +1036,11 @@ public class ZestZapUtils {
             try {
                 msg.setResponseHeader(new HttpResponseHeader(response.getHeaders()));
             } catch (Exception e) {
-                LOGGER.error(e.getMessage(), e);
+                LOGGER.error(
+                        "Failed to get headers {} from {}",
+                        e.getMessage(),
+                        response.getHeaders(),
+                        e);
             }
             msg.setResponseBody(response.getBody());
             msg.setTimeElapsedMillis((int) response.getResponseTimeInMs());
@@ -1044,7 +1050,12 @@ public class ZestZapUtils {
     }
 
     public static ZestResponse toZestResponse(HttpMessage msg) throws MalformedURLException {
-        return toZestResponse(new URL(msg.getRequestHeader().getURI().toString()), msg);
+        try {
+            return toZestResponse(
+                    new java.net.URI(msg.getRequestHeader().getURI().toString()).toURL(), msg);
+        } catch (java.net.URISyntaxException e) {
+            throw new MalformedURLException(e.getMessage());
+        }
     }
 
     private static ZestResponse toZestResponse(URL url, HttpMessage msg) {
@@ -1071,7 +1082,11 @@ public class ZestZapUtils {
             throw new HttpMalformedHeaderException("The request header does not have a URI.");
         }
 
-        req.setUrl(new URL(uri.toString()));
+        try {
+            req.setUrl(new java.net.URI(uri.toString()).toURL());
+        } catch (java.net.URISyntaxException e) {
+            throw new MalformedURLException(e.getMessage());
+        }
         if (replaceTokens) {
             req.setUrlToken(correctTokens(uri.toString()));
             req.setData(correctTokens(msg.getRequestBody().toString()));
@@ -1247,5 +1262,21 @@ public class ZestZapUtils {
                     ZestAssignCalc.OPERAND_DIVIDE);
         }
         return labelsToCalcOperation.get(label);
+    }
+
+    public static ZestScript parseZestScript(String content) {
+        if (content == null || content.isBlank()) {
+            return null;
+        }
+        try {
+            ZestElement element =
+                    content.trim().startsWith("{")
+                            ? ZestJSON.fromString(content)
+                            : ZestYaml.fromString(content);
+            return element instanceof ZestScript ? (ZestScript) element : null;
+        } catch (Exception e) {
+            LOGGER.debug("Failed to parse Zest script: {}", e.getMessage());
+            return null;
+        }
     }
 }

@@ -57,8 +57,9 @@ class UserAgentScanRuleUnitTest extends ActiveScannerTest<UserAgentScanRule> {
         // Given / When
         Map<String, String> tags = rule.getAlertTags();
         // Then
-        assertThat(tags.size(), is(equalTo(2)));
+        assertThat(tags.size(), is(equalTo(3)));
         assertThat(tags, hasKey(CommonAlertTag.CUSTOM_PAYLOADS.getTag()));
+        assertThat(tags, hasKey(CommonAlertTag.SYSTEMIC.getTag()));
         assertThat(tags, hasKey(PolicyTag.PENTEST.getTag()));
     }
 
@@ -73,11 +74,5 @@ class UserAgentScanRuleUnitTest extends ActiveScannerTest<UserAgentScanRule> {
         assertThat(alert.getConfidence(), is(equalTo(Alert.CONFIDENCE_MEDIUM)));
         assertThat(alert.getParam(), is(equalTo("Header User-Agent")));
         assertThat(alert.getAttack(), is(equalTo("ExampleBot 1.1")));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 }

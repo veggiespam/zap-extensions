@@ -4,6 +4,53 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Changed
+- Maintenance changes.
+- Update dependency.
+- Include cause of invalid URL in error message of Ajax Spider job.
+- Clarify Automation Framework job behaviour when `clickDefaultElems` is false and no `elements` provided.
+- Depend on newer version of Selenium add-on.
+
+## [23.32.0] - 2026-07-06
+### Changed
+- Help to show that the Client Spider is now the recommended option for modern apps.
+
+## [23.31.0] - 2026-05-21
+### Added
+- Missing parameters from the spiderAjax help page.
+
+### Changed
+- Update dependency.
+
+## [23.30.0] - 2026-04-02
+### Changed
+- Update Crawljax to version 3.8.0 (Issues 3412 and 7138).
+
+## [23.29.0] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [23.28.0] - 2025-12-03
+### Fixed
+- Correct bundled logging dependencies.
+
+## [23.27.0] - 2025-11-04
+### Added
+- Spider stats.
+
+### Fixed
+- Correctly validate browser IDs.
+
+## [23.26.0] - 2025-09-02
+### Added
+- Support for stopping the spiderAjax automation job.
+
+## [23.25.0] - 2025-07-10
+### Fixed
+- Correct configuration key for Logout Avoidance (Issue 8994).
+- Error logs to always include stack trace.
+
+## [23.24.0] - 2025-06-20
 ### Added
 - Allow to configure how the scope is checked, either Flexible or Strict, to allow or not access to out of scope domains.
 - Allow to avoid logout elements.
@@ -350,6 +397,15 @@ By default it allows files with extension `.js` and `.css`.
 
 
 
+[23.32.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.32.0
+[23.31.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.31.0
+[23.30.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.30.0
+[23.29.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.29.0
+[23.28.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.28.0
+[23.27.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.27.0
+[23.26.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.26.0
+[23.25.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.25.0
+[23.24.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.24.0
 [23.23.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.23.0
 [23.22.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.22.0
 [23.21.0]: https://github.com/zaproxy/zap-extensions/releases/spiderAjax-v23.21.0

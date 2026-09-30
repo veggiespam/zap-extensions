@@ -63,6 +63,7 @@ class HashDisclosureScanRuleUnitTest extends PassiveScannerTest<HashDisclosureSc
         assertThat(alertsRaised.size(), is(1));
         assertThat(alertsRaised.get(0).getName(), is("Hash Disclosure - MD4 / MD5"));
         assertThat(alertsRaised.get(0).getEvidence(), is(hashVal));
+        assertThat(alertsRaised.get(0).getAlertRef(), is("10097-16"));
     }
 
     @Test
@@ -184,14 +185,8 @@ class HashDisclosureScanRuleUnitTest extends PassiveScannerTest<HashDisclosureSc
         // Given / When
         List<Alert> alerts = rule.getExampleAlerts();
         // Then
-        assertThat(alerts.size(), is(equalTo(1)));
+        assertThat(alerts.size(), is(equalTo(16)));
         assertThat(alerts.get(0).getCweId(), is(equalTo(497)));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 
     private static HttpMessage createMsg(String hashVal) throws HttpMalformedHeaderException {

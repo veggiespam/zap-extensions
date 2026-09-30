@@ -5,11 +5,158 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 ### Added
-- Client Spider scope check.
-- Added optional parameters for Page Load Time and Max Crawl Depth to the Client Spider API.
+- Stand in for the AJAX Spider's `spiderAjax` automation job and `ajaxSpider` API, using the Client Spider, when the AJAX Spider add-on is not installed.
+- Add `runOnlyIfModern` option to the `spiderClient` automation job, to only run the Client Spider if a "Modern Web Application" alert has been raised.
 
 ### Changed
-- Updated Chrome and Firefox extensions to v0.1.2.
+- Updated Chrome and Firefox full extensions to v0.2.3.
+- Update the Client Spider clear action title capitalization (Issue 2000).
+- Depend on newer version of Selenium add-on.
+- Adjust log level to reduce log pollution.
+
+### Fixed
+- Respect spider and global exclusions (Issue 9439).
+- Execute Selenium scripts synchronously when the browser is launched (Issue 9472).
+- Address exception while handling browser extension events.
+
+## [0.31.0] - 2026-08-14
+### Changed
+- Maintenance changes.
+- Include cause of invalid URL in error message of Client Spider job.
+- Updated Chrome and Firefox recorders to v0.2.1.
+- Check launched browsers can access the callback URL, and retry more often.
+- Updated Chrome and Firefox full extensions to v0.2.2.
+
+## [0.30.0] - 2026-07-06
+### Changed
+- Wait always after component navigation while crawling.
+- Follow any navigation component while crawling.
+- Crawl component state changes.
+- Help to show that the Client Spider is now the recommended option for modern apps.
+
+### Fixed
+- Normalise behaviour of Delete context menu item.
+
+## [0.29.0] - 2026-06-30
+### Changed
+- Use new functionality from the browser extension for crawling.
+- Fill text areas while crawling.
+
+### Fixed
+- Spider should finish when existingOnly option used with an empty Client Map. 
+
+## [0.28.0] - 2026-06-26
+### Added
+- Client Spider existingOnly option, e.g. for scan rules.
+ 
+### Changed
+- Reduce duplicated accesses while crawling.
+- Use adaptive wait by default for page load and action waits while crawling.
+- Default threads to 1/2 number of cores, max 8.
+- Updated Chrome and Firefox extensions to v0.2.0.
+
+### Fixed
+- Prevent temporary GUI hang when stopping the Client Spider.
+
+## [0.27.0] - 2026-06-12
+### Added
+- Client Spider Options panel.
+- Support for ZAP modes in the Client Spider.
+- Show Client Spider icon in the Sites tree.
+- More option API endpoints.
+
+### Changed
+- Change the Client Spider to crawl through page components (e.g. links) to reduce full page reloads, improving support for SPAs.
+
+### Fixed
+- Change the Client Spider to track all redirects while crawling.
+
+## [0.26.0] - 2026-05-27
+### Added
+- More programmatic control of the spider.
+
+## [0.25.0] - 2026-05-22
+### Changed
+- Updated Chrome and Firefox extensions to v0.1.9.
+- Maintenance changes.
+
+### Fixed
+- Prevent interferences between the spiders and manual actions.
+- Prevent loops when acting on elements due appended input data.
+
+## [0.24.0] - 2026-05-07
+### Added
+- Client spider option "Action Wait Time".
+
+### Changed
+- Client map export to report the number of items exported.
+
+## Fixed
+- Client map export to export contexts defined with paths, e.g. like https://example.com/test/
+
+## [0.23.0] - 2026-05-06
+### Changed
+- Client spider to wait for all browsers to close before reporting it has finished.
+
+## [0.22.0] - 2026-04-14
+### Added
+- Persist Client History entries in the session.
+- Add a button in the Client History tab to clear the history from both the GUI and session.
+- Support exporting the Client Map via the Automation Framework export job (requires the Import/Export add-on).
+
+### Changed
+- Allow callback implementors to handle browsers closing.
+- Depend on Database add-on.
+
+## [0.21.0] - 2026-03-31
+### Added
+- Support for other add-ons to piggyback the secure connection established with the ZAP browser extension.
+- Allow to avoid logout elements with the spider.
+
+### Changed
+- Set the extension order so that it will always be available to unordered extensions.
+- Maintenance changes.
+
+## [0.20.0] - 2025-12-15
+### Changed
+- Update the automation framework template to include missing field (`scopeCheck`).
+- Update minimum ZAP version to 2.17.0.
+- Updated Chrome and Firefox extensions to v0.1.8.
+
+## [0.19.0] - 2025-12-03
+### Changed
+- Updated Chrome and Firefox extensions to v0.1.7.
+- Bundle Chrome extension unpacked due changes in Chrome.
+
+## [0.18.0] - 2025-11-04
+### Added
+- Add optional parameters for the Client Spider API action `scan`:
+  - `numberOfBrowsers` - control concurrency (number of browser windows).
+  - `scopeCheck` - select Scope Check (Flexible or Strict).
+- Spider stats.
+
+## [0.17.0] - 2025-09-02
+### Added
+- Edge recorder link to help.
+- Support for stopping the spiderCient automation job.
+- Support for configuring the client passive scan rules via the passiveScan-config Automation Framework job. This add-on now depends on the pscan add-on.
+
+### Changed
+- Updated Chrome and Firefox extensions to v0.1.6.
+- Reduce warnings when passive scanning.
+
+### Fixed
+- Error logs to always include stack trace.
+- Log Firefox missing at debug instead of error.
+
+## [0.16.0] - 2025-06-20
+### Added
+- Client Spider scope check.
+- Added optional parameters for Page Load Time and Max Crawl Depth to the Client Spider API.
+- Recording advice and guidance.
+
+### Changed
+- Updated Chrome and Firefox extensions to v0.1.3.
 
 ### Fixed
 - Client Spider to allow all requests while authenticating.
@@ -144,6 +291,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First version.
 
+[0.31.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.31.0
+[0.30.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.30.0
+[0.29.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.29.0
+[0.28.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.28.0
+[0.27.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.27.0
+[0.26.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.26.0
+[0.25.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.25.0
+[0.24.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.24.0
+[0.23.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.23.0
+[0.22.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.22.0
+[0.21.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.21.0
+[0.20.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.20.0
+[0.19.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.19.0
+[0.18.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.18.0
+[0.17.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.17.0
+[0.16.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.16.0
 [0.15.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.15.0
 [0.14.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.14.0
 [0.13.0]: https://github.com/zaproxy/zap-extensions/releases/client-v0.13.0

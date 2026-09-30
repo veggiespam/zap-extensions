@@ -4,6 +4,32 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Fixed
+- The tags stored for an alert are no longer lost when the alert is changed by an alert filter.
+- The alert tree is no longer updated twice when an alert is changed by an alert filter.
+
+## [28] - 2026-09-25
+### Fixed
+- The `alertFilter` automation framework job now correctly reads the `deleteGlobalAlerts` parameter.
+- Defaulting a new automation framework job rule to Directory Browsing (0) correctly recorded.
+
+## [27] - 2026-08-07
+### Added
+- Added an optional LLM extension for reviewing alerts.
+
+### Changed
+- Maintenance changes.
+
+## [26] - 2025-12-15
+### Changed
+- Update the automation framework template and help to include missing fields (`ruleName` and `methods`).
+- Update minimum ZAP version to 2.17.0.
+
+## [25] - 2025-11-04
+### Changed
+- Include String as supported type for the Automation Framework `alertFilter` job's `ruleId` field.
+
+## [24] - 2025-06-20
 ### Changed
 - Use the alert reference for statistics.
 - Workaround core issue that prevents the filters to be correctly applied (Issue 8888).
@@ -154,6 +180,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First version
 
+[28]: https://github.com/zaproxy/zap-extensions/releases/alertFilters-v28
+[27]: https://github.com/zaproxy/zap-extensions/releases/alertFilters-v27
+[26]: https://github.com/zaproxy/zap-extensions/releases/alertFilters-v26
+[25]: https://github.com/zaproxy/zap-extensions/releases/alertFilters-v25
+[24]: https://github.com/zaproxy/zap-extensions/releases/alertFilters-v24
 [23]: https://github.com/zaproxy/zap-extensions/releases/alertFilters-v23
 [22]: https://github.com/zaproxy/zap-extensions/releases/alertFilters-v22
 [21]: https://github.com/zaproxy/zap-extensions/releases/alertFilters-v21

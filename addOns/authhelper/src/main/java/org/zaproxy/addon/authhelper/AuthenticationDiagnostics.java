@@ -21,8 +21,11 @@ package org.zaproxy.addon.authhelper;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 import javax.jdo.PersistenceManager;
 import javax.jdo.Transaction;
@@ -31,6 +34,7 @@ import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.OutputType;
+import org.openqa.selenium.ScriptKey;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
@@ -48,8 +52,10 @@ import org.zaproxy.addon.authhelper.internal.db.DiagnosticMessage;
 import org.zaproxy.addon.authhelper.internal.db.DiagnosticScreenshot;
 import org.zaproxy.addon.authhelper.internal.db.DiagnosticStep;
 import org.zaproxy.addon.authhelper.internal.db.DiagnosticWebElement;
+import org.zaproxy.addon.authhelper.internal.db.DiagnosticWebElement.SelectorType;
 import org.zaproxy.addon.authhelper.internal.db.TableJdo;
 import org.zaproxy.zap.extension.zest.ZestZapUtils;
+import org.zaproxy.zap.model.Context;
 import org.zaproxy.zap.network.HttpSenderListener;
 import org.zaproxy.zest.core.v1.ZestClientElement;
 import org.zaproxy.zest.core.v1.ZestClientElementClear;
@@ -65,11 +71,135 @@ public class AuthenticationDiagnostics implements AutoCloseable {
 
     private static final Logger LOGGER = LogManager.getLogger(AuthenticationDiagnostics.class);
 
+    private static final List<DiagnosticDataProvider> diagnosticDataProviders =
+            Collections.synchronizedList(new ArrayList<>());
+
+    private static final List<MessageAccessedConsumer> messageAccessedConsumers =
+            Collections.synchronizedList(new ArrayList<>());
+
+    private static final String ELEMENT_SELECTOR_SCRIPT =
+            """
+function isElementPathUnique(path, documentElement) {
+  const elements = documentElement.querySelectorAll(path);
+  return elements.length === 1;
+}
+
+function isElementXPathUnique(xpath, documentElement) {
+  const result = documentElement.evaluate(
+    xpath,
+    documentElement,
+    null,
+    XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+    null,
+  );
+  return result.snapshotLength === 1;
+}
+
+function getCSSSelector(element, documentElement) {
+  let selector = element.tagName.toLowerCase();
+  if (selector === "html") {
+    selector = "body";
+  } else if (element === documentElement.body) {
+    selector = "body";
+  } else if (element.parentNode) {
+    const parentSelector = getCSSSelector(element.parentNode, documentElement);
+    selector = `${parentSelector} > ${selector}`;
+  }
+  return selector;
+}
+
+function getXPath(element, documentElement) {
+  if (!element.tagName) {
+    return "";
+  }
+
+  let selector = element.tagName.toLowerCase();
+
+  if (element.id && isElementXPathUnique(selector, documentElement)) {
+    selector += `[@id="${element.id}"]`;
+  } else {
+    let index = 1;
+    let sibling = element.previousSibling;
+    let isUnique = true;
+    while (sibling) {
+      if (
+        sibling.nodeType === Node.ELEMENT_NODE &&
+        sibling.nodeName === element.nodeName
+      ) {
+        index += 1;
+        isUnique = false;
+      }
+      sibling = sibling.previousSibling;
+    }
+
+    if (isUnique) {
+      sibling = element.nextSibling;
+      while (sibling) {
+        if (
+          sibling.nodeType === Node.ELEMENT_NODE &&
+          sibling.nodeName === element.nodeName
+        ) {
+          isUnique = false;
+          break;
+        }
+        sibling = sibling.nextSibling;
+      }
+    }
+
+    if (index !== 1 || !isUnique) {
+      selector += `[${index}]`;
+    }
+  }
+
+  if (element.parentNode) {
+    const parentSelector = getXPath(element.parentNode, documentElement);
+    selector = `${parentSelector}/${selector}`;
+  }
+  return selector;
+}
+
+function getSelector(element, documentElement) {
+  const selector = { type: "", value: "" };
+
+  if (element.id) {
+    selector.type = "css";
+    selector.value = `#${element.id}`;
+  } else if (
+    element.classList.length === 1 &&
+    element.classList.item(0) != null &&
+    isElementPathUnique(`.${element.classList.item(0)}`, documentElement)
+  ) {
+    selector.type = "css";
+    selector.value = `.${element.classList.item(0)}`;
+  } else {
+    const cssSelector = getCSSSelector(element, documentElement);
+    if (cssSelector && isElementPathUnique(cssSelector, documentElement)) {
+      selector.type = "css";
+      selector.value = cssSelector;
+    } else {
+      const xpath = getXPath(element, documentElement);
+      if (xpath) {
+        selector.type = "xpath";
+        selector.value = xpath;
+      }
+    }
+  }
+
+  return selector;
+}
+
+return getSelector(arguments[0], document)
+""";
+
+    private final HttpSenderListener messageAccessedListener;
+
     private final boolean enabled;
 
     private Diagnostic diagnostic;
     private HttpSenderListener listener;
     private DiagnosticStep currentStep;
+    private ScriptKey elementSelectorScriptKey;
+    private boolean interrupted;
 
     public AuthenticationDiagnostics(
             boolean enabled, String authenticationMethod, String context, String user) {
@@ -83,6 +213,32 @@ public class AuthenticationDiagnostics implements AutoCloseable {
             String user,
             String script) {
         this.enabled = enabled;
+
+        messageAccessedListener =
+                new HttpSenderListener() {
+
+                    private Context ctx = Model.getSingleton().getSession().getContext(context);
+
+                    @Override
+                    public void onHttpResponseReceive(
+                            HttpMessage msg, int initiator, HttpSender sender) {
+                        // Nothing to do.
+
+                    }
+
+                    @Override
+                    public void onHttpRequestSend(
+                            HttpMessage msg, int initiator, HttpSender sender) {
+                        messageAccessedConsumers.forEach(e -> e.messageAccessed(ctx, msg));
+                    }
+
+                    @Override
+                    public int getListenerOrder() {
+                        return 0;
+                    }
+                };
+        HttpSender.addListener(messageAccessedListener);
+
         if (!enabled) {
             return;
         }
@@ -149,7 +305,7 @@ public class AuthenticationDiagnostics implements AutoCloseable {
 
         for (int i = 0; i < zestScript.getStatements().size(); i++) {
             ZestStatement stmt = zestScript.getStatements().get(i);
-            if (stmt instanceof ZestClientElementClear) {
+            if (stmt instanceof ZestClientElementClear || !stmt.isEnabled()) {
                 continue;
             }
 
@@ -167,6 +323,7 @@ public class AuthenticationDiagnostics implements AutoCloseable {
                 screenshotDiag.setDescription(
                         Constant.messages.getString(
                                 "authhelper.auth.method.diags.zest.interaction",
+                                element.getIndex(),
                                 ZestZapUtils.toUiString(element, false)));
                 i += 1;
                 zestScript.getStatements().add(i, screenshotDiag);
@@ -201,24 +358,47 @@ public class AuthenticationDiagnostics implements AutoCloseable {
         try {
             Thread.sleep(150);
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            interrupted = true;
         }
 
         currentStep.setCreateTimestamp(Instant.now());
-        currentStep.setUrl(wd.getCurrentUrl());
+        currentStep.setUrl(withInterruptHandled(wd::getCurrentUrl));
         currentStep.setDescription(description);
 
         if (wd instanceof TakesScreenshot ts) {
             DiagnosticScreenshot screenshot = new DiagnosticScreenshot();
-            screenshot.setData(ts.getScreenshotAs(OutputType.BASE64));
+            screenshot.setData(withInterruptHandled(() -> ts.getScreenshotAs(OutputType.BASE64)));
             screenshot.setCreateTimestamp(Instant.now());
             screenshot.setStep(currentStep);
             currentStep.setScreenshot(screenshot);
         }
 
+        try {
+            recordElements(wd, element);
+            recordStorage(wd);
+        } catch (WebDriverException e) {
+            if (!(e.getCause() instanceof InterruptedException)) {
+                throw e;
+            }
+            interrupted = true;
+        }
+
+        createStep();
+
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void recordElements(WebDriver wd, WebElement element) {
+        if (interrupted) {
+            return;
+        }
+
         List<WebElement> foundElements =
-                resetWait(wd, () -> wd.findElements(By.xpath("//input|//button")));
-        List<WebElement> forms = resetWait(wd, () -> wd.findElements(By.xpath("//form")));
+                resetWait(wd, () -> wd.findElements(By.xpath("//input|//button")), () -> List.of());
+        List<WebElement> forms =
+                resetWait(wd, () -> wd.findElements(By.xpath("//form")), () -> List.of());
 
         currentStep.setWebElement(createDiagnosticWebElement(wd, forms, element));
         for (WebElement foundElement : foundElements) {
@@ -227,55 +407,82 @@ public class AuthenticationDiagnostics implements AutoCloseable {
                 currentStep.getWebElements().add(field);
             }
         }
+    }
+
+    private void recordStorage(WebDriver wd) {
+        if (interrupted) {
+            return;
+        }
 
         if (wd instanceof JavascriptExecutor je) {
             for (var type : DiagnosticBrowserStorageItem.Type.values()) {
                 processStorage(je, type);
             }
         }
+    }
 
-        createStep();
+    private <T> T withInterruptHandled(Supplier<T> function) {
+        interrupted |= Thread.interrupted();
+
+        try {
+            return function.get();
+        } catch (WebDriverException e) {
+            if (!(e.getCause() instanceof InterruptedException)) {
+                throw e;
+            }
+
+            // Retry again with interruption cleared.
+            interrupted |= Thread.interrupted();
+
+            return function.get();
+        }
     }
 
     /**
      * Reset the webdriver implicit wait - use when you want the current state and don't want any
      * delays.
      */
-    private static <T> T resetWait(WebDriver wd, Supplier<? extends T> function) {
+    private static <T> T resetWait(
+            WebDriver wd, Supplier<? extends T> function, Supplier<T> defaultValue) {
         Duration duration = wd.manage().timeouts().getImplicitWaitTimeout();
         wd.manage().timeouts().implicitlyWait(Duration.ofMillis(0));
         try {
             return function.get();
         } catch (Exception e) {
-            return null;
+            return defaultValue.get();
         } finally {
             wd.manage().timeouts().implicitlyWait(duration);
         }
     }
 
     private void processStorage(JavascriptExecutor je, DiagnosticBrowserStorageItem.Type type) {
-        @SuppressWarnings("unchecked")
-        List<Map<String, String>> storage =
-                (List<Map<String, String>>) je.executeScript(type.getScript());
-        if (storage == null || storage.isEmpty()) {
-            return;
-        }
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> storage =
+                    (List<Map<String, String>>) je.executeScript(type.getScript());
+            if (storage == null || storage.isEmpty()) {
+                return;
+            }
 
-        storage.stream()
-                .map(
-                        e -> {
-                            DiagnosticBrowserStorageItem item = new DiagnosticBrowserStorageItem();
-                            item.setCreateTimestamp(Instant.now());
-                            item.setStep(currentStep);
-                            item.setType(type);
-                            item.setKey(e.get("key"));
-                            item.setValue(e.get("value"));
-                            return item;
-                        })
-                .forEach(currentStep.getBrowserStorageItems()::add);
+            storage.stream()
+                    .map(
+                            e -> {
+                                DiagnosticBrowserStorageItem item =
+                                        new DiagnosticBrowserStorageItem();
+                                item.setCreateTimestamp(Instant.now());
+                                item.setStep(currentStep);
+                                item.setType(type);
+                                item.setKey(e.get("key"));
+                                item.setValue(e.get("value"));
+                                return item;
+                            })
+                    .forEach(currentStep.getBrowserStorageItems()::add);
+        } catch (WebDriverException e) {
+            LOGGER.debug("Failed to process the storage:", e);
+        }
     }
 
-    private static DiagnosticWebElement createDiagnosticWebElement(
+    private DiagnosticWebElement createDiagnosticWebElement(
             WebDriver wd, List<WebElement> forms, WebElement element) {
         if (element == null) {
             return null;
@@ -291,13 +498,24 @@ public class AuthenticationDiagnostics implements AutoCloseable {
                     int idx = forms.indexOf(form);
                     diagElement.setFormIndex(idx != -1 ? idx : null);
                 }
+
+                if (elementSelectorScriptKey == null) {
+                    elementSelectorScriptKey = je.pin(ELEMENT_SELECTOR_SCRIPT);
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, String> data =
+                        (Map<String, String>) je.executeScript(elementSelectorScriptKey, element);
+                diagElement.setSelectorType(
+                        "xpath".equals(data.get("type")) ? SelectorType.XPATH : SelectorType.CSS);
+                diagElement.setSelectorValue(data.get("value"));
             }
 
             diagElement.setTagName(element.getTagName());
-            diagElement.setAttributeType(getAttribute(element, "type"));
-            diagElement.setAttributeId(getAttribute(element, "id"));
-            diagElement.setAttributeName(getAttribute(element, "name"));
-            diagElement.setAttributeValue(getAttribute(element, "value"));
+            diagElement.setAttributeType(element.getAttribute("type"));
+            diagElement.setAttributeId(element.getAttribute("id"));
+            diagElement.setAttributeName(element.getAttribute("name"));
+            diagElement.setAttributeValue(element.getAttribute("value"));
             diagElement.setText(element.getText());
             diagElement.setDisplayed(element.isDisplayed());
             diagElement.setEnabled(element.isEnabled());
@@ -316,6 +534,32 @@ public class AuthenticationDiagnostics implements AutoCloseable {
         createStep();
     }
 
+    public void recordErrorStep(WebDriver webDriver) {
+        if (!enabled) {
+            return;
+        }
+
+        try {
+            String description =
+                    Constant.messages.getString("authhelper.auth.method.diags.steps.error");
+            if (webDriver == null) {
+                recordStep(description);
+            } else {
+                recordStep(webDriver, description);
+            }
+        } catch (Exception e) {
+            LOGGER.warn("An error occurred while recording the error step:", e);
+        }
+    }
+
+    public void reportFlowException(Exception cause) {
+        if (!enabled) {
+            return;
+        }
+
+        LOGGER.info("Exception during steps:", cause);
+    }
+
     public void recordStep(String description) {
         if (!enabled) {
             return;
@@ -331,21 +575,26 @@ public class AuthenticationDiagnostics implements AutoCloseable {
         finishCurrentStep(message.getRequestHeader().getURI().toString(), description);
     }
 
-    private static String getAttribute(WebElement element, String name) {
-        String value = element.getDomAttribute(name);
-        if (value != null) {
-            return value;
-        }
-        return element.getDomProperty(name);
-    }
-
     @Override
     public void close() {
+        HttpSender.removeListener(messageAccessedListener);
+
         if (!enabled) {
             return;
         }
 
         HttpSender.removeListener(listener);
+
+        diagnosticDataProviders.forEach(
+                provider -> {
+                    try {
+                        provider.addDiagnostics(diagnostic);
+                    } catch (Exception e) {
+                        LOGGER.error("An error occurred calling a data provider:", e);
+                    }
+                });
+
+        interrupted |= Thread.interrupted();
 
         PersistenceManager pm = TableJdo.getPmf().getPersistenceManager();
         Transaction tx = pm.currentTransaction();
@@ -353,11 +602,18 @@ public class AuthenticationDiagnostics implements AutoCloseable {
             tx.begin();
             pm.makePersistent(diagnostic);
             tx.commit();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to persist diagnostics:", e);
         } finally {
             if (tx.isActive()) {
                 tx.rollback();
             }
             pm.close();
+
+            // JDO/DataNucleus does not restore the interruption.
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -397,12 +653,64 @@ public class AuthenticationDiagnostics implements AutoCloseable {
             return resetWait(
                     wd,
                     () -> {
+                        int waitForMsec = element.getWaitForMsec();
                         try {
+                            element.setWaitForMsec(0);
                             return element.getWebElement(runtime);
                         } catch (ZestClientFailException e) {
                             return null;
+                        } finally {
+                            element.setWaitForMsec(waitForMsec);
                         }
-                    });
+                    },
+                    () -> null);
         }
+    }
+
+    public static void addMessageAccessedConsumer(MessageAccessedConsumer consumer) {
+        Objects.requireNonNull(consumer);
+        messageAccessedConsumers.add(consumer);
+    }
+
+    public static void removeMessageAccessedConsumer(MessageAccessedConsumer consumer) {
+        Objects.requireNonNull(consumer);
+        messageAccessedConsumers.remove(consumer);
+    }
+
+    public interface MessageAccessedConsumer {
+
+        void messageAccessed(Context ctx, HttpMessage message);
+    }
+
+    public static void addDiagnosticDataProvider(DiagnosticDataProvider provider) {
+        Objects.requireNonNull(provider);
+        diagnosticDataProviders.add(provider);
+    }
+
+    public static void removeDiagnosticDataProvider(DiagnosticDataProvider provider) {
+        Objects.requireNonNull(provider);
+        diagnosticDataProviders.remove(provider);
+    }
+
+    private static FlushRunnable flushHook;
+
+    public static void setFlushHook(FlushRunnable hook) {
+        flushHook = hook;
+    }
+
+    public static void callFlushHook() {
+        if (flushHook != null) {
+            flushHook.flush();
+        }
+    }
+
+    public interface DiagnosticDataProvider {
+
+        void addDiagnostics(Diagnostic diagnostic);
+    }
+
+    public interface FlushRunnable {
+
+        void flush();
     }
 }

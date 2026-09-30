@@ -6,15 +6,32 @@
 <BODY>
 	<H1>Traditional XML Report</H1>
 
+	<H3>Sections</H3>
+
+	<table>
+		<tr>
+			<th align="left">Section</th>
+			<th align="left">ID</th>
+		</tr>
+		<tr>
+			<td>Script Diagnostics</td>
+			<td>scriptdiagnostics</td>
+		</tr>
+		<tr>
+			<td>Screenshots for Script Diagnostics</td>
+			<td>scriptdiagnosticsscreenshots</td>
+		</tr>
+		<tr>
+			<td>Output for Script Diagnostics</td>
+			<td>scriptdiagnosticsoutput</td>
+		</tr>
+	</table>
+
 	<H3>Sample</H3>
-	<H4>About riskdesc</H4>
-	riskdesc - Is a combination identifier, showing Risk followed by
-	Confidence (in brackets). For example
-	<code>High (Medium)</code>
-	would indicate a High risk issue identified with Medium confidence.
+
 	<pre>
 &lt;?xml version="1.0"?&gt;
-&lt;OWASPZAPReport version="Dev Build" generated="Fri, 4 Feb 2022 17:42:18"&gt;
+&lt;OWASPZAPReport version="Dev Build" generated="Fri, 4 Feb 2022 17:42:18" created="2022-02-04T17:42:18.236211400Z"&gt;
     
         &lt;site name="http://localhost:8080" host="localhost" port="8080" ssl="false"&gt;
             &lt;alerts&gt;
@@ -30,9 +47,9 @@
                         &lt;confidencedesc&gt;Medium&lt;/confidencedesc&gt;
                         &lt;desc&gt;&lt;p&gt;A cross-site request forgery is an attack that involves forcing a victim to send an HTTP request to a target destination without their knowledge...&lt;/desc&gt;
                         &lt;instances&gt;
-
                                 &lt;instance&gt;
                                     &lt;uri&gt;http://localhost:8080/bodgeit/advanced.jsp&lt;/uri&gt;
+                                    &lt;nodeName&gt;http://localhost:8080/bodgeit/advanced.jsp&lt;/nodeName&gt;
                                     &lt;method&gt;GET&lt;/method&gt;
                                     &lt;param&gt;&lt;/param&gt;
                                     &lt;attack&gt;&lt;/attack&gt;
@@ -42,6 +59,7 @@
 
                                 &lt;instance&gt;
                                     &lt;uri&gt;http://localhost:8080/bodgeit/advanced.jsp&lt;/uri&gt;
+                                    &lt;nodeName&gt;http://localhost:8080/bodgeit/advanced.jsp&lt;/nodeName&gt;
                                     &lt;method&gt;GET&lt;/method&gt;
                                     &lt;param&gt;&lt;/param&gt;
                                     &lt;attack&gt;&lt;/attack&gt;
@@ -51,15 +69,26 @@
 
                                 &lt;instance&gt;
                                     &lt;uri&gt;http://localhost:8080/bodgeit/basket.jsp&lt;/uri&gt;
+                                    &lt;nodeName&gt;http://localhost:8080/bodgeit/basket.jsp&lt;/nodeName&gt;
                                     &lt;method&gt;GET&lt;/method&gt;
                                     &lt;param&gt;&lt;/param&gt;
                                     &lt;attack&gt;&lt;/attack&gt;
                                     &lt;evidence&gt;&lt;form action=&quot;basket.jsp&quot; method=&quot;post&quot;&gt;&lt;/evidence&gt;
                                     &lt;otherinfo&gt;&lt;/otherinfo&gt;
                                 &lt;/instance&gt;
-
+                        &lt;count&gt;2&lt;/count&gt;
+                        &lt;systemic&gt;false&lt;/systemic&gt;
+                        &lt;solution&gt;The solution&lt;/solution&gt;
+                        &lt;otherinfo&gt;The other info&lt;/otherinfo&gt;
 
 </pre>
+
+	<H3>Script Diagnostics</H3>
+	Section descriptions are documented in
+	<a href="report-traditional-script-diagnostics.html">Script
+		Diagnostics in Traditional Reports</a> . See
+	<a href="report-traditional-xml-plus.html">Traditional XML Report
+		with Requests and Responses</a> for structured examples.
 
 </BODY>
 </HTML>

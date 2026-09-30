@@ -35,15 +35,14 @@ import java.net.ServerSocket;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.text.MessageFormat;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -54,7 +53,6 @@ import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -98,17 +96,21 @@ public abstract class TestUtils {
      */
     @TempDir protected static Path tempDir;
 
-    private static String zapInstallDir;
-    private static String zapHomeDir;
-
     private static CloseableHttpSenderImpl<?> httpSender;
 
     /**
      * The resource bundle of the extension under test.
      *
-     * <p>Lazily initialised, in {@link #mockMessages(Extension)}.
+     * <p>Lazily initialised in {@link #mockMessages(Extension...)}. When multiple extensions are
+     * supplied, this is set to the first extension's bundle.
      */
     protected static ResourceBundle extensionResourceBundle;
+
+    /**
+     * Prefix-to-bundle mappings for all extensions supplied to {@link #mockMessages(Extension...)}.
+     * Used to look up messages by key using the longest matching prefix.
+     */
+    private static List<Entry<String, ResourceBundle>> extensionBundlesByPrefix;
 
     /**
      * A HTTP test server.
@@ -146,20 +148,6 @@ public abstract class TestUtils {
         }
     }
 
-    @BeforeAll
-    public static void beforeClass() throws Exception {
-        Path installDir = Files.createDirectory(tempDir.resolve("install"));
-        Path xmlDir = Files.createDirectory(installDir.resolve("xml"));
-        Files.createFile(xmlDir.resolve("log4j2.properties"));
-
-        zapInstallDir = installDir.toAbsolutePath().toString();
-        createHomeDirectory();
-    }
-
-    private static void createHomeDirectory() throws Exception {
-        zapHomeDir = Files.createTempDirectory(tempDir, "home").toAbsolutePath().toString();
-    }
-
     /**
      * Sets up ZAP, by initialising the home/installation dirs and core classes (for example, {@link
      * Constant}, {@link Control}, {@link Model}).
@@ -168,10 +156,6 @@ public abstract class TestUtils {
      * @see #setUpMessages()
      */
     protected void setUpZap() throws Exception {
-        Constant.setZapInstall(zapInstallDir);
-        createHomeDirectory();
-        Constant.setZapHome(zapHomeDir);
-
         Control control = mock(Control.class, withSettings().strictness(Strictness.LENIENT));
         when(control.getExtensionLoader()).thenReturn(mock(ExtensionLoader.class));
 
@@ -234,47 +218,9 @@ public abstract class TestUtils {
      * Called when {@link #setUpZap() setting up ZAP} to initialise the {@link Constant#messages
      * messages}.
      *
-     * @see #mockMessages(Extension)
+     * @see #mockMessages(Extension...)
      */
     protected void setUpMessages() {}
-
-    /**
-     * Deletes the ZAP's home directory.
-     *
-     * @throws Exception if an error occurred while deleting the home directory.
-     */
-    @AfterEach
-    public void shutDown() throws Exception {
-        deleteDir(Paths.get(zapHomeDir));
-    }
-
-    private static void deleteDir(Path dir) throws IOException {
-        if (Files.notExists(dir)) {
-            return;
-        }
-
-        Files.walkFileTree(
-                dir,
-                new SimpleFileVisitor<Path>() {
-
-                    @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                            throws IOException {
-                        Files.delete(file);
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult postVisitDirectory(Path dir, IOException e)
-                            throws IOException {
-                        if (e != null) {
-                            throw e;
-                        }
-                        Files.delete(dir);
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
-    }
 
     /**
      * Creates a (GET) HTTP message with the given path, for the {@link #nano test server}.
@@ -515,21 +461,35 @@ public abstract class TestUtils {
 
     /**
      * Mocks the class variable {@link Constant#messages} using the resource bundle
-     * (Messages.properties) created from the given extension.
+     * (Messages.properties) created from the given extension(s).
      *
-     * <p>The extension's messages are asserted that exists before obtaining it.
+     * <p>When multiple extensions are supplied, messages are looked up by the longest matching
+     * {@link Extension#getI18nPrefix() prefix}. Each extension's messages are asserted to exist
+     * when obtained.
      *
-     * <p>Resource messages that do not belong to the extension (that is, do not start with {@link
-     * Extension#getI18nPrefix()}) have an empty {@code String}.
+     * <p>Resource messages that do not belong to any of the extensions have an empty {@code
+     * String}.
      *
-     * @param extension the target extension to mock the messages
+     * @param extensions one or more extensions whose messages to mock
+     * @throws IllegalArgumentException if {@code extensions} is null or empty
      */
-    protected static void mockMessages(final Extension extension) {
-        mockMessages(
-                extension.getClass().getPackage().getName()
-                        + ".resources."
-                        + Constant.MESSAGES_PREFIX,
-                extension.getI18nPrefix());
+    protected static void mockMessages(final Extension... extensions) {
+        if (extensions == null || extensions.length == 0) {
+            throw new IllegalArgumentException("At least one extension must be supplied.");
+        }
+        List<Entry<String, ResourceBundle>> bundles = new ArrayList<>();
+        for (Extension extension : extensions) {
+            String baseName =
+                    extension.getClass().getPackage().getName()
+                            + ".resources."
+                            + Constant.MESSAGES_PREFIX;
+            String prefix = extension.getI18nPrefix();
+            ResourceBundle bundle = getExtensionResourceBundle(baseName);
+            bundles.add(new AbstractMap.SimpleImmutableEntry<>(prefix, bundle));
+        }
+        extensionBundlesByPrefix = Collections.unmodifiableList(bundles);
+        extensionResourceBundle = bundles.get(0).getValue();
+        setupI18nMockWithBundles(extensionBundlesByPrefix);
     }
 
     /**
@@ -544,21 +504,29 @@ public abstract class TestUtils {
      * @param prefix the prefix for the resource bundle.
      */
     protected static void mockMessages(String baseName, String prefix) {
+        ResourceBundle bundle = getExtensionResourceBundle(baseName);
+        extensionBundlesByPrefix =
+                Collections.singletonList(new AbstractMap.SimpleImmutableEntry<>(prefix, bundle));
+        extensionResourceBundle = bundle;
+        setupI18nMockWithBundles(extensionBundlesByPrefix);
+    }
+
+    private static void setupI18nMockWithBundles(
+            List<Entry<String, ResourceBundle>> bundlesByPrefix) {
         I18N i18n = mock(I18N.class, withSettings().strictness(Strictness.LENIENT));
         Constant.messages = i18n;
 
         given(i18n.getLocal()).willReturn(Locale.getDefault());
 
-        extensionResourceBundle = getExtensionResourceBundle(baseName);
         when(i18n.getString(anyString()))
                 .thenAnswer(
                         invocation -> {
                             String key = (String) invocation.getArguments()[0];
-                            if (key.startsWith(prefix)) {
+                            ResourceBundle bundle = getBundleForKey(key);
+                            if (bundle != null) {
                                 assertKeyExists(key);
-                                return extensionResourceBundle.getString(key);
+                                return bundle.getString(key);
                             }
-                            // Return an empty string for non extension's messages.
                             return "";
                         });
 
@@ -567,13 +535,13 @@ public abstract class TestUtils {
                         invocation -> {
                             Object[] args = invocation.getArguments();
                             String key = (String) args[0];
-                            if (key.startsWith(prefix)) {
+                            ResourceBundle bundle = getBundleForKey(key);
+                            if (bundle != null) {
                                 assertKeyExists(key);
                                 return MessageFormat.format(
-                                        extensionResourceBundle.getString(key),
+                                        bundle.getString(key),
                                         Arrays.copyOfRange(args, 1, args.length));
                             }
-                            // Return an empty string for non extension's messages.
                             return "";
                         });
 
@@ -581,12 +549,31 @@ public abstract class TestUtils {
                 .thenAnswer(
                         invocation -> {
                             String key = (String) invocation.getArguments()[0];
-                            if (key.startsWith(prefix)) {
-                                return extensionResourceBundle.containsKey(key);
+                            ResourceBundle bundle = getBundleForKey(key);
+                            if (bundle != null) {
+                                return bundle.containsKey(key);
                             }
-                            // Return true for non extension's messages.
                             return true;
                         });
+    }
+
+    /**
+     * Returns the resource bundle for the given key by longest matching prefix, or null if none
+     * match.
+     */
+    private static ResourceBundle getBundleForKey(String key) {
+        if (extensionBundlesByPrefix == null) {
+            return null;
+        }
+        Entry<String, ResourceBundle> best = null;
+        for (Entry<String, ResourceBundle> entry : extensionBundlesByPrefix) {
+            String prefix = entry.getKey();
+            if (key.startsWith(prefix)
+                    && (best == null || prefix.length() > best.getKey().length())) {
+                best = entry;
+            }
+        }
+        return best != null ? best.getValue() : null;
     }
 
     private static ResourceBundle getExtensionResourceBundle(String baseName) {
@@ -598,10 +585,14 @@ public abstract class TestUtils {
     }
 
     private static void assertKeyExists(String key) {
+        ResourceBundle bundle =
+                extensionBundlesByPrefix != null ? getBundleForKey(key) : extensionResourceBundle;
         assertTrue(
-                extensionResourceBundle != null,
-                "The extension's ResourceBundle was not initialised.");
-        assertTrue(extensionResourceBundle.containsKey(key), "No resource message for: " + key);
+                bundle != null,
+                extensionBundlesByPrefix != null
+                        ? "No resource bundle for key (no matching extension prefix): " + key
+                        : "The extension's ResourceBundle was not initialised.");
+        assertTrue(bundle.containsKey(key), "No resource message for: " + key);
     }
 
     /**

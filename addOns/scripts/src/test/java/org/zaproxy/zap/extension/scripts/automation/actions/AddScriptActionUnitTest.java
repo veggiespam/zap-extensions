@@ -23,6 +23,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -74,7 +75,9 @@ class AddScriptActionUnitTest extends TestUtils {
         plan = new AutomationPlan();
         env = plan.getEnv();
         progress = mock(AutomationProgress.class);
-        parameters = new ScriptJobParameters(AddScriptAction.NAME, null, null, "", "", "", "");
+        parameters =
+                new ScriptJobParameters(
+                        AddScriptAction.NAME, null, null, "", "", "", "", "", "", null, null);
 
         action = new AddScriptAction(parameters);
     }
@@ -87,7 +90,7 @@ class AddScriptActionUnitTest extends TestUtils {
         action.runJob(JOB_NAME, env, progress);
         // Then
         ArgumentCaptor<ScriptWrapper> argCaptor = ArgumentCaptor.forClass(ScriptWrapper.class);
-        verify(extension).addScript(argCaptor.capture());
+        verify(extension).addScript(argCaptor.capture(), eq(false));
         ScriptWrapper sw = argCaptor.getValue();
         assertThat(sw.getFile(), is(nullValue()));
         assertThat(sw.getContents(), is(equalTo(parameters.getInline())));

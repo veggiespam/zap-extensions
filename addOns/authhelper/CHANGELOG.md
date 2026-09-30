@@ -4,6 +4,168 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Fixed
+- Notify authentication successes/failures for browser login and error paths in Browser and Client Script Based Authentication.
+
+## [0.42.0] - 2026-08-26
+### Added
+- A toolbar button to the Authentication Diagnostics screenshots tab, to toggle screenshots between full size and scaled to fit the window.
+- Use the HTTP method for the verification configuration (on newer ZAP versions).
+
+### Changed
+- Depend on newer Common Library add-on.
+- Tag diagnostic HTTP messages with an internal ID, to make it easier to cross reference them.
+- Obtain the minimal authentication diagnostics when aborting the authentication.
+- Authentication report: include summary with connection success and failure counts.
+- Include Accept, Accept-Language, Connection, and User-Agent headers when doing authentication verification.
+- Ignore commented Zest statements when collecting authentication diagnostics.
+
+### Fixed
+- Do not wait when getting the element for a screenshot diagnostic step to not add unnecessary delays.
+- Performance issue checking for where cookie values were set during authentication.
+
+## [0.41.0] - 2026-08-07
+### Added
+- Automation Framework `diagnostics` job to start and stop plan-level recording of authentication related diagnostics.
+
+### Changed
+- Update dependency.
+- Include the Zest statement index in the authentication diagnostics' steps.
+- Include Origin header when doing authentication verification.
+
+### Fixed
+- Handle exception while extracting session tokens.
+
+## [0.40.0] - 2026-06-12
+### Added
+- Support for handling the Microsoft login "Permissions requested" user consent screen.
+
+### Fixed
+- Handling of Ionic input elements, which can appear to not be displayed until they are clicked on.
+
+## [0.39.0] - 2026-05-06
+### Changed
+- Do not attempt to extract session tokens from big responses, to reduce memory usage, which are more likely to represent application data rather than having session tokens.
+
+### Fixed
+- Improve detection of finished Microsoft login.
+
+## [0.38.0] - 2026-04-14
+### Fixed
+- Correct reported username/password fields' state in the Authentication Report.
+
+## [0.37.0] - 2026-03-31
+### Added
+- Support for Microsoft login in a pop-up window
+
+## [0.36.0] - 2026-03-19
+### Changed
+- Maintenance changes.
+
+### Fixed
+- Autodetect HTTP authentication, and added more auth diagnostics.
+
+## [0.35.0] - 2026-03-02
+### Fixed
+- Exception in authentication diagnostics.
+- Ensure the login link verification URL has both logged in and out indicators.
+
+### Changed
+- Maintenance changes.
+
+## [0.34.0] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [0.33.0] - 2025-12-03
+### Added
+- Handle account selection and TOTP step in Microsoft login.
+- Allow to include domains completely and partially out of scope in the Authentication Report.
+
+### Changed
+- Fail the Microsoft login if not able to perform all the expected steps.
+- Track GWT headers.
+- Handle additional exceptions when processing JSON authentication components.
+- Improved performance of the Session Detection scan rule.
+
+### Fixed
+- Do not include known authentication providers in context.
+- Ensure all domains accessed during authentication are included in the Authentication Report.
+
+## [0.32.0] - 2025-11-07
+### Changed
+- Track authentication headers with key in the name.
+- No longer quote domains as these will not get counted as valid URLs in the Automation Framework.
+
+## [0.31.0] - 2025-11-05
+### Added
+- Domains to auth tester.
+
+## [0.30.0] - 2025-11-04
+### Added
+- Click on button when login form does not handle return in Browser Based Authentication.
+- Handle password fields by ID and name in Browser Based Authentication.
+- Check div elements when searching for login links.
+
+### Changed
+- Maintenance changes
+- Depend on newer version of Zest add-on.
+
+### Fixed
+- Inform when the Authentication Report being imported does not contain any diagnostics.
+
+## [0.29.0] - 2025-09-18
+### Added
+- Add login word variant for Spanish.
+- Log exception during authentication with diagnostics enabled.
+- Add the statistics of the site of the verification URL to the Authentication Report.
+- Add Authentication Report section for the domains accessed during the authentication.
+
+### Changed
+- Update alert references to latest locations to fix 404 and resolve redirection.
+- Search also for login elements with ARIA role button.
+- Show always the diagnostic HTTP messages in the Sites tree and History tab when importing the Authentication Report.
+- Include the site in the site statistics of the Authentication Report.
+
+### Fixed
+- Collect the current value of the element's attributes for the authentication diagnostics.
+- In the Authentication Report set authentication successful only when the login was verified with the indicators.
+
+## [0.28.0] - 2025-09-02
+### Added
+- Add wait authentication step to Browser Based Authentication.
+- Include Web Element's selector in the Authentication Report.
+- Support for tracking authentication and CSRF headers automatically for Header based auth.
+- Add Authentication Report section for the log file and for the Automation Framework plan.
+- Support for step delay in Browser Based Authentication, which replaces the auth tester "demo mode".
+- Support for min wait for time in Client Script Authentication.
+- Allow to manage the authentication diagnostics through the GUI.
+
+## Changed
+- Now depends on minimum Common Library version 1.35.0 and Zest version 48.9.0.
+- Send the referer header on verification if set on the original request.
+- Removed requirement to set at least one header in the GUI for Header-Based Session Management.
+- Include step for errors in the authentication diagnostics.
+- Include messages' RTT in the Authentication Report.
+- Browser based authentication to also support HTTP basic authentication for Firefox.
+- Verification rule to improve detection.
+- Add support for Microsoft login in Browser Based Authentication.
+- Consider login like URLs as candidates for verification URL.
+
+### Fixed
+- Do not fail the authentication on diagnostic errors.
+- Do not configure poll authentication verification without logged in indicator.
+- Handle errors collecting the browser storage diagnostics.
+- Fix proxy errors during authentication with Client Script Based Authentication.
+
+## [0.27.0] - 2025-07-03
+### Added
+- Support for recorded scripts in the Authentication Tester.
+
+### Changed
+- Updated to depend on Zest add-on 48.8.0.
+
+## [0.26.0] - 2025-06-20
 ### Added
 - Add configuration support for the wait time after Client Script Based Authentication.
 - Include the Web Element being interacted with in the Client Script Based Authentication diagnostics.
@@ -248,6 +410,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Support of authentication request identification and configuration.
 
+[0.42.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.42.0
+[0.41.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.41.0
+[0.40.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.40.0
+[0.39.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.39.0
+[0.38.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.38.0
+[0.37.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.37.0
+[0.36.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.36.0
+[0.35.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.35.0
+[0.34.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.34.0
+[0.33.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.33.0
+[0.32.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.32.0
+[0.31.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.31.0
+[0.30.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.30.0
+[0.29.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.29.0
+[0.28.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.28.0
+[0.27.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.27.0
+[0.26.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.26.0
 [0.25.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.25.0
 [0.24.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.24.0
 [0.23.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.23.0

@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -123,7 +124,7 @@ class EventStreamListenerUnitTest {
     }
 
     @Test
-    void shouldFireProcessEventOnAnEmptyEvent() throws IOException {
+    void shouldNotFireProcessEventOnALeadingEmptyLine() throws IOException {
         // Given
         LinkedList<String> streamLines = new LinkedList<>();
         streamLines.add("");
@@ -137,7 +138,47 @@ class EventStreamListenerUnitTest {
         listener.run();
 
         // Then
-        verify(proxyMock, times(1)).processEvent("");
+        verify(proxyMock, never()).processEvent(anyString());
+    }
+
+    @Test
+    void shouldContinueReadingAfterSocketTimeoutBeforeEvent() throws IOException {
+        // Given
+        String event = "data:blub";
+        BufferedReader readerMock = mock();
+        when(readerMock.readLine())
+                .thenThrow(new SocketTimeoutException())
+                .thenReturn(event)
+                .thenReturn("")
+                .thenReturn(null);
+        EventStreamProxy proxyMock = mock();
+        EventStreamListener listener = new EventStreamListener(proxyMock, readerMock, mock());
+
+        // When
+        listener.run();
+
+        // Then
+        verify(proxyMock).processEvent(event);
+    }
+
+    @Test
+    void shouldContinueReadingAfterSocketTimeoutDuringEvent() throws IOException {
+        // Given
+        BufferedReader readerMock = mock();
+        when(readerMock.readLine())
+                .thenReturn("event: foo")
+                .thenThrow(new SocketTimeoutException())
+                .thenReturn("data: bar")
+                .thenReturn("")
+                .thenReturn(null);
+        EventStreamProxy proxyMock = mock();
+        EventStreamListener listener = new EventStreamListener(proxyMock, readerMock, mock());
+
+        // When
+        listener.run();
+
+        // Then
+        verify(proxyMock).processEvent("event: foo\ndata: bar");
     }
 
     @Test

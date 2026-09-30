@@ -20,6 +20,8 @@
 package org.zaproxy.addon.authhelper.report;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
@@ -32,16 +34,15 @@ import static org.mockito.Mockito.withSettings;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.quality.Strictness;
 import org.parosproxy.paros.Constant;
@@ -56,12 +57,19 @@ import org.zaproxy.addon.authhelper.ClientScriptBasedAuthenticationMethodType;
 import org.zaproxy.addon.authhelper.ClientScriptBasedAuthenticationMethodType.ClientScriptBasedAuthenticationMethod;
 import org.zaproxy.addon.authhelper.ExtensionAuthhelper;
 import org.zaproxy.addon.authhelper.HeaderBasedSessionManagementMethodType;
+import org.zaproxy.addon.authhelper.internal.db.Diagnostic;
+import org.zaproxy.addon.authhelper.internal.db.DiagnosticStep;
+import org.zaproxy.addon.authhelper.internal.db.DiagnosticWebElement;
+import org.zaproxy.addon.authhelper.internal.db.DiagnosticWebElement.SelectorType;
 import org.zaproxy.addon.authhelper.report.AuthReportData.FailureDetail;
+import org.zaproxy.addon.authhelper.report.AuthReportData.StatsItem;
+import org.zaproxy.addon.authhelper.report.AuthReportData.SummaryItem;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.reports.ExtensionReports;
 import org.zaproxy.addon.reports.ReportData;
 import org.zaproxy.addon.reports.Template;
 import org.zaproxy.zap.authentication.AuthenticationHelper;
+import org.zaproxy.zap.authentication.AuthenticationMethod;
 import org.zaproxy.zap.authentication.AuthenticationMethod.AuthCheckingStrategy;
 import org.zaproxy.zap.authentication.ManualAuthenticationMethodType;
 import org.zaproxy.zap.authentication.ManualAuthenticationMethodType.ManualAuthenticationMethod;
@@ -181,6 +189,7 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         ard.setAfEnv(afEnv);
         ard.addSummaryItem(true, "summary.1", "First Item");
         ard.addSummaryItem(false, "summary.2", "Second Item");
+        ard.addSummaryItem("auth.summary.connection_successes", 1, "Responses received");
         ard.addFailureDetail(FailureDetail.NO_SUCCESSFUL_LOGINS);
         ard.addStatsItem("stats.auth.1", "global", 123);
         ard.addStatsItem("stats.other.1", "site", 456);
@@ -197,7 +206,7 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         // Then
         assertThat(json.getString("site"), is(equalTo("https://www.example.com")));
         assertThat(json.getString("afEnv"), is(equalTo(afEnv)));
-        assertThat(summaryItems.size(), is(equalTo(2)));
+        assertThat(summaryItems.size(), is(equalTo(3)));
         assertThat(summaryItems.getJSONObject(0), is(notNullValue()));
         assertThat(summaryItems.getJSONObject(0).getBoolean("passed"), is(equalTo(true)));
         assertThat(summaryItems.getJSONObject(0).getString("key"), is(equalTo("summary.1")));
@@ -208,6 +217,14 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         assertThat(summaryItems.getJSONObject(1).getString("key"), is(equalTo("summary.2")));
         assertThat(
                 summaryItems.getJSONObject(1).getString("description"), is(equalTo("Second Item")));
+        assertThat(summaryItems.getJSONObject(2).has("passed"), is(equalTo(false)));
+        assertThat(
+                summaryItems.getJSONObject(2).getString("key"),
+                is(equalTo("auth.summary.connection_successes")));
+        assertThat(summaryItems.getJSONObject(2).getLong("value"), is(equalTo(1L)));
+        assertThat(
+                summaryItems.getJSONObject(2).getString("description"),
+                is(equalTo("Responses received")));
 
         assertThat(failureReasons.size(), is(equalTo(1)));
         assertThat(
@@ -238,35 +255,40 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         File f = File.createTempFile(templateName, template.getExtension());
         ReportData reportData = getGenericReportData(templateName);
         reportData.setSections(template.getSections());
-        AuthReportData ard = new AuthReportData();
+        AuthReportData ard = mock();
         reportData.addReportObjects("authdata", ard);
 
-        ard.setSite("https://www.example.com");
+        given(ard.getSite()).willReturn("https://www.example.com");
         String afEnv =
                 """
                   env:
                   contexts:
                       name: 'some "quote" name'
                 """;
-        ard.setAfEnv(afEnv);
-        ard.addSummaryItem(true, "summary.1", "Bob's \"Item\"");
-        ard.addSummaryItem(true, "summary.\"2\"", "Foo bar");
-        ard.addStatsItem("stats.auth.1", "foo \"random\" bar", 123);
-        ard.addStatsItem("stats.foo.oops \"foo\" bar", "global", 0);
+        given(ard.getAfEnv()).willReturn(afEnv);
+        given(ard.getSummaryItems())
+                .willReturn(
+                        List.of(
+                                new SummaryItem(true, "summary.1", "Bob's \"Item\""),
+                                new SummaryItem(true, "summary.\"2\"", "Foo bar")));
+        given(ard.getStatistics())
+                .willReturn(
+                        List.of(
+                                        new StatsItem("stats.auth.1", "foo \"random\" bar", 123),
+                                        new StatsItem("stats.foo.oops \"foo\" bar", "global", 0))
+                                .toArray());
+        given(ard.getLogContent()).willReturn("Log content");
         // When
         File r = extRep.generateReport(reportData, template, f.getAbsolutePath(), false);
         String report = Files.readString(r.toPath());
 
         // Then
-        LocalDateTime localDateTime = LocalDateTime.now();
-        ZonedDateTime zonedDateTime = localDateTime.atZone(ZoneId.systemDefault());
-        String current = zonedDateTime.format(DateTimeFormatter.RFC_1123_DATE_TIME);
         String expected =
                 """
                 {
                 	"@programName": "ZAP",
                 	"@version": "Test Build",
-                	"@generated": "@@@replace@@@",
+                	"@generated": "",
                 	"site":  "https:\\/\\/www.example.com"
                 \t
                 	,"summaryItems": [
@@ -300,17 +322,20 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
                 			"value": 0
                 		}
                 	]
-                \t
-                \t
+                	,"domains": [
+                	]
+                	,"domainsPartiallyOutOfScope": [
+                	]
+                	,"domainsOutOfScope": [
+                	]
+                	,"logFile": "Log content"
                 	,\"diagnostics\": [
                 	]
                 }
-                """
-                        .replace("@@@replace@@@", current);
-        report =
-                report.replaceAll(
-                        "[a-zA-Z]{3}, \\d{1,2} [a-zA-Z]{3} \\d{4} \\d{2}:\\d{2}:\\d{2}", current);
-        assertThat(report, is(equalTo(expected)));
+                """;
+        assertThat(
+                report.replaceFirst("@generated\": \"[^\"]+\"", "@generated\": \"\""),
+                is(equalTo(expected)));
     }
 
     static Template getTemplateFromYamlFile(String templateName) throws Exception {
@@ -319,6 +344,126 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
                                 ExtensionReports.class,
                                 "/reports/" + templateName + "/template.yaml")
                         .toFile());
+    }
+
+    @Test
+    void shouldIncludeDiagnosticsDataInReport() throws Exception {
+        // Given
+        ExtensionReports extRep = new ExtensionReports();
+        String templateName = "auth-report-json";
+        Template template = getTemplateFromYamlFile(templateName);
+        File f = File.createTempFile(templateName, template.getExtension());
+        ReportData reportData = getGenericReportData(templateName);
+        reportData.setSections(template.getSections());
+        AuthReportData ard = mock();
+        List<Diagnostic> diagnostics = new ArrayList<>();
+        Diagnostic diagnostic = new Diagnostic();
+        diagnostic.setCreateTimestamp(Instant.ofEpochMilli(1L));
+        diagnostic.setAuthenticationMethod("AuthenticationMethod 1");
+        diagnostic.setContext("Context 1");
+        diagnostic.setUser("User 1");
+        diagnostic.setScript("Script");
+        diagnostic.setAfPlan("AF Plan 1");
+        diagnostics.add(diagnostic);
+
+        diagnostic = new Diagnostic();
+        diagnostic.setCreateTimestamp(Instant.ofEpochMilli(2L));
+        diagnostic.setAuthenticationMethod("AuthenticationMethod 2");
+        diagnostic.setContext("Context 2");
+        diagnostic.setUser("User 2");
+
+        List<DiagnosticStep> steps = new ArrayList<>();
+        DiagnosticStep step = new DiagnosticStep();
+        step.setCreateTimestamp(Instant.ofEpochMilli(3L));
+        step.setId(123);
+        step.setUrl("http://example.com");
+        step.setDescription("Step Description");
+
+        DiagnosticWebElement webElement = new DiagnosticWebElement();
+        webElement.setCreateTimestamp(Instant.ofEpochMilli(4L));
+        webElement.setId(1);
+        webElement.setFormIndex(2);
+        webElement.setSelectorType(SelectorType.CSS);
+        webElement.setSelectorValue("x > y");
+        webElement.setFormIndex(1);
+        webElement.setTagName("Tag Name");
+        webElement.setAttributeType("Attribute Type");
+        webElement.setAttributeId("Attribute ID");
+        webElement.setAttributeValue("Attribute Value");
+        webElement.setText("Text");
+        webElement.setDisplayed(true);
+        webElement.setEnabled(true);
+        step.setWebElement(webElement);
+
+        steps.add(step);
+        diagnostic.setSteps(steps);
+        diagnostics.add(diagnostic);
+
+        given(ard.getDiagnostics()).willReturn(diagnostics);
+        reportData.addReportObjects("authdata", ard);
+
+        // When
+        extRep.generateReport(reportData, template, f.getAbsolutePath(), false);
+
+        // Then
+        assertThat(
+                Files.readString(f.toPath()).replaceAll("[\t\n]+", " "),
+                containsString(
+                        """
+	,"diagnostics": [
+		{
+			"created": "1970-01-01T00:00:00.001Z",
+			"authenticationMethod": "AuthenticationMethod 1",
+			"context": "Context 1",
+			"user": "User 1",
+			"script": "Script"
+			,"afPlan": "AF Plan 1"
+
+			,"steps": [
+			]
+		},
+		{
+			"created": "1970-01-01T00:00:00.002Z",
+			"authenticationMethod": "AuthenticationMethod 2",
+			"context": "Context 2",
+			"user": "User 2",
+			"script": null
+			,"afPlan": null
+
+			,"steps": [
+				{
+					"id": 123,
+					"created": "1970-01-01T00:00:00.003Z",
+					"url": "http:\\/\\/example.com",
+					"description": "Step Description"
+
+					,"webElement": {
+						"selector": {"type": "CSS", "value": "x > y"},
+						"formIndex": 1,
+						"tagName": "Tag Name",
+						"attributeType":  "Attribute Type",
+						"attributeId": "Attribute ID",
+						"attributeName": null,
+						"attributeValue":  "Attribute Value",
+						"text":  "Text",
+						"displayed": true,
+						"enabled": true
+					}
+
+					,"webElements": [
+					]
+					,"localStorage": [
+					]
+					,"sessionStorage": [
+					]
+					,"messages": [
+					]
+				}
+			]
+		}
+	]
+"""
+                                .replaceAll("[\t\n]+", " ")));
     }
 
     @Test
@@ -343,14 +488,24 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         ReportData reportData = new ReportData("auth-report-test");
         reportData.setContexts(List.of());
 
+        ExtensionLoader extensionLoader =
+                mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
+        ExtensionStats extStats =
+                mock(ExtensionStats.class, withSettings().strictness(Strictness.LENIENT));
+        given(extensionLoader.getExtension(ExtensionStats.class)).willReturn(extStats);
+        given(extStats.getInMemoryStats()).willReturn(new InMemoryStats());
+        Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
+
         // When
         dataHandler.handle(reportData);
 
         // Then
         assertThat(reportData.getReportObject("authdata"), is(notNullValue()));
         AuthReportData ard = (AuthReportData) reportData.getReportObject("authdata");
-        assertThat(ard.isValidReport(), is(equalTo(false)));
-        assertThat(ard.getSummaryItems().size(), is(equalTo(0)));
+        assertThat(ard.isValidReport(), is(equalTo(true)));
+        assertThat(ard.getSummaryItems().size(), is(equalTo(2)));
+        assertThat(ard.getSummaryItems().get(0).value(), is(equalTo(0L)));
+        assertThat(ard.getSummaryItems().get(1).value(), is(equalTo(0L)));
     }
 
     @Test
@@ -378,6 +533,8 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
 
         stats.counterInc(site, AuthUtils.AUTH_BROWSER_PASSED_STATS);
         stats.counterInc(site, AuthenticationHelper.AUTH_SUCCESS_STATS);
+
+        stats.counterInc(site, AuthenticationMethod.AUTH_STATE_LOGGED_IN_STATS, 1);
 
         Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
 
@@ -411,7 +568,67 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
     }
 
     @Test
-    void shouldReportFailingBbaCase() {
+    void shouldReportFailingWithUnknownLoggedInState() {
+        // Given
+        String site = "https://www.example.com";
+        ExtensionAuthhelperReport.AuthReportDataHandler dataHandler =
+                new ExtensionAuthhelperReport.AuthReportDataHandler();
+        ReportData reportData = new ReportData("auth-report-test");
+        Context context = mock(Context.class);
+        given(context.getAuthenticationMethod())
+                .willReturn(
+                        new BrowserBasedAuthenticationMethodType().createAuthenticationMethod(0));
+        given(context.getIncludeInContextRegexs()).willReturn(List.of(site + ".*"));
+        reportData.setContexts(List.of(context));
+
+        ExtensionLoader extensionLoader =
+                mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
+        ExtensionStats extStats =
+                mock(ExtensionStats.class, withSettings().strictness(Strictness.LENIENT));
+        given(extensionLoader.getExtension(ExtensionStats.class)).willReturn(extStats);
+
+        InMemoryStats stats = new InMemoryStats();
+        given(extStats.getInMemoryStats()).willReturn(stats);
+
+        stats.counterInc(site, AuthUtils.AUTH_BROWSER_PASSED_STATS);
+        stats.counterInc(site, AuthenticationHelper.AUTH_SUCCESS_STATS);
+
+        stats.counterInc(site, AuthenticationMethod.AUTH_STATE_UNKNOWN_STATS, 1);
+
+        Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
+
+        // When
+        dataHandler.handle(reportData);
+
+        // Then
+        assertThat(reportData.getReportObject("authdata"), is(notNullValue()));
+        AuthReportData ard = (AuthReportData) reportData.getReportObject("authdata");
+        assertThat(ard.isValidReport(), is(equalTo(true)));
+        assertThat(ard.getSummaryItems().size(), is(equalTo(5)));
+
+        assertThat(ard.getSummaryItems().get(0).key(), is(equalTo("auth.summary.auth")));
+        assertThat(ard.getSummaryItems().get(0).passed(), is(equalTo(false)));
+
+        assertThat(ard.getSummaryItems().get(1).key(), is(equalTo("auth.summary.username")));
+        assertThat(ard.getSummaryItems().get(1).passed(), is(equalTo(true)));
+
+        assertThat(ard.getSummaryItems().get(2).key(), is(equalTo("auth.summary.password")));
+        assertThat(ard.getSummaryItems().get(2).passed(), is(equalTo(true)));
+
+        assertThat(ard.getSummaryItems().get(3).key(), is(equalTo("auth.summary.session")));
+        assertThat(ard.getSummaryItems().get(3).passed(), is(equalTo(true)));
+
+        assertThat(ard.getSummaryItems().get(4).key(), is(equalTo("auth.summary.verif")));
+        assertThat(ard.getSummaryItems().get(4).passed(), is(equalTo(true)));
+
+        assertThat(ard.getFailureDetails(), contains(FailureDetail.LOGGED_IN));
+
+        assertThat(ard.getAfPlanErrors().size(), is(equalTo(0)));
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"true, true", "false, false", "true, false", "false, true"})
+    void shouldReportFailingBbaCase(boolean usernameFound, boolean passwordFound) {
         // Given
         String site = "https://www.example.com";
         ExtensionAuthhelperReport.AuthReportDataHandler dataHandler =
@@ -438,6 +655,12 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         given(extensionLoader.getExtension(ExtensionStats.class)).willReturn(extStats);
 
         InMemoryStats stats = new InMemoryStats();
+        if (!usernameFound) {
+            stats.counterInc(site, AuthUtils.AUTH_NO_USER_FIELD_STATS);
+        }
+        if (!passwordFound) {
+            stats.counterInc(site, AuthUtils.AUTH_NO_PASSWORD_FIELD_STATS);
+        }
         given(extStats.getInMemoryStats()).willReturn(stats);
 
         Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
@@ -455,10 +678,10 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         assertThat(ard.getSummaryItems().get(0).passed(), is(equalTo(false)));
 
         assertThat(ard.getSummaryItems().get(1).key(), is(equalTo("auth.summary.username")));
-        assertThat(ard.getSummaryItems().get(1).passed(), is(equalTo(false)));
+        assertThat(ard.getSummaryItems().get(1).passed(), is(equalTo(usernameFound)));
 
         assertThat(ard.getSummaryItems().get(2).key(), is(equalTo("auth.summary.password")));
-        assertThat(ard.getSummaryItems().get(2).passed(), is(equalTo(false)));
+        assertThat(ard.getSummaryItems().get(2).passed(), is(equalTo(passwordFound)));
 
         assertThat(ard.getSummaryItems().get(3).key(), is(equalTo("auth.summary.session")));
         assertThat(ard.getSummaryItems().get(3).passed(), is(equalTo(false)));
@@ -526,12 +749,15 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         assertThat(ard.getSummaryItems().get(2).key(), is(equalTo("auth.summary.verif")));
         assertThat(ard.getSummaryItems().get(2).passed(), is(equalTo(false)));
 
-        assertThat(ard.getFailureDetails().size(), is(equalTo(5)));
-        assertThat(ard.getFailureDetails().get(0).name(), is(equalTo("SESSION_MGMT")));
-        assertThat(ard.getFailureDetails().get(1).name(), is(equalTo("VERIF_IDENT")));
-        assertThat(ard.getFailureDetails().get(2).name(), is(equalTo("PASS_COUNT")));
-        assertThat(ard.getFailureDetails().get(3).name(), is(equalTo("LOGIN_FAILURES")));
-        assertThat(ard.getFailureDetails().get(4).name(), is(equalTo("AF_PLAN_ERRORS")));
+        assertThat(
+                ard.getFailureDetails(),
+                contains(
+                        FailureDetail.SESSION_MGMT,
+                        FailureDetail.VERIF_IDENT,
+                        FailureDetail.PASS_COUNT,
+                        FailureDetail.LOGIN_FAILURES,
+                        FailureDetail.AF_PLAN_ERRORS,
+                        FailureDetail.LOGGED_IN));
 
         assertThat(ard.getAfPlanErrors().size(), is(equalTo(1)));
         assertThat(ard.getAfPlanErrors().get(0), is(equalTo("It's all gone horribly wrong")));
@@ -573,6 +799,8 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         stats.counterInc(site, AuthenticationHelper.AUTH_SUCCESS_STATS, 2);
         stats.counterInc(site, AuthenticationHelper.AUTH_FAILURE_STATS, 1);
 
+        stats.counterInc(site, AuthenticationMethod.AUTH_STATE_LOGGED_IN_STATS, 1);
+
         Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
 
         // When
@@ -601,6 +829,7 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
     @Test
     void shouldReportWithManualAuth() {
         // Given
+        String site = "https://www.example.com";
         ExtensionAuthhelperReport.AuthReportDataHandler dataHandler =
                 new ExtensionAuthhelperReport.AuthReportDataHandler();
         ReportData reportData = new ReportData("auth-report-test");
@@ -609,6 +838,10 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         ManualAuthenticationMethod authMethod =
                 new ManualAuthenticationMethodType().createAuthenticationMethod(0);
         given(context.getAuthenticationMethod()).willReturn(authMethod);
+        given(context.getName()).willReturn("api-auth");
+        given(context.getIncludeInContextRegexs()).willReturn(List.of(site + ".*"));
+        given(context.getExcludeFromContextRegexs()).willReturn(List.of());
+        given(context.getDataDrivenNodes()).willReturn(List.of());
 
         reportData.setContexts(List.of(context));
 
@@ -629,8 +862,101 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         // Then
         assertThat(reportData.getReportObject("authdata"), is(notNullValue()));
         AuthReportData ard = (AuthReportData) reportData.getReportObject("authdata");
+        assertThat(ard.isValidReport(), is(equalTo(true)));
+        assertThat(ard.getSite(), is(equalTo(site)));
+        assertThat(ard.getAfEnv(), containsString("api-auth"));
+        assertThat(ard.getSummaryItems().size(), is(equalTo(2)));
+        assertThat(
+                ard.getSummaryItems().get(0).key(),
+                is(equalTo("auth.summary.connection_successes")));
+        assertThat(ard.getSummaryItems().get(0).value(), is(equalTo(0L)));
+        assertThat(ard.getSummaryItems().get(0).description(), is(equalTo("Responses received")));
+        assertThat(
+                ard.getSummaryItems().get(1).key(),
+                is(equalTo("auth.summary.connection_failures")));
+        assertThat(ard.getSummaryItems().get(1).value(), is(equalTo(0L)));
+        assertThat(
+                ard.getSummaryItems().get(1).description(),
+                is(equalTo("Communication or network failures")));
+    }
+
+    @Test
+    void shouldReportConnectionCountsFromStatsWithoutAuthConfig() {
+        // Given
+        ExtensionAuthhelperReport.AuthReportDataHandler dataHandler =
+                new ExtensionAuthhelperReport.AuthReportDataHandler();
+        ReportData reportData = new ReportData("auth-report-test");
+        reportData.setSections(List.of("summary"));
+        Context context = mock(Context.class);
+
+        ManualAuthenticationMethod authMethod =
+                new ManualAuthenticationMethodType().createAuthenticationMethod(0);
+        given(context.getAuthenticationMethod()).willReturn(authMethod);
+        given(context.getName()).willReturn("api-auth");
+        given(context.getIncludeInContextRegexs()).willReturn(List.of());
+        given(context.getExcludeFromContextRegexs()).willReturn(List.of());
+        given(context.getDataDrivenNodes()).willReturn(List.of());
+        reportData.setContexts(List.of(context));
+
+        ExtensionLoader extensionLoader =
+                mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
+        ExtensionStats extStats =
+                mock(ExtensionStats.class, withSettings().strictness(Strictness.LENIENT));
+        given(extensionLoader.getExtension(ExtensionStats.class)).willReturn(extStats);
+
+        InMemoryStats stats = new InMemoryStats();
+        stats.counterInc("stats.network.send.success", 3);
+        stats.counterInc("stats.network.send.failure", 1);
+        given(extStats.getInMemoryStats()).willReturn(stats);
+
+        Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
+
+        // When
+        dataHandler.handle(reportData);
+
+        // Then
+        AuthReportData ard = (AuthReportData) reportData.getReportObject("authdata");
+        assertThat(ard.isValidReport(), is(equalTo(true)));
+        assertThat(ard.getAfEnv(), containsString("api-auth"));
+        assertThat(ard.getSummaryItems().get(0).value(), is(equalTo(3L)));
+        assertThat(ard.getSummaryItems().get(1).value(), is(equalTo(1L)));
+    }
+
+    @Test
+    void shouldSkipConnectionSummaryWhenSummarySectionNotRequested() {
+        // Given
+        ExtensionAuthhelperReport.AuthReportDataHandler dataHandler =
+                new ExtensionAuthhelperReport.AuthReportDataHandler();
+        ReportData reportData = new ReportData("auth-report-test");
+        reportData.setSections(List.of("diagnostics"));
+        Context context = mock(Context.class);
+
+        ManualAuthenticationMethod authMethod =
+                new ManualAuthenticationMethodType().createAuthenticationMethod(0);
+        given(context.getAuthenticationMethod()).willReturn(authMethod);
+        given(context.getName()).willReturn("api-auth");
+        given(context.getIncludeInContextRegexs()).willReturn(List.of());
+        given(context.getExcludeFromContextRegexs()).willReturn(List.of());
+        given(context.getDataDrivenNodes()).willReturn(List.of());
+        reportData.setContexts(List.of(context));
+
+        ExtensionLoader extensionLoader =
+                mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
+        ExtensionStats extStats =
+                mock(ExtensionStats.class, withSettings().strictness(Strictness.LENIENT));
+        given(extensionLoader.getExtension(ExtensionStats.class)).willReturn(extStats);
+        given(extStats.getInMemoryStats()).willReturn(new InMemoryStats());
+
+        Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
+
+        // When
+        dataHandler.handle(reportData);
+
+        // Then
+        AuthReportData ard = (AuthReportData) reportData.getReportObject("authdata");
         assertThat(ard.isValidReport(), is(equalTo(false)));
         assertThat(ard.getSummaryItems().size(), is(equalTo(0)));
+        assertThat(ard.getAfEnv(), containsString("api-auth"));
     }
 
     @Test
@@ -784,10 +1110,14 @@ class ExtensionAuthhelperReportUnitTest extends TestUtils {
         assertThat(ard.getSummaryItems().get(2).key(), is(equalTo("auth.summary.verif")));
         assertThat(ard.getSummaryItems().get(2).passed(), is(equalTo(false)));
 
-        assertThat(ard.getFailureDetails().size(), is(equalTo(5)));
-        assertThat(ard.getFailureDetails().get(0).name(), is(equalTo("SESSION_MGMT")));
-        assertThat(ard.getFailureDetails().get(1).name(), is(equalTo("VERIF_IDENT")));
-        assertThat(ard.getFailureDetails().get(2).name(), is(equalTo("PASS_COUNT")));
-        assertThat(ard.getFailureDetails().get(3).name(), is(equalTo("NO_SUCCESSFUL_LOGINS")));
+        assertThat(
+                ard.getFailureDetails(),
+                contains(
+                        FailureDetail.SESSION_MGMT,
+                        FailureDetail.VERIF_IDENT,
+                        FailureDetail.PASS_COUNT,
+                        FailureDetail.NO_SUCCESSFUL_LOGINS,
+                        FailureDetail.LOGIN_FAILURES,
+                        FailureDetail.LOGGED_IN));
     }
 }

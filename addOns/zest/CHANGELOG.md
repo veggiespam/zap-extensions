@@ -5,7 +5,79 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Changed
+- Depend on newer version of Script Console add-on to use its functionality.
 
+## [48.14.0] - 2026-07-06
+### Added
+- Browser screenshots are now automatically captured on Zest client step failures, and script print output is included in the diagnostics report. For chain runs, each output is clearly attributed to the specific script that produced it.
+
+### Changed
+- Update minimum `scripts` add-on version to 45.19.0.
+- Chained scripts now have provenance information preserved for troubleshooting purposes.
+- Update Zest library to 0.36.0:
+  - Update dependencies.
+  - Restore JSON deserialization behaviour.
+  - Handle text (and similar) input elements which only become visible when interacted with.
+- Maintenance changes.
+
+### Fixed
+- Fix exception when adding/editing Zest non-standalone type scripts through the GUI.
+- Prevent exception with scripts when their engine isn't installed or present, which may be encountered when the zest add-on is uninstalled/updated.
+
+## [48.13.0] - 2026-03-31
+### Added
+- Internal support for creating a single runnable chain script from multiple Zest scripts.
+- Support for import and export.
+
+## [48.12.0] - 2026-02-13
+### Added
+- UI support for Zest script options.
+- Now supports authentication for client side scripts.
+
+### Fixed
+- Bug which prevented client side scripts from being recorded in ZAP.
+
+### Changed
+- Update Zest library to 0.35.0:
+  - Migrate JSON serialization from Gson to Jackson.
+
+## [48.11.0] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Use lowercase credential parameters in the Authentication default template.
+- Update Zest library to 0.33.0:
+  - Support for script level `statementDelay`.
+  - Update Selenium to version 4.39.0.
+
+### Fixed
+- Address deadlock when adding scripts.
+
+## [48.10.0] - 2025-10-29
+### Added
+- Support for Edge in scripts run from the script console.
+
+### Changed
+- Deprecate the `Username` and `Password` credential parameters in favor of the lowercase `username` and
+`password` variants, aligning them with the naming convention of the other authentication credentials.
+- Update Zest library to 0.32.0.
+
+### Removed
+- Support for Internet Explorer.
+
+## [48.9.0] - 2025-09-02
+### Changed
+- Allow to keep auhtenticator's proxy running after the authentication.
+
+## [48.8.0] - 2025-07-03
+
+### Added
+- New extension level method for recording client scripts.
+
+### Changed
+- Fail fast on client errors.
+- Update Zest library to 0.31.0:
+  - Update Selenium to version 4.34.0.
 
 ## [48.7.0] - 2025-06-10
 ### Changed
@@ -412,6 +484,13 @@ Sender scripts. (Issue 5590)
 
 - Updated for 2.1.0
 
+[48.14.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.14.0
+[48.13.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.13.0
+[48.12.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.12.0
+[48.11.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.11.0
+[48.10.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.10.0
+[48.9.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.9.0
+[48.8.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.8.0
 [48.7.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.7.0
 [48.6.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.6.0
 [48.5.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.5.0

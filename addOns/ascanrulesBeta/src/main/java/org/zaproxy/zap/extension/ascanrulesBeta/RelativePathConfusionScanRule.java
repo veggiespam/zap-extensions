@@ -19,6 +19,7 @@
  */
 package org.zaproxy.zap.extension.ascanrulesBeta;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -176,6 +177,7 @@ public class RelativePathConfusionScanRule extends AbstractAppPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG));
         alertTags.put(PolicyTag.QA_FULL.getTag(), "");
@@ -642,8 +644,8 @@ public class RelativePathConfusionScanRule extends AbstractAppPlugin
                 LOGGER.debug(
                         "The URI has no filename component, so there is unlikely to be any ambiguity over any relative paths");
             }
-        } catch (Exception e) {
-            LOGGER.error(
+        } catch (IOException e) {
+            LOGGER.debug(
                     "Error scanning a request for Relative Path confusion: {}", e.getMessage(), e);
         }
     }

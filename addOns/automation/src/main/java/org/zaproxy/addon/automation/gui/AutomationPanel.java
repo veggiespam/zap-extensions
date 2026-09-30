@@ -20,11 +20,17 @@
 package org.zaproxy.addon.automation.gui;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.awt.EventQueue;
 import java.awt.GridBagLayout;
+import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.lang.System.Logger.Level;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,15 +41,9 @@ import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
-import javax.swing.JTextPane;
 import javax.swing.JToolBar;
 import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileFilter;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Style;
-import javax.swing.text.StyleConstants;
-import javax.swing.text.StyledDocument;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreePath;
 import org.apache.logging.log4j.LogManager;
@@ -60,6 +60,7 @@ import org.zaproxy.addon.automation.AutomationPlan;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.ExtensionAutomation;
 import org.zaproxy.addon.automation.tests.AbstractAutomationTest;
+import org.zaproxy.addon.commonlib.ui.TabbedOutputPanel;
 import org.zaproxy.zap.ZAP;
 import org.zaproxy.zap.eventBus.Event;
 import org.zaproxy.zap.eventBus.EventConsumer;
@@ -73,72 +74,71 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
 
     private static final ImageIcon PLAY_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/131.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/131.png"));
     private static final ImageIcon LOAD_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/047.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/047.png"));
     private static final ImageIcon SAVE_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/096.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/096.png"));
     private static final ImageIcon SAVE_AS_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(
-                            AutomationPanel.class.getResource(
-                                    ExtensionAutomation.RESOURCES_DIR + "save-as.png")));
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "save-as.png"));
+    private static final ImageIcon STOP_ICON =
+            DisplayUtils.getScaledIcon(
+                    AutomationPanel.class.getResource("/resource/icon/16/142.png"));
     private static final ImageIcon ADD_PLAN_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(
-                            AutomationPanel.class.getResource(
-                                    ExtensionAutomation.RESOURCES_DIR + "clipboard--plus.png")));
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "clipboard--plus.png"));
+    private static final ImageIcon LOAD_PLAN_CLIPBOARD_ICON =
+            DisplayUtils.getScaledIcon(
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "clipboard-sign.png"));
     private static final ImageIcon DOWN_ARROW_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(
-                            AutomationPanel.class.getResource(
-                                    ExtensionAutomation.RESOURCES_DIR + "task-move-down.png")));
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "task-move-down.png"));
     private static final ImageIcon UP_ARROW_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(
-                            AutomationPanel.class.getResource(
-                                    ExtensionAutomation.RESOURCES_DIR + "task-move-up.png")));
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "task-move-up.png"));
     private static final ImageIcon ADD_JOB_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(
-                            AutomationPanel.class.getResource(
-                                    ExtensionAutomation.RESOURCES_DIR + "task--plus.png")));
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "task--plus.png"));
     private static final ImageIcon REMOVE_JOB_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(
-                            AutomationPanel.class.getResource(
-                                    ExtensionAutomation.RESOURCES_DIR + "task--minus.png")));
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "task--minus.png"));
     private static final ImageIcon ADD_TEST_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(
-                            AutomationPanel.class.getResource(
-                                    ExtensionAutomation.RESOURCES_DIR + "question-plus.png")));
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "question-plus.png"));
     private static final ImageIcon REMOVE_TEST_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(
-                            AutomationPanel.class.getResource(
-                                    ExtensionAutomation.RESOURCES_DIR + "question-minus.png")));
+                    AutomationPanel.class.getResource(
+                            ExtensionAutomation.RESOURCES_DIR + "question-minus.png"));
 
     protected static final ImageIcon GREEN_BALL_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/152.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/152.png"));
     protected static final ImageIcon RED_BALL_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/151.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/151.png"));
     protected static final ImageIcon YELLOW_BALL_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/154.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/154.png"));
     protected static final ImageIcon ORANGE_BALL_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/156.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/156.png"));
     protected static final ImageIcon WHITE_BALL_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/160.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/160.png"));
     protected static final ImageIcon GREY_BALL_ICON =
             DisplayUtils.getScaledIcon(
-                    new ImageIcon(AutomationPanel.class.getResource("/resource/icon/16/158.png")));
+                    AutomationPanel.class.getResource("/resource/icon/16/158.png"));
 
     private static final Logger LOGGER = LogManager.getLogger(AutomationPanel.class);
 
@@ -146,26 +146,22 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
     private JToolBar toolbar;
     private JScrollPane planScrollpane;
     private JButton loadPlanButton;
+    private JButton loadFromClipboardButton;
     private JButton addPlanButton;
     private JButton runPlanButton;
     private JButton savePlanButton;
     private JButton saveAsPlanButton;
+    private JButton stopPlanButton;
     private JButton jobUpButton;
     private JButton jobDownButton;
     private JButton addJobButton;
     private JButton removeJobButton;
-    private JTabbedPane tabbedPane;
     private JButton addTestButton;
     private JButton removeTestButton;
     private JButton optionsButton;
     private JXTreeTable tree;
     private PlanTreeTableModel treeModel;
-    private JScrollPane outputScrollpane;
-    private JTextPane outputArea;
     private AutomationPlan currentPlan;
-    private Style styleError;
-    private Style styleWarning;
-    private Style styleInfo;
 
     public AutomationPanel(ExtensionAutomation ext) {
         this.ext = ext;
@@ -177,7 +173,7 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
         this.setLayout(new GridBagLayout());
 
         this.add(this.getToolbar(), LayoutHelper.getGBC(0, 0, 1, 1.0));
-        this.add(this.getTabbedPane(), LayoutHelper.getGBC(0, 1, 1, 1.0, 1.0));
+        this.add(this.getPlanScrollpane(), LayoutHelper.getGBC(0, 1, 1, 1.0, 1.0));
 
         ZAP.getEventBus()
                 .registerConsumer(this, AutomationEventPublisher.getPublisher().getPublisherName());
@@ -189,9 +185,11 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
             toolbar.setFloatable(false);
             toolbar.add(getAddPlanButton());
             toolbar.add(getLoadPlanButton());
+            toolbar.add(getLoadFromClipboardButton());
             toolbar.add(getSavePlanButton());
             toolbar.add(getSaveAsPlanButton());
             toolbar.add(getRunPlanButton());
+            toolbar.add(getStopPlanButton());
             toolbar.addSeparator();
             toolbar.add(getAddJobButton());
             toolbar.add(getRemoveJobButton());
@@ -217,10 +215,20 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
                         if (currentPlan == null) {
                             return;
                         }
+                        runPlanButton.setEnabled(false);
+                        getStopPlanButton().setEnabled(true);
                         ext.runPlanAsync(currentPlan);
+                        focusOutputPanel();
                     });
         }
         return runPlanButton;
+    }
+
+    private void focusOutputPanel() {
+        if (View.getSingleton().getOutputPanel() instanceof TabbedOutputPanel tabbedPanel) {
+            tabbedPanel.setSelectedOutputTab(ext.getOutputSource().getName());
+            tabbedPanel.setTabFocus();
+        }
     }
 
     private void savePlan(boolean promptForFile) {
@@ -300,6 +308,24 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
         return saveAsPlanButton;
     }
 
+    private JButton getStopPlanButton() {
+        if (stopPlanButton == null) {
+            stopPlanButton = new JButton();
+            stopPlanButton.setIcon(STOP_ICON);
+            stopPlanButton.setToolTipText(
+                    Constant.messages.getString("automation.dialog.plan.stop"));
+            stopPlanButton.setEnabled(false);
+            stopPlanButton.addActionListener(
+                    e -> {
+                        if (currentPlan != null) {
+                            stopPlanButton.setEnabled(false);
+                            ext.stopPlan(currentPlan);
+                        }
+                    });
+        }
+        return stopPlanButton;
+    }
+
     private JButton getLoadPlanButton() {
         if (loadPlanButton == null) {
             loadPlanButton = new JButton();
@@ -308,14 +334,8 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
                     Constant.messages.getString("automation.dialog.plan.load"));
             loadPlanButton.addActionListener(
                     e -> {
-                        if (currentPlan != null && currentPlan.isChanged()) {
-                            if (JOptionPane.OK_OPTION
-                                    != View.getSingleton()
-                                            .showConfirmDialog(
-                                                    Constant.messages.getString(
-                                                            "automation.dialog.plan.loosechanges"))) {
-                                return;
-                            }
+                        if (refuseUnsavedChanges()) {
+                            return;
                         }
                         final JFileChooser chooser =
                                 new JFileChooser(ext.getParam().getPlanDirectory());
@@ -344,24 +364,75 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
                                             chooser.getSelectedFile()
                                                     .getParentFile()
                                                     .getAbsolutePath());
-                            loadPlan(chooser.getSelectedFile());
+                            File f = chooser.getSelectedFile();
+                            loadPlanWithErrorHandling(
+                                    () -> {
+                                        loadPlan(ext.loadPlan(f));
+                                        ext.getParam().setLastPlanPath(f.getAbsolutePath());
+                                    });
                         }
                     });
         }
         return loadPlanButton;
     }
 
-    private void loadPlan(File f) {
+    private boolean refuseUnsavedChanges() {
+        return currentPlan != null
+                && currentPlan.isChanged()
+                && JOptionPane.OK_OPTION
+                        != View.getSingleton()
+                                .showConfirmDialog(
+                                        Constant.messages.getString(
+                                                "automation.dialog.plan.loosechanges"));
+    }
+
+    private interface RunnableException {
+        void run() throws Exception;
+    }
+
+    private void loadPlanWithErrorHandling(RunnableException loadAction) {
         try {
-            loadPlan(ext.loadPlan(f));
-            ext.getParam().setLastPlanPath(f.getAbsolutePath());
+            loadAction.run();
         } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+            outputMessage(e.getMessage(), Level.ERROR);
+            focusOutputPanel();
             View.getSingleton()
-                    .showWarningDialog(
-                            Constant.messages.getString(
-                                    "automation.panel.load.failed", e.getMessage()));
+                    .showWarningDialog(Constant.messages.getString("automation.panel.load.failed"));
         }
+    }
+
+    private JButton getLoadFromClipboardButton() {
+        if (loadFromClipboardButton == null) {
+            loadFromClipboardButton = new JButton();
+            loadFromClipboardButton.setIcon(LOAD_PLAN_CLIPBOARD_ICON);
+            loadFromClipboardButton.setToolTipText(
+                    Constant.messages.getString("automation.dialog.plan.fromclipboard"));
+            loadFromClipboardButton.addActionListener(
+                    e -> {
+                        if (refuseUnsavedChanges()) {
+                            return;
+                        }
+                        var clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                        if (!clipboard.isDataFlavorAvailable(DataFlavor.stringFlavor)) {
+                            View.getSingleton()
+                                    .showWarningDialog(
+                                            Constant.messages.getString(
+                                                    "automation.dialog.plan.fromclipboard.notext"));
+                            return;
+                        }
+                        loadPlanWithErrorHandling(
+                                () -> {
+                                    String data =
+                                            (String) clipboard.getData(DataFlavor.stringFlavor);
+                                    loadPlan(
+                                            ext.loadPlan(
+                                                    new ByteArrayInputStream(
+                                                            data.getBytes(
+                                                                    StandardCharsets.UTF_8))));
+                                });
+                    });
+        }
+        return loadFromClipboardButton;
     }
 
     private Object setSelectedItem() {
@@ -382,13 +453,7 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
             addPlanButton.setToolTipText(Constant.messages.getString("automation.dialog.plan.new"));
             addPlanButton.addActionListener(
                     e -> {
-                        if (currentPlan != null
-                                && currentPlan.isChanged()
-                                && JOptionPane.OK_OPTION
-                                        != View.getSingleton()
-                                                .showConfirmDialog(
-                                                        Constant.messages.getString(
-                                                                "automation.dialog.plan.loosechanges"))) {
+                        if (refuseUnsavedChanges()) {
                             return;
                         }
                         new NewPlanDialog().setVisible(true);
@@ -418,14 +483,19 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
                             AutomationJob job = (AutomationJob) userObj;
                             if (currentPlan.moveJobUp(job)) {
                                 getTreeModel().moveJobUp(job);
-                                // TODO this isnt working :(
-                                tree.setRowSelectionInterval(row - 1, row - 1);
+                                selectTreeRow(row - 1);
                                 job.setChanged();
                             }
                         }
                     });
         }
         return jobUpButton;
+    }
+
+    private void selectTreeRow(int row) {
+        // Selections need to happen after all changes have been reflected in the tree.
+        // See the JXTreeTable$TreeTableModelAdapter delayed* methods.
+        EventQueue.invokeLater(() -> tree.setRowSelectionInterval(row, row));
     }
 
     private JButton getJobDownButton() {
@@ -454,8 +524,7 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
                             AutomationJob job = (AutomationJob) userObj;
                             if (currentPlan.moveJobDown(job)) {
                                 getTreeModel().moveJobDown(job);
-                                // TODO this isnt working :(
-                                tree.setRowSelectionInterval(row + 1, row + 1);
+                                selectTreeRow(row + 1);
                                 job.setChanged();
                             }
                         }
@@ -567,8 +636,7 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
             optionsButton = new JButton();
             optionsButton.setToolTipText(Constant.messages.getString("automation.dialog.options"));
             optionsButton.setIcon(
-                    DisplayUtils.getScaledIcon(
-                            new ImageIcon(ZAP.class.getResource("/resource/icon/16/041.png"))));
+                    DisplayUtils.getScaledIcon(ZAP.class.getResource("/resource/icon/16/041.png")));
 
             optionsButton.addActionListener(
                     e ->
@@ -585,30 +653,29 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
         setCurrentPlan(plan);
         ext.registerPlan(currentPlan);
         AutomationProgress progress = currentPlan.getProgress();
-        this.getOutputArea().setText(listToStr(progress.getAllMessages()));
         if (progress.hasErrors()) {
             View.getSingleton()
-                    .showWarningDialog(
-                            Constant.messages.getString(
-                                    "automation.panel.load.error",
-                                    listToStr(progress.getErrors())));
+                    .showWarningDialog(Constant.messages.getString("automation.panel.load.error"));
         } else if (progress.hasWarnings()) {
             View.getSingleton()
                     .showWarningDialog(
-                            Constant.messages.getString(
-                                    "automation.panel.load.warning",
-                                    listToStr(progress.getWarnings())));
+                            Constant.messages.getString("automation.panel.load.warning"));
         }
     }
 
     public void setCurrentPlan(AutomationPlan plan) {
         currentPlan = plan;
-        getOutputArea().setText("");
         getTreeModel().setPlan(currentPlan);
-        getRunPlanButton().setEnabled(currentPlan != null);
+        packPlanTableColumns();
+        getRunPlanButton()
+                .setEnabled(
+                        currentPlan != null
+                                && (currentPlan.getStarted() == null
+                                        || currentPlan.getFinished() != null));
         getAddJobButton().setEnabled(currentPlan != null);
         getSavePlanButton().setEnabled(false);
         getSaveAsPlanButton().setEnabled(currentPlan != null);
+        getStopPlanButton().setEnabled(currentPlan != null && !getRunPlanButton().isEnabled());
     }
 
     public List<String> getUnsavedPlans() {
@@ -618,15 +685,6 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
             return list;
         }
         return Collections.emptyList();
-    }
-
-    private JTabbedPane getTabbedPane() {
-        if (this.tabbedPane == null) {
-            this.tabbedPane = new JTabbedPane();
-            this.tabbedPane.addTab("Plan", this.getPlanScrollpane());
-            this.tabbedPane.addTab("Output", getOutputScrollpane());
-        }
-        return this.tabbedPane;
     }
 
     private JScrollPane getPlanScrollpane() {
@@ -691,28 +749,12 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
         getRemoveTestButton().setEnabled(false);
     }
 
-    private JScrollPane getOutputScrollpane() {
-        if (outputScrollpane == null) {
-            outputScrollpane = new JScrollPane();
-            outputScrollpane.setViewportView(this.getOutputArea());
+    private void packPlanTableColumns() {
+        if (currentPlan == null) {
+            return;
         }
-        return outputScrollpane;
-    }
-
-    private JTextPane getOutputArea() {
-        if (outputArea == null) {
-            outputArea = new JTextPane();
-            outputArea.setEditable(false);
-            styleError = this.getOutputArea().addStyle("Error", null);
-            StyleConstants.setIcon(styleError, RED_BALL_ICON);
-
-            styleWarning = this.getOutputArea().addStyle("Warning", null);
-            StyleConstants.setIcon(styleWarning, ORANGE_BALL_ICON);
-
-            styleInfo = this.getOutputArea().addStyle("Info", null);
-            StyleConstants.setIcon(styleInfo, WHITE_BALL_ICON);
-        }
-        return outputArea;
+        // Allow the tree table to reflect the new plan before resizing columns.
+        EventQueue.invokeLater(tree::packAll);
     }
 
     private PlanTreeTableModel getTreeModel() {
@@ -722,18 +764,21 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
         return treeModel;
     }
 
-    private static String listToStr(List<String> list) {
-        return String.join("\n", list);
+    private void outputMessage(String message, Level level) {
+        ext.getView()
+                .getOutputPanel()
+                .append(
+                        String.format("%-9s%s\n", getI18nLogLevel(level), message),
+                        ext.getOutputSource().getName());
     }
 
-    private void outputMessage(String message, Style style) {
-        StyledDocument doc = this.getOutputArea().getStyledDocument();
-        try {
-            doc.insertString(doc.getLength(), " ", style);
-            doc.insertString(doc.getLength(), "  " + message + "\n", null);
-        } catch (BadLocationException e) {
-            // Ignore
-        }
+    private static String getI18nLogLevel(Level level) {
+        return switch (level) {
+            case ERROR -> Constant.messages.getString("automation.output.level.error");
+            case WARNING -> Constant.messages.getString("automation.output.level.warning");
+            case INFO -> Constant.messages.getString("automation.output.level.info");
+            default -> level.getName();
+        };
     }
 
     private AutomationPlan getPlan(Event event) {
@@ -800,19 +845,22 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
                 updateSaveButton(event, true);
                 break;
             case AutomationEventPublisher.PLAN_STARTED:
-                this.getOutputArea().setText("");
+                break;
+            case AutomationEventPublisher.PLAN_FINISHED:
+                this.getRunPlanButton().setEnabled(true);
+                this.getStopPlanButton().setEnabled(false);
                 break;
             case AutomationEventPublisher.PLAN_ERROR_MESSAGE:
                 outputMessage(
-                        event.getParameters().get(AutomationEventPublisher.MESSAGE), styleError);
+                        event.getParameters().get(AutomationEventPublisher.MESSAGE), Level.ERROR);
                 break;
             case AutomationEventPublisher.PLAN_WARNING_MESSAGE:
                 outputMessage(
-                        event.getParameters().get(AutomationEventPublisher.MESSAGE), styleWarning);
+                        event.getParameters().get(AutomationEventPublisher.MESSAGE), Level.WARNING);
                 break;
             case AutomationEventPublisher.PLAN_INFO_MESSAGE:
                 outputMessage(
-                        event.getParameters().get(AutomationEventPublisher.MESSAGE), styleInfo);
+                        event.getParameters().get(AutomationEventPublisher.MESSAGE), Level.INFO);
                 break;
             case AutomationEventPublisher.PLAN_ENV_CREATED:
                 getTreeModel().envChanged();

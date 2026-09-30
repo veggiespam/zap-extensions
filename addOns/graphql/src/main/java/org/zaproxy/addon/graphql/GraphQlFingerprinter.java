@@ -35,7 +35,6 @@ import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.core.scanner.Alert;
 import org.parosproxy.paros.network.HttpMessage;
-import org.parosproxy.paros.network.HttpSender;
 import org.zaproxy.addon.commonlib.CommonAlertTag;
 import org.zaproxy.zap.extension.alert.ExtensionAlert;
 
@@ -47,17 +46,18 @@ public class GraphQlFingerprinter {
     private static final Logger LOGGER = LogManager.getLogger(GraphQlFingerprinter.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private static List<DiscoveredGraphQlEngineHandler> handlers;
+    private static final List<DiscoveredGraphQlEngineHandler> handlers = new ArrayList<>(2);
 
+    private final URI endpointUrl;
     private final Requestor requestor;
     private final Map<String, HttpMessage> queryCache;
 
     private HttpMessage lastQueryMsg;
     private String matchedString;
 
-    public GraphQlFingerprinter(URI endpointUrl) {
-        resetHandlers();
-        requestor = new Requestor(endpointUrl, HttpSender.MANUAL_REQUEST_INITIATOR);
+    public GraphQlFingerprinter(URI endpointUrl, Requestor requestor) {
+        this.endpointUrl = endpointUrl;
+        this.requestor = requestor;
         queryCache = new HashMap<>();
     }
 
@@ -201,7 +201,7 @@ public class GraphQlFingerprinter {
                 createFingerprintingAlert(discoveredGraphQlEngine)
                         .setEvidence(matchedString)
                         .setMessage(lastQueryMsg)
-                        .setUri(requestor.getEndpointUrl().toString())
+                        .setUri(endpointUrl.toString())
                         .build();
         extAlert.alertFound(alert, null);
     }
@@ -641,14 +641,11 @@ public class GraphQlFingerprinter {
     }
 
     public static void addEngineHandler(DiscoveredGraphQlEngineHandler handler) {
-        if (handlers == null) {
-            resetHandlers();
-        }
         handlers.add(handler);
     }
 
     public static void resetHandlers() {
-        handlers = new ArrayList<>(2);
+        handlers.clear();
     }
 
     public static class DiscoveredGraphQlEngine {

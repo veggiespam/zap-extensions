@@ -1,7 +1,8 @@
-import org.rm3l.datanucleus.gradle.DataNucleusApi
-import org.rm3l.datanucleus.gradle.extensions.enhance.EnhanceExtension
-import org.zaproxy.gradle.addon.AddOnPlugin
 import org.zaproxy.gradle.addon.AddOnStatus
+
+plugins {
+    id("org.zaproxy.gradle.jdo-enhance")
+}
 
 description = "Helps identify and set up authentication handling"
 
@@ -52,26 +53,38 @@ zapAddOn {
                     }
                 }
             }
+            register("org.zaproxy.addon.authhelper.automation.ExtensionAuthhelperAutomation") {
+                classnames {
+                    allowed.set(listOf("org.zaproxy.addon.authhelper.automation"))
+                }
+                dependencies {
+                    addOns {
+                        register("automation") {
+                            version.set(">=0.60.0")
+                        }
+                    }
+                }
+            }
         }
         dependencies {
             addOns {
                 register("commonlib") {
-                    version.set(">= 1.33.0 & < 2.0.0")
+                    version.set(">= 1.44.0 & < 2.0.0")
                 }
                 register("database") {
                     version.set(">=0.8.0 & < 1.0.0")
                 }
                 register("network") {
-                    version.set(">=0.6.0")
+                    version.set(">=0.23.0")
                 }
                 register("pscan") {
                     version.set(">= 0.1.0 & < 1.0.0")
                 }
                 register("selenium") {
-                    version.set("15.*")
+                    version.set(">=15.44.0")
                 }
                 register("zest") {
-                    version.set(">=48.6.0")
+                    version.set(">=48.10.0")
                 }
             }
         }
@@ -86,24 +99,13 @@ crowdin {
     }
 }
 
-val enhance by tasks.named("enhance") {
-    outputs.upToDateWhen { false }
-}
-
-tasks.named(AddOnPlugin.GENERATE_MANIFEST_TASK_NAME) {
-    mustRunAfter(enhance)
-}
-
-datanucleus {
-    enhance(
-        closureOf<EnhanceExtension> {
-            api(DataNucleusApi.JDO)
-            persistenceUnitName(zapAddOn.addOnId.get())
-        },
-    )
+jdoEnhance {
+    persistenceUnitName.set(zapAddOn.addOnId.get())
 }
 
 dependencies {
+    jdoEnhance(libs.database.datanucleusJdo)
+
     zapAddOn("automation")
     zapAddOn("commonlib")
     zapAddOn("database")
@@ -113,13 +115,18 @@ dependencies {
     zapAddOn("spiderAjax")
     zapAddOn("client")
     zapAddOn("reports")
+    // Transitive compile-time dependency via zest.
+    compileOnly(parent!!.childProjects.get("scripts")!!)
     zapAddOn("zest")
 
-    implementation("com.github.bastiaanjansen:otp-java:2.1.0") {
+    compileOnly(libs.log4j.core)
+
+    implementation(libs.authhelper.otpJava) {
         // Provided by ZAP.
         exclude(group = "commons-codec", module = "commons-codec")
     }
 
-    testImplementation("io.github.bonigarcia:selenium-jupiter:5.1.1")
+    testImplementation(libs.test.selenium.jupiter)
     testImplementation(project(":testutils"))
+    testRuntimeOnly("commons-codec:commons-codec:1.20.0")
 }

@@ -4,6 +4,77 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Added
+- Move script types from core (Issue 8027).
+- Add button to load script from clipboard in the Scripts tab toolbar.
+
+### Changed
+- Update dependency.
+- Show script output/errors asynchronously in the GUI to not block the running script.
+
+## [45.20.0] - 2026-07-13
+### Added
+- GUI support for Zest script chains and failure level in the Automation Framework Script job dialog (via the Use Script Chain checkbox, and Chains tab).
+
+### Changed
+- Update dependency.
+
+## [45.19.0] - 2026-07-06
+### Added
+- Functionality to store script diagnostics and provides them to Reports. Depends on the database add-on.
+- The Script Job Run action now supports a `failureLevel` parameter (`info`, `warning`, `error`) to control the Automation Framework progress level used when a script or chain execution fails (defaults to `error`).
+
+### Changed
+- Update dependency.
+- Revised error handling for chained scripts, output is now more detailed/specific.
+- The Run Script action display for chains in the Automation panel has been updated to display the names of scripts in the chain instead of being blank.
+- Maintenance changes.
+- Formatted JavaScript files for consistency.
+
+## [45.18.0] - 2026-03-31
+### Changed
+- Update dependency.
+
+### Added
+- The Script Job Run action now supports:
+    - Passing authentication details (context and user) for standalone Zest client script execution.
+    - Executing a chain of one or more Zest standalone scripts using the chain parameter.
+
+## [45.17.0] - 2025-12-15
+### Changed
+- Update the automation framework template to include missing field (`inline`).
+- Do not display scripts added through the Automation Framework.
+- Update minimum ZAP version to 2.17.0.
+
+## [45.16.0] - 2025-12-03
+### Fixed
+- Script scan rules were not using the attack strength and alert threshold from active scan policies.
+
+### Changed
+- Update dependency.
+
+## [45.15.0] - 2025-11-04
+### Added
+- `scanHost` method to the active script scan rule interface that is called once per host being scanned.
+
+### Changed
+- Update dependency.
+
+## [45.14.0] - 2025-10-07
+### Added
+- Support for alert reference overrides in script scan rule metadata.
+
+### Changed
+- Do not report authentication script errors as warnings in the Automation Framework for consistent behavior with all authentication methods, which handle errors as authentication failures.
+
+## [45.13.0] - 2025-09-02
+### Changed
+- Update help with newer JavaScript engine and links.
+
+### Fixed
+- Error logs to always include stack trace.
+
+## [45.12.0] - 2025-06-20
 ### Changed
 - Maintenance changes.
 
@@ -385,6 +456,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
 
+[45.20.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.20.0
+[45.19.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.19.0
+[45.18.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.18.0
+[45.17.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.17.0
+[45.16.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.16.0
+[45.15.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.15.0
+[45.14.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.14.0
+[45.13.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.13.0
+[45.12.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.12.0
 [45.11.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.11.0
 [45.10.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.10.0
 [45.9.0]: https://github.com/zaproxy/zap-extensions/releases/scripts-v45.9.0

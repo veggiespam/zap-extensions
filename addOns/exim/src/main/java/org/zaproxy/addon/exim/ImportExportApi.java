@@ -20,7 +20,6 @@
 package org.zaproxy.addon.exim;
 
 import de.sstoehr.harreader.model.HarEntry;
-import de.sstoehr.harreader.model.HarLog;
 import java.awt.EventQueue;
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +32,7 @@ import net.sf.json.JSONObject;
 import org.apache.commons.httpclient.URI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.util.Strings;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.control.Control.Mode;
 import org.parosproxy.paros.db.DatabaseException;
@@ -71,9 +71,12 @@ public class ImportExportApi extends ApiImplementor {
 
     private static final String PARAM_BASE_URL = "baseurl";
     private static final String PARAM_COUNT = "count";
+    private static final String PARAM_DATA = "data";
     private static final String PARAM_FILE_PATH = "filePath";
     private static final String PARAM_FOLLOW_REDIRECTS = "followRedirects";
     private static final String PARAM_IDS = "ids";
+    private static final String PARAM_SEND_REQUESTS = "sendRequests";
+    private static final String PARAM_MAX_MESSAGES = "maxMessages";
     private static final String PARAM_REQUEST = "request";
     private static final String PARAM_START = "start";
 
@@ -92,7 +95,15 @@ public class ImportExportApi extends ApiImplementor {
 
     public ImportExportApi() {
         super();
-        this.addApiAction(new ApiAction(ACTION_IMPORT_HAR, new String[] {PARAM_FILE_PATH}));
+        this.addApiAction(
+                new ApiAction(
+                        ACTION_IMPORT_HAR,
+                        List.of(),
+                        List.of(
+                                PARAM_FILE_PATH,
+                                PARAM_DATA,
+                                PARAM_SEND_REQUESTS,
+                                PARAM_MAX_MESSAGES)));
         this.addApiAction(new ApiAction(ACTION_IMPORT_URLS, new String[] {PARAM_FILE_PATH}));
         this.addApiAction(new ApiAction(ACTION_IMPORT_ZAP_LOGS, new String[] {PARAM_FILE_PATH}));
         this.addApiAction(
@@ -126,8 +137,30 @@ public class ImportExportApi extends ApiImplementor {
         File file;
         switch (name) {
             case ACTION_IMPORT_HAR:
-                file = new File(ApiUtils.getNonEmptyStringParam(params, PARAM_FILE_PATH));
-                HarImporter harImporter = new HarImporter(file);
+                String data = ApiUtils.getOptionalStringParam(params, PARAM_DATA);
+                String filePath = ApiUtils.getOptionalStringParam(params, PARAM_FILE_PATH);
+                boolean sendRequests = getParam(params, PARAM_SEND_REQUESTS, false);
+
+                if (Strings.isNotBlank(data)) {
+                    if (Strings.isNotBlank(filePath)) {
+                        throw new ApiException(
+                                Type.ILLEGAL_PARAMETER,
+                                "Only one of the parameters should be provided at the same time.");
+                    }
+
+                    if (new HarImporter(data, sendRequests, getMaxMessages(params)).isSuccess()) {
+                        return ApiResponseElement.OK;
+                    }
+                    throw new ApiException(Type.ILLEGAL_PARAMETER, PARAM_DATA);
+                }
+
+                if (Strings.isBlank(filePath)) {
+                    throw new ApiException(Type.MISSING_PARAMETER);
+                }
+
+                file = new File(filePath);
+                HarImporter harImporter =
+                        new HarImporter(file, null, sendRequests, getMaxMessages(params));
                 return handleFileImportResponse(harImporter.isSuccess(), file);
             case ACTION_IMPORT_URLS:
                 file = new File(ApiUtils.getNonEmptyStringParam(params, PARAM_FILE_PATH));
@@ -186,10 +219,8 @@ public class ImportExportApi extends ApiImplementor {
                             rh -> addHarEntry(entries, rh));
                 }
 
-                HarLog harLog = HarUtils.createZapHarLog();
-                harLog.setEntries(entries);
-
-                responseBody = HarUtils.toJsonAsBytes(harLog);
+                responseBody =
+                        HarUtils.toJsonAsBytes(HarUtils.createZapHarLog().entries(entries).build());
             } catch (ApiException e) {
                 responseBody =
                         e.toString(API.Format.JSON, incErrorDetails())
@@ -252,10 +283,9 @@ public class ImportExportApi extends ApiImplementor {
                                                     httpMessage));
                                 });
 
-                        HarLog harLog = HarUtils.createZapHarLog();
-                        harLog.setEntries(entries);
-
-                        responseBody = HarUtils.toJsonAsBytes(harLog);
+                        responseBody =
+                                HarUtils.toJsonAsBytes(
+                                        HarUtils.createZapHarLog().entries(entries).build());
                     } catch (ApiException e) {
                         responseBody =
                                 e.toString(API.Format.JSON, incErrorDetails())
@@ -286,6 +316,18 @@ public class ImportExportApi extends ApiImplementor {
         } else {
             throw new ApiException(ApiException.Type.BAD_OTHER);
         }
+    }
+
+    private static int getMaxMessages(JSONObject params) throws ApiException {
+        if (!params.containsKey(PARAM_MAX_MESSAGES)
+                || params.getString(PARAM_MAX_MESSAGES).isEmpty()) {
+            return 0;
+        }
+        int maxMessages = ApiUtils.getIntParam(params, PARAM_MAX_MESSAGES);
+        if (maxMessages < 0) {
+            throw new ApiException(Type.ILLEGAL_PARAMETER, PARAM_MAX_MESSAGES);
+        }
+        return maxMessages;
     }
 
     private ApiResponseElement handleFileImportResponse(boolean success, File file)

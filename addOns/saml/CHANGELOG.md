@@ -5,8 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 ### Changed
-- Update minimum ZAP version to 2.16.0.
+- Update the SAML Settings' buttons title capitalization (Issue 2000).
+- Update dependency.
+
+## [11] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Update dependency.
 - Maintenance changes.
+
+### Fixed
+- Error logs to always include stack trace.
 
 ## [10] - 2022-10-28
 ### Changed
@@ -62,6 +71,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First version
 
+[11]: https://github.com/zaproxy/zap-extensions/releases/saml-v11
 [10]: https://github.com/zaproxy/zap-extensions/releases/saml-v10
 [9]: https://github.com/zaproxy/zap-extensions/releases/saml-v9
 [8]: https://github.com/zaproxy/zap-extensions/releases/saml-v8

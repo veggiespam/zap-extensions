@@ -31,7 +31,7 @@ zapAddOn {
                 dependencies {
                     addOns {
                         register("automation") {
-                            version.set(">=0.42.0")
+                            version.set(">=0.59.0")
                         }
                     }
                 }
@@ -40,13 +40,13 @@ zapAddOn {
         dependencies {
             addOns {
                 register("commonlib") {
-                    version.set(">= 1.23.0 & < 2.0.0")
+                    version.set(">= 1.43.0 & < 2.0.0")
                 }
                 register("network") {
                     version.set(">=0.11.0")
                 }
                 register("selenium") {
-                    version.set("15.*")
+                    version.set(">=15.57.0")
                 }
             }
         }
@@ -77,23 +77,15 @@ dependencies {
 
     compileOnly(libs.log4j.core)
 
-    implementation(files("lib/crawljax-core-3.7.1.jar"))
-    implementation("commons-math:commons-math:1.2")
-    implementation("com.codahale.metrics:metrics-core:3.0.2")
-    implementation("com.google.code.findbugs:jsr305:3.0.2")
-    implementation("com.google.inject.extensions:guice-assistedinject:5.0.1") {
-        // Not needed.
-        exclude(group = "org.sonatype.sisu.inject", module = "cglib")
-    }
-    implementation("net.jcip:jcip-annotations:1.0")
-    implementation("net.sourceforge.nekohtml:nekohtml:1.9.22")
-    implementation("org.slf4j:jcl-over-slf4j:1.7.32")
-    implementation("org.slf4j:jul-to-slf4j:1.7.32")
-    implementation("org.slf4j:slf4j-log4j12:1.7.32") {
-        // Provided by ZAP.
-        exclude(group = "log4j", module = "log4j")
-    }
-    implementation("xmlunit:xmlunit:1.6")
+    implementation(files("lib/crawljax-core-3.8.0.jar"))
+    implementation(libs.log4j.slf4j2)
+    implementation(libs.spiderAjax.apache.commons.math)
+    implementation(libs.spiderAjax.metricsCore)
+    implementation(libs.spiderAjax.guiceAssistedInject)
+    implementation(libs.spiderAjax.jcipAnnotations)
+    implementation(libs.spiderAjax.nekohtml)
+    implementation(libs.spiderAjax.julToSlf4j)
+    implementation(libs.spiderAjax.xmlunit)
 
     testImplementation(libs.log4j.core)
     testImplementation(project(":testutils"))

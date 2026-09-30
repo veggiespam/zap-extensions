@@ -71,6 +71,9 @@ public class FormatStringScanRule extends AbstractAppParamPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.API_2023_API10_UNSAFE_CONSUMPTION,
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
+                                CommonAlertTag.OWASP_2025_A10_EXCEPTIONAL_CONDITIONS,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A01_INJECTION));
         alertTags.put(PolicyTag.API.getTag(), "");
@@ -272,7 +275,7 @@ public class FormatStringScanRule extends AbstractAppParamPlugin
         } catch (URIException e) {
             LOGGER.debug("Failed to send HTTP message, cause: {}", e.getMessage());
         } catch (IOException e) {
-            LOGGER.error(e.getMessage(), e);
+            LOGGER.debug(e.getMessage(), e);
         }
     }
 

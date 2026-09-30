@@ -80,7 +80,7 @@ class HtAccessScanRuleUnitTest extends AbstractAppFilePluginUnitTest<HtAccessSca
         // Then
         assertThat(cwe, is(equalTo(94)));
         assertThat(wasc, is(equalTo(14)));
-        assertThat(tags.size(), is(equalTo(5)));
+        assertThat(tags.size(), is(equalTo(6)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG.getTag()),
                 is(equalTo(true)));
@@ -293,12 +293,6 @@ class HtAccessScanRuleUnitTest extends AbstractAppFilePluginUnitTest<HtAccessSca
         assertThat(authAlert.getRisk(), is(equalTo(Alert.RISK_INFO)));
         assertThat(authAlert.getConfidence(), is(equalTo(Alert.CONFIDENCE_LOW)));
         assertThat(authAlert.getAlertRef(), is(equalTo("40032-2")));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 
     private static class MiscOkResponse extends NanoServerHandler {

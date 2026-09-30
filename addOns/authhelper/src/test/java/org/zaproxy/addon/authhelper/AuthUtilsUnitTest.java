@@ -21,18 +21,24 @@ package org.zaproxy.addon.authhelper;
 
 import static fi.iki.elonen.NanoHTTPD.newFixedLengthResponse;
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
@@ -54,7 +60,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import lombok.Getter;
 import lombok.Setter;
+import net.sf.json.JSON;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONException;
+import net.sf.json.JSONObject;
 import org.apache.commons.httpclient.URI;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
@@ -69,6 +80,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.EnumSource.Mode;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
@@ -93,6 +106,10 @@ import org.zaproxy.zap.testutils.NanoServerHandler;
 import org.zaproxy.zap.testutils.TestUtils;
 import org.zaproxy.zap.users.User;
 import org.zaproxy.zap.utils.Pair;
+import org.zaproxy.zest.core.v1.ZestActionSleep;
+import org.zaproxy.zest.core.v1.ZestClientElementClick;
+import org.zaproxy.zest.core.v1.ZestClientLaunch;
+import org.zaproxy.zest.core.v1.ZestScript;
 
 class AuthUtilsUnitTest extends TestUtils {
 
@@ -101,6 +118,7 @@ class AuthUtilsUnitTest extends TestUtils {
         setUpZap();
 
         mockMessages(new ExtensionAuthhelper());
+        AuthUtils.setHistoryProvider(new TestHistoryProvider());
     }
 
     @AfterEach
@@ -212,6 +230,172 @@ class AuthUtilsUnitTest extends TestUtils {
         assertThat(field, is(notNullValue()));
         assertThat(field.getAttribute("type"), is(equalTo("customtype")));
         assertThat(field.isDisplayed(), is(equalTo(true)));
+    }
+
+    @Test
+    void shouldClickNonDisplayedInputWithoutTypeAttributeToMakeItVisibleWhenChoosingUserField() {
+        // Given - HTML inputs default to type text when the attribute is omitted
+        TestWebElement inputField = new TestWebElement("input", null);
+        inputField.setDisplayed(false);
+        inputField.setDisplayOnClick(true);
+        List<WebElement> inputElements = List.of(inputField);
+
+        // When
+        WebElement field = AuthUtils.getUserField(null, inputElements, null);
+
+        // Then
+        assertThat(inputField.isClicked(), is(true));
+        assertThat(field, is(notNullValue()));
+        assertThat(field.isDisplayed(), is(true));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"text, user", "email, user", "password, password"})
+    void shouldClickNonDisplayedInputToMakeItVisible(String inputType, String fieldLookup) {
+        // Given
+        TestWebElement inputField = new TestWebElement("input", inputType);
+        inputField.setDisplayed(false);
+        inputField.setDisplayOnClick(true);
+        List<WebElement> inputElements = List.of(inputField);
+
+        // When
+        WebElement field =
+                "user".equals(fieldLookup)
+                        ? AuthUtils.getUserField(null, inputElements, null)
+                        : AuthUtils.getPasswordField(inputElements);
+
+        // Then
+        assertThat(inputField.isClicked(), is(true));
+        assertThat(field, is(notNullValue()));
+        assertThat(field.isDisplayed(), is(true));
+    }
+
+    @Test
+    void shouldNotClickDisplayedInputWhenChoosingUserField() {
+        // Given
+        TestWebElement inputField = new TestWebElement("input", "text");
+        List<WebElement> inputElements = List.of(inputField);
+
+        // When
+        WebElement field = AuthUtils.getUserField(null, inputElements, null);
+
+        // Then
+        assertThat(inputField.isClicked(), is(false));
+        assertThat(field, is(notNullValue()));
+    }
+
+    @Test
+    void shouldNotClickNonInputElementsWhenChoosingUserField() {
+        // Given
+        TestWebElement nonDisplayedDiv = new TestWebElement("div", null);
+        nonDisplayedDiv.setDisplayed(false);
+        TestWebElement nonDisplayedInput = new TestWebElement("input", "text");
+        nonDisplayedInput.setDisplayed(false);
+        nonDisplayedInput.setDisplayOnClick(true);
+        List<WebElement> inputElements = List.of(nonDisplayedDiv, nonDisplayedInput);
+
+        // When
+        WebElement field = AuthUtils.getUserField(null, inputElements, null);
+
+        // Then
+        assertThat(nonDisplayedDiv.isClicked(), is(false));
+        assertThat(nonDisplayedInput.isClicked(), is(true));
+        assertThat(field, is(notNullValue()));
+    }
+
+    @Test
+    void shouldReturnUserFieldWhenIsDisplayedThrowsForAnotherElement() {
+        // Given
+        TestWebElement brokenElement = new TestWebElement("input", "text");
+        brokenElement.setDisplayedCheckThrows(true);
+        TestWebElement visibleText = new TestWebElement("input", "text");
+        List<WebElement> inputElements = List.of(brokenElement, visibleText);
+
+        // When
+        WebElement field = AuthUtils.getUserField(null, inputElements, null);
+
+        // Then
+        assertThat(brokenElement.isClicked(), is(false));
+        assertThat(field, is(notNullValue()));
+        assertThat(field, is(visibleText));
+    }
+
+    @Test
+    void shouldReturnUserFieldWhenIsDisplayedThrowsAfterClickOnNonDisplayedInput() {
+        // Given
+        TestWebElement nonDisplayedInput = new TestWebElement("input", "text");
+        nonDisplayedInput.setDisplayed(false);
+        nonDisplayedInput.setDisplayOnClick(true);
+        nonDisplayedInput.setDisplayedAfterClickThrows(true);
+        TestWebElement visibleEmail = new TestWebElement("input", "email");
+        List<WebElement> inputElements = List.of(nonDisplayedInput, visibleEmail);
+
+        // When
+        WebElement field = AuthUtils.getUserField(null, inputElements, null);
+
+        // Then
+        assertThat(nonDisplayedInput.isClicked(), is(true));
+        assertThat(field, is(notNullValue()));
+        assertThat(field, is(visibleEmail));
+    }
+
+    @Test
+    void shouldIgnoreClickExceptionOnNonDisplayedInputWhenChoosingUserField() {
+        // Given
+        TestWebElement nonDisplayedInput = new TestWebElement("input", "text");
+        nonDisplayedInput.setDisplayed(false);
+        nonDisplayedInput.setClickThrows(true);
+        List<WebElement> inputElements = new ArrayList<>();
+        inputElements.add(nonDisplayedInput);
+        inputElements.add(new TestWebElement("input", "text"));
+
+        // When
+        WebElement field = AuthUtils.getUserField(null, inputElements, null);
+
+        // Then
+        assertThat(nonDisplayedInput.isClicked(), is(true));
+        assertThat(field, is(notNullValue()));
+        assertThat(field.isDisplayed(), is(true));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"button, text", "checkbox, text", "radio, email"})
+    void shouldNotClickNonDisplayedSensitiveInputWhenChoosingUserField(
+            String nonDisplayedType, String visibleType) {
+        // Given
+        TestWebElement nonDisplayedInput = new TestWebElement("input", nonDisplayedType);
+        nonDisplayedInput.setDisplayed(false);
+        nonDisplayedInput.setDisplayOnClick(true);
+        TestWebElement visibleInput = new TestWebElement("input", visibleType);
+        List<WebElement> inputElements = List.of(nonDisplayedInput, visibleInput);
+
+        // When
+        WebElement field = AuthUtils.getUserField(null, inputElements, null);
+
+        // Then
+        assertThat(nonDisplayedInput.isClicked(), is(false));
+        assertThat(field, is(notNullValue()));
+        assertThat(field.getAttribute("type"), is(equalTo(visibleType)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"submit", "checkbox"})
+    void shouldNotClickNonDisplayedSensitiveInputWhenChoosingPasswordField(
+            String nonDisplayedType) {
+        // Given
+        TestWebElement nonDisplayedInput = new TestWebElement("input", nonDisplayedType);
+        nonDisplayedInput.setDisplayed(false);
+        nonDisplayedInput.setDisplayOnClick(true);
+        TestWebElement visiblePassword = new TestWebElement("input", "password");
+        List<WebElement> inputElements = List.of(nonDisplayedInput, visiblePassword);
+
+        // When
+        WebElement field = AuthUtils.getPasswordField(inputElements);
+
+        // Then
+        assertThat(nonDisplayedInput.isClicked(), is(false));
+        assertThat(field, is(notNullValue()));
+        assertThat(field.getAttribute("type"), is(equalTo("password")));
     }
 
     @Test
@@ -390,6 +574,43 @@ class AuthUtilsUnitTest extends TestUtils {
     }
 
     @Test
+    void shouldHandleParsingExceptions() throws Exception {
+        // Given
+        HttpMessage msg = new HttpMessage(new URI("https://example.com/test", true));
+        msg.getResponseHeader().addHeader(HttpHeader.CONTENT_TYPE, "blah-blah-json");
+        msg.getResponseBody()
+                .setBody(
+                        """
+                        {"auth": {"{}": "123"}}
+                        """);
+
+        // When
+        Map<String, SessionToken> tokens =
+                assertDoesNotThrow(() -> AuthUtils.getResponseSessionTokens(msg));
+
+        // Then
+        assertThat(tokens.size(), is(equalTo(0)));
+    }
+
+    @Test
+    void shouldNotExtractJsonSessionTokensFromTooLargeBody() throws Exception {
+        // Given
+        HttpMessage msg = new HttpMessage(new URI("https://example.com/test", true));
+        msg.getResponseHeader().addHeader(HttpHeader.CONTENT_TYPE, "application/json");
+        msg.getResponseBody().setBody(getBigJsonBodyWithToken());
+
+        // When
+        Map<String, SessionToken> tokens = AuthUtils.getResponseSessionTokens(msg);
+
+        // Then
+        assertThat(tokens.size(), is(equalTo(0)));
+    }
+
+    private static String getBigJsonBodyWithToken() {
+        return "{\"accessToken\": \"%s\"}".formatted("a".repeat(2_000_000));
+    }
+
+    @Test
     void shouldExtractJsonSessionTokenInString() throws Exception {
         // Given
         HttpMessage msg = new HttpMessage(new URI("https://example.com/test", true));
@@ -548,6 +769,115 @@ class AuthUtilsUnitTest extends TestUtils {
         assertThat(
                 tokens.get("json:wrapper1.wrapper2.array[1].att4").getValue(), is(equalTo("val7")));
         assertThat(tokens.get("header:Content-Type").getValue(), is(equalTo("application/json")));
+    }
+
+    @Test
+    void shouldNotExtractJsonTokensFromTooLargeBody() throws Exception {
+        // Given
+        HttpMessage msg =
+                new HttpMessage(
+                        new HttpRequestHeader("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"),
+                        new HttpRequestBody("Request Body"),
+                        new HttpResponseHeader(
+                                "HTTP/1.1 200 OK\r\n" + "Content-Type: application/json"),
+                        new HttpResponseBody(getBigJsonBodyWithToken()));
+        // When
+        Map<String, SessionToken> tokens = AuthUtils.getAllTokens(msg, false);
+
+        // Then
+        assertThat(tokens.get("json:accessToken"), is(nullValue()));
+    }
+
+    @Test
+    void shouldExtractJsonTokensFromTopLevelArrayBody() throws Exception {
+        // Given - a top level JSON array response body, e.g. as returned by some login APIs
+        HttpMessage msg =
+                new HttpMessage(
+                        new HttpRequestHeader("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"),
+                        new HttpRequestBody("Request Body"),
+                        new HttpResponseHeader(
+                                "HTTP/1.1 200 OK\r\n" + "Content-Type: application/json"),
+                        new HttpResponseBody("[{\"accessToken\": \"abc123\"}]"));
+        // When
+        Map<String, SessionToken> tokens = AuthUtils.getAllTokens(msg, false);
+
+        // Then
+        assertThat(tokens.get("json:[0].accessToken").getValue(), is(equalTo("abc123")));
+    }
+
+    @Test
+    void shouldParseJsonObjectString() {
+        // Given
+        String json = "{\"a\":\"b\"}";
+
+        // When
+        JSON result = AuthUtils.toJSON(json);
+
+        // Then
+        assertThat(result, is(instanceOf(JSONObject.class)));
+        assertThat(((JSONObject) result).getString("a"), is(equalTo("b")));
+    }
+
+    @Test
+    void shouldParseJsonArrayString() {
+        // Given
+        String json = "[\"a\",\"b\"]";
+
+        // When
+        JSON result = AuthUtils.toJSON(json);
+
+        // Then
+        assertThat(result, is(instanceOf(JSONArray.class)));
+        assertThat(((JSONArray) result).size(), is(equalTo(2)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "{\"a\":\"b\"}",
+                " {\"a\":\"b\"}",
+                "\n\t {\"a\":\"b\"}",
+                "\r\n{\"a\":\"b\"}"
+            })
+    void shouldParseJsonObjectStringWithLeadingWhitespace(String json) {
+        // When
+        JSON result = AuthUtils.toJSON(json);
+
+        // Then
+        assertThat(result, is(instanceOf(JSONObject.class)));
+        assertThat(((JSONObject) result).getString("a"), is(equalTo("b")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[\"a\"]", " [\"a\"]", "\n\t [\"a\"]"})
+    void shouldParseJsonArrayStringWithLeadingWhitespace(String json) {
+        // When
+        JSON result = AuthUtils.toJSON(json);
+
+        // Then
+        assertThat(result, is(instanceOf(JSONArray.class)));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(
+            strings = {
+                "",
+                " ",
+                "\t",
+                "\n",
+                " \t\n ",
+                "null",
+                "true",
+                "false",
+                "123",
+                "\"a string\"",
+                "not json at all",
+                "{\"a\":",
+                "[\"a\""
+            })
+    void shouldThrowJsonExceptionForInvalidJsonString(String json) {
+        assertThrows(JSONException.class, () -> AuthUtils.toJSON(json));
     }
 
     @Test
@@ -983,6 +1313,51 @@ class AuthUtilsUnitTest extends TestUtils {
         assertThat(res, is(equalTo(Boolean.parseBoolean(result))));
     }
 
+    @Test
+    void shouldSetMinWaitFor() {
+        // Given
+        ZestScript zs = new ZestScript();
+        ZestClientElementClick el1 = new ZestClientElementClick();
+        ZestClientElementClick el2 = new ZestClientElementClick();
+        ZestClientElementClick el3 = new ZestClientElementClick();
+        el1.setWaitForMsec(1000);
+        el2.setWaitForMsec(5000);
+        el3.setWaitForMsec(8000);
+        zs.add(new ZestClientLaunch());
+        zs.add(el1);
+        zs.add(el2);
+        zs.add(el3);
+        zs.add(new ZestActionSleep());
+
+        // When
+        AuthUtils.setMinWaitFor(zs, 5000);
+
+        // Then
+        assertThat(el1.getWaitForMsec(), is(equalTo(5000)));
+        assertThat(el2.getWaitForMsec(), is(equalTo(5000)));
+        assertThat(el3.getWaitForMsec(), is(equalTo(8000)));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "  "})
+    void shouldReturnFallbackUrlWhenUrlIsNullOrBlank(String loginUrl) {
+        // Given / When
+        String url = AuthUtils.getFallbackUnknownAuthUrl(loginUrl, mock(User.class));
+        // Then
+        assertThat(url, is(equalTo("https://unknown-auth-url.zap/")));
+    }
+
+    @Test
+    void shouldReturnUrlWhenUrlIsNotBlank() {
+        // Given
+        String loginUrl = "https://example.com/login";
+        // When
+        String url = AuthUtils.getFallbackUnknownAuthUrl(loginUrl, mock(User.class));
+        // Then
+        assertThat(url, is(equalTo(loginUrl)));
+    }
+
     static class BrowserTest extends TestUtils {
 
         private static final String HTML_SHADOM_DOM =
@@ -1008,6 +1383,21 @@ class AuthUtilsUnitTest extends TestUtils {
                     </script>
                 """;
 
+        private static final String FORM_SUBMIT_TIMEOUT =
+                """
+                    <script>
+                        function remove() {
+                            setTimeout(() => {
+                              document.getElementsByTagName("input")[0].remove();
+                            }, 1000);
+                        }
+                    </script>
+                    <form action="javascript:remove()">
+                        <input type="password" />
+                    </form>
+                    <button />
+                """;
+
         @RegisterExtension static SeleniumJupiter seleniumJupiter = new SeleniumJupiter();
 
         private String url;
@@ -1023,6 +1413,8 @@ class AuthUtilsUnitTest extends TestUtils {
                             new String[] {"-headless"},
                             new String[] {"remote.active-protocols=1"},
                             Map.of("webSocketUrl", true)));
+
+            mockMessages(new ExtensionAuthhelper());
         }
 
         @BeforeEach
@@ -1165,6 +1557,63 @@ class AuthUtilsUnitTest extends TestUtils {
         }
 
         @TestTemplate
+        void shouldReturnPasswordFieldWithPasswordInName(WebDriver wd) {
+            // Given
+            pageContent =
+                    () ->
+                            """
+                                <input type="text" name="IsPasswordField" />
+                            """;
+            wd.get(url);
+            List<WebElement> inputElements = AuthUtils.getInputElements(wd, false);
+
+            // When
+            WebElement field = AuthUtils.getPasswordField(inputElements);
+
+            // Then
+            assertThat(field, is(notNullValue()));
+        }
+
+        @TestTemplate
+        void shouldReturnPasswordFieldWithPasswordInId(WebDriver wd) {
+            // Given
+            pageContent =
+                    () ->
+                            """
+                                <input type="text" id="IsPasswordField" />
+                            """;
+            wd.get(url);
+            List<WebElement> inputElements = AuthUtils.getInputElements(wd, false);
+
+            // When
+            WebElement field = AuthUtils.getPasswordField(inputElements);
+
+            // Then
+            assertThat(field, is(notNullValue()));
+        }
+
+        @TestTemplate
+        void shouldReturnPasswordFieldByTypeOverIdAndName(WebDriver wd) {
+            // Given
+            pageContent =
+                    () ->
+                            """
+                                <input type="text" name="IsPasswordField" />
+                                <input type="text" id="IsPasswordField" />
+                                <input type="password" />
+                            """;
+            wd.get(url);
+            List<WebElement> inputElements = AuthUtils.getInputElements(wd, false);
+
+            // When
+            WebElement field = AuthUtils.getPasswordField(inputElements);
+
+            // Then
+            assertThat(field, is(notNullValue()));
+            assertThat(field.getDomProperty("type"), is(equalTo("password")));
+        }
+
+        @TestTemplate
         void shouldReturnInputElementsUnderShadowDom(WebDriver wd) {
             // Given
             pageContent = () -> HTML_SHADOM_DOM;
@@ -1194,6 +1643,89 @@ class AuthUtilsUnitTest extends TestUtils {
             assertThat(inputElements, hasSize(2));
             assertId(inputElements.get(0), "host-input-a");
             assertId(inputElements.get(1), "host-input-b");
+        }
+
+        @TestTemplate
+        void shouldReturnOnFieldOnSubmit(WebDriver wd) {
+            // Given
+            pageContent =
+                    () ->
+                            """
+                                <input type="password" />
+                            """;
+            wd.get(url);
+            WebElement passwordField = wd.findElement(By.tagName("input"));
+            AuthenticationDiagnostics diags = mock();
+
+            // When
+            AuthUtils.submit(diags, wd, passwordField, 0, 0);
+
+            // Then
+            verify(diags).recordStep(wd, "Auto Return");
+            verifyNoMoreInteractions(diags);
+        }
+
+        @TestTemplate
+        void shouldClickButtonIfReturnDoesNoActionOnFieldOnSubmit(WebDriver wd) {
+            // Given
+            pageContent = () -> FORM_SUBMIT_TIMEOUT;
+            wd.get(url);
+            WebElement passwordField = wd.findElement(By.tagName("input"));
+            AuthenticationDiagnostics diags = mock();
+
+            // When
+            AuthUtils.submit(diags, wd, passwordField, 0, 0);
+
+            // Then
+            WebElement button = wd.findElement(By.tagName("button"));
+            verify(diags).recordStep(wd, "Auto Return");
+            verify(diags).recordStep(wd, "Click Button", button);
+            verifyNoMoreInteractions(diags);
+        }
+
+        @TestTemplate
+        void shouldClickLoginLikeButtonWhenMoreThanOneIfReturnDoesNoActionOnFieldOnSubmit(
+                WebDriver wd) {
+            // Given
+            pageContent =
+                    () ->
+                            """
+                                <input type="password" />
+                                <button>
+                                    <span>Show Password</span>
+                                </button>
+                                <button id="x">
+                                    <span>Login</span>
+                                </button>
+                            """;
+            wd.get(url);
+            WebElement passwordField = wd.findElement(By.tagName("input"));
+            AuthenticationDiagnostics diags = mock();
+
+            // When
+            AuthUtils.submit(diags, wd, passwordField, 0, 0);
+
+            // Then
+            WebElement button = wd.findElement(By.id("x"));
+            verify(diags).recordStep(wd, "Auto Return");
+            verify(diags).recordStep(wd, "Click Button", button);
+            verifyNoMoreInteractions(diags);
+        }
+
+        @TestTemplate
+        void shouldNotClickButtonIfReturnActionWorksUnderPageLoadWaitOnSubmit(WebDriver wd) {
+            // Given
+            pageContent = () -> FORM_SUBMIT_TIMEOUT;
+            wd.get(url);
+            WebElement passwordField = wd.findElement(By.tagName("input"));
+            AuthenticationDiagnostics diags = mock();
+
+            // When
+            AuthUtils.submit(diags, wd, passwordField, 0, 2);
+
+            // Then
+            verify(diags).recordStep(wd, "Auto Return");
+            verifyNoMoreInteractions(diags);
         }
 
         private static void assertId(WebElement element, String id) {
@@ -1317,6 +1849,38 @@ class AuthUtilsUnitTest extends TestUtils {
             // First message sent is notified as well.
             verify(historyProvider, times(2)).addAuthMessageToHistory(any(HttpMessage.class));
         }
+
+        @Test
+        void shouldConfigureContext() throws Exception {
+            // Given
+            handler =
+                    session ->
+                            newFixedLengthResponse(
+                                    Status.OK, NanoHTTPD.MIME_HTML, "<a href='/login'>Login</a>");
+            given(authenticationMethod.getAuthCheckingStrategy())
+                    .willReturn(AuthCheckingStrategy.AUTO_DETECT);
+            doAnswer(
+                            invocation -> {
+                                HttpMessage authMessage = invocation.getArgument(0);
+                                authMessage
+                                        .getResponseHeader()
+                                        .setHeader(HttpFieldsNames.CONTENT_TYPE, "text/html");
+                                authMessage.setResponseBody("<a href='/logout'>Logout</a>");
+
+                                return null;
+                            })
+                    .when(authSender)
+                    .sendAndReceive(any(), eq(true));
+            // When
+            AuthUtils.checkLoginLinkVerification(authSender, user, url);
+            // Then
+            verify(authenticationMethod).setAuthCheckingStrategy(AuthCheckingStrategy.POLL_URL);
+            verify(authenticationMethod).setPollUrl(url);
+            verify(authenticationMethod)
+                    .setLoggedInIndicatorPattern("\\Q<a href='/logout'>Logout</a>\\E");
+            verify(authenticationMethod)
+                    .setLoggedOutIndicatorPattern("\\Q<a href='/login'>Login</a>\\E");
+        }
     }
 
     class TestWebElement implements WebElement {
@@ -1326,6 +1890,12 @@ class AuthUtilsUnitTest extends TestUtils {
         private String id;
         private String name;
         @Setter private boolean displayed = true;
+        @Setter private boolean displayOnClick = false;
+        @Setter private boolean clickThrows = false;
+        @Setter private boolean displayedCheckThrows = false;
+        @Setter private boolean displayedAfterClickThrows = false;
+        @Getter private boolean clicked = false;
+        private boolean clickAttempted;
 
         TestWebElement(String tag, String type) {
             this.tag = tag;
@@ -1344,7 +1914,16 @@ class AuthUtilsUnitTest extends TestUtils {
         }
 
         @Override
-        public void click() {}
+        public void click() {
+            clicked = true;
+            clickAttempted = true;
+            if (clickThrows) {
+                throw new WebDriverException("click failed");
+            }
+            if (displayOnClick) {
+                displayed = true;
+            }
+        }
 
         @Override
         public void submit() {}
@@ -1401,6 +1980,12 @@ class AuthUtilsUnitTest extends TestUtils {
 
         @Override
         public boolean isDisplayed() {
+            if (displayedCheckThrows) {
+                throw new WebDriverException("isDisplayed failed");
+            }
+            if (displayedAfterClickThrows && clickAttempted) {
+                throw new WebDriverException("isDisplayed failed after click");
+            }
             return displayed;
         }
 

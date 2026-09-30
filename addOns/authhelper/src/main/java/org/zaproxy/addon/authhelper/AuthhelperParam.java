@@ -32,30 +32,37 @@ public class AuthhelperParam extends AbstractParam {
     private static final String AUTO_KEY = "authhelper";
 
     private static final String LOGIN_URL_KEY = AUTO_KEY + ".loginurl";
+    private static final String DOMAINS_KEY = AUTO_KEY + ".domains";
     private static final String USERNAME_KEY = AUTO_KEY + ".username";
     private static final String BROWSER_KEY = AUTO_KEY + ".browser";
     private static final String WAIT_KEY = AUTO_KEY + ".wait";
     private static final String DEMO_MODE_KEY = AUTO_KEY + ".demo";
     private static final String RECORD_DIAGNOSTICS_KEY = AUTO_KEY + ".diagnostics";
     private static final String STEP_KEY = AUTO_KEY + ".steps.step";
+    private static final String STEP_DELAY_KEY = AUTO_KEY + ".stepDelay";
+    private static final String AUTH_REPORT_DIR_KEY = AUTO_KEY + ".authReportDir";
 
     private String loginUrl;
     private String username;
     private String browser;
+    private String domains;
     private int wait = DEFAULT_WAIT;
-    private boolean demoMode;
+    private int stepDelay;
     private boolean recordDiagnostics;
     private List<AuthenticationStep> steps = List.of();
+
+    private String authReportDir = "";
 
     public AuthhelperParam() {}
 
     @Override
     protected void parse() {
         this.loginUrl = this.getString(LOGIN_URL_KEY, "");
+        this.domains = this.getString(DOMAINS_KEY, "");
         this.username = this.getString(USERNAME_KEY, null);
         this.browser = this.getString(BROWSER_KEY, DEFAULT_BROWSER.getId());
         this.wait = getInteger(WAIT_KEY, DEFAULT_WAIT);
-        this.demoMode = getBoolean(DEMO_MODE_KEY, false);
+        this.stepDelay = getInteger(STEP_DELAY_KEY, 0);
         this.recordDiagnostics = getBoolean(RECORD_DIAGNOSTICS_KEY, false);
 
         steps =
@@ -64,6 +71,12 @@ public class AuthhelperParam extends AbstractParam {
                         .map(AuthenticationStep::decode)
                         .filter(Objects::nonNull)
                         .toList();
+        if (this.getConfig().containsKey(DEMO_MODE_KEY)) {
+            // No longer used
+            this.getConfig().clearProperty(DEMO_MODE_KEY);
+        }
+
+        authReportDir = getString(AUTH_REPORT_DIR_KEY, "");
     }
 
     public String getLoginUrl() {
@@ -75,13 +88,13 @@ public class AuthhelperParam extends AbstractParam {
         getConfig().setProperty(LOGIN_URL_KEY, loginUrl);
     }
 
-    public boolean isDemoMode() {
-        return demoMode;
+    public String getDomains() {
+        return domains;
     }
 
-    public void setDemoMode(boolean demoMode) {
-        this.demoMode = demoMode;
-        getConfig().setProperty(DEMO_MODE_KEY, demoMode);
+    public void setDomains(String domains) {
+        this.domains = domains;
+        getConfig().setProperty(DOMAINS_KEY, domains);
     }
 
     public String getBrowser() {
@@ -111,6 +124,15 @@ public class AuthhelperParam extends AbstractParam {
         getConfig().setProperty(WAIT_KEY, wait);
     }
 
+    public int getStepDelay() {
+        return stepDelay;
+    }
+
+    public void setStepDelay(int stepDelay) {
+        this.stepDelay = stepDelay;
+        getConfig().setProperty(STEP_DELAY_KEY, stepDelay);
+    }
+
     public boolean isRecordDiagnostics() {
         return recordDiagnostics;
     }
@@ -131,5 +153,14 @@ public class AuthhelperParam extends AbstractParam {
         this.steps.stream()
                 .map(AuthenticationStep::encode)
                 .forEach(e -> getConfig().addProperty(STEP_KEY, e));
+    }
+
+    public String getAuthReportDir() {
+        return authReportDir;
+    }
+
+    public void setAuthReportDir(String authReportDir) {
+        this.authReportDir = authReportDir == null ? "" : authReportDir;
+        getConfig().setProperty(AUTH_REPORT_DIR_KEY, this.authReportDir);
     }
 }

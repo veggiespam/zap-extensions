@@ -19,11 +19,14 @@
  */
 package org.zaproxy.zap.extension.selenium.internal;
 
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import org.openqa.selenium.WebDriver;
 import org.zaproxy.zap.extension.selenium.Browser;
 import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
 import org.zaproxy.zap.extension.selenium.ProvidedBrowser;
 import org.zaproxy.zap.extension.selenium.SingleWebDriverProvider;
+import org.zaproxy.zap.utils.DisplayUtils;
 
 /**
  * A {@link SingleWebDriverProvider} for built-in supported browsers.
@@ -40,6 +43,15 @@ public class BuiltInSingleWebDriverProvider implements SingleWebDriverProvider {
         this.name = name;
         this.browser = browser;
         this.providedBrowser = new ProvidedBrowserImpl();
+    }
+
+    /**
+     * Gets the built-in browser this provider supplies.
+     *
+     * @return the browser
+     */
+    public Browser getBrowser() {
+        return browser;
     }
 
     @Override
@@ -75,7 +87,15 @@ public class BuiltInSingleWebDriverProvider implements SingleWebDriverProvider {
         return ExtensionSelenium.isConfigured(browser);
     }
 
+    @Override
+    public boolean isCustom() {
+        return false;
+    }
+
     private class ProvidedBrowserImpl implements ProvidedBrowser {
+
+        private ImageIcon icon;
+        private boolean iconInitialized;
 
         @Override
         public String getProviderId() {
@@ -101,6 +121,30 @@ public class BuiltInSingleWebDriverProvider implements SingleWebDriverProvider {
         public boolean isConfigured() {
             Browser b = Browser.getBrowserWithIdNoFailSafe(browser.getId());
             return b != null && ExtensionSelenium.isConfigured(b);
+        }
+
+        @Override
+        public Icon getIcon() {
+            if (!iconInitialized) {
+                iconInitialized = true;
+                String iconName =
+                        switch (browser) {
+                            case CHROME, CHROME_HEADLESS -> "chrome.png";
+                            case FIREFOX, FIREFOX_HEADLESS -> "firefox.png";
+                            case EDGE, EDGE_HEADLESS -> "edge.png";
+                            case SAFARI -> "safari.png";
+                            default -> null;
+                        };
+                if (iconName != null) {
+                    icon =
+                            DisplayUtils.getScaledIcon(
+                                    getClass()
+                                            .getResource(
+                                                    "/org/zaproxy/zap/extension/selenium/resources/"
+                                                            + iconName));
+                }
+            }
+            return icon;
         }
     }
 }

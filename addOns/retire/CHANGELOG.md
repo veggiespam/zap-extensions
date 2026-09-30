@@ -4,6 +4,91 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+
+## [0.66.0] - 2026-09-16
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.65.0] - 2026-09-02
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.64.0] - 2026-08-16
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.63.0] - 2026-08-02
+### Changed
+- Updated with upstream retire.js pattern changes.
+- Update reference to avoid redirects.
+
+## [0.62.0] - 2026-07-16
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.61.0] - 2026-07-02
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.60.0] - 2026-06-16
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.59.0] - 2026-06-02
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.58.0] - 2026-05-16
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.57.0] - 2026-05-06
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.56.0] - 2026-04-14
+### Changed
+- Updated with upstream retire.js pattern changes.
+- The scan rule now has new tags for the OWASP Top 10 2025, and API Top 10 2023.
+- Depends on an updated version of the Common Library add-on.
+
+## [0.55.0] - 2026-03-31
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.54.0] - 2026-02-24
+### Changed
+- Updated with upstream retire.js pattern changes.
+- Now only loads the data once (Issue 9103).
+
+## [0.53.0] - 2026-01-08
+### Changed
+- Updated with upstream retire.js pattern changes.
+- Update minimum ZAP version to 2.17.0.
+
+## [0.52.0] - 2025-12-04
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.51.0] - 2025-12-03
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.50.0] - 2025-11-04
+### Changed
+- Updated with upstream retire.js pattern changes.
+- Reduced usage of error level logging.
+
+## [0.49.0] - 2025-09-18
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.48.0] - 2025-07-29
+### Changed
+- Updated with upstream retire.js pattern changes.
+
+## [0.47.0] - 2025-06-20
 ### Changed
 - Updated with upstream retire.js pattern changes.
 - Depends on an updated version of the Common Library add-on.
@@ -254,6 +339,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 - First release.
 
+[0.66.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.66.0
+[0.65.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.65.0
+[0.64.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.64.0
+[0.63.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.63.0
+[0.62.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.62.0
+[0.61.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.61.0
+[0.60.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.60.0
+[0.59.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.59.0
+[0.58.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.58.0
+[0.57.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.57.0
+[0.56.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.56.0
+[0.55.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.55.0
+[0.54.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.54.0
+[0.53.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.53.0
+[0.52.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.52.0
+[0.51.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.51.0
+[0.50.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.50.0
+[0.49.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.49.0
+[0.48.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.48.0
+[0.47.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.47.0
 [0.46.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.46.0
 [0.45.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.45.0
 [0.44.0]: https://github.com/zaproxy/zap-extensions/releases/retire-v0.44.0

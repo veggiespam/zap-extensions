@@ -6,15 +6,8 @@ pluginManagement {
     }
 }
 
-dependencyResolutionManagement {
-    versionCatalogs {
-        create("libs") {
-            version("log4j", "2.24.2")
-            library("log4j-core", "org.apache.logging.log4j", "log4j-core").versionRef("log4j")
-            library("log4j-slf4j", "org.apache.logging.log4j", "log4j-slf4j-impl").versionRef("log4j")
-            library("log4j-slf4j2", "org.apache.logging.log4j", "log4j-slf4j2-impl").versionRef("log4j")
-        }
-    }
+plugins {
+    id("io.github.ben-manes.versions.settings") version "0.64.0"
 }
 
 rootProject.name = "zap-extensions"
@@ -22,10 +15,11 @@ rootProject.name = "zap-extensions"
 val addOnsProjectName = "addOns"
 include(addOnsProjectName)
 include("testutils")
+include("testutilscore")
 
 // Keep the add-ons in alphabetic order.
-var addOns =
-    listOf(
+val addOns =
+    mutableListOf(
         "accessControl",
         "alertFilters",
         "allinonenotes",
@@ -56,9 +50,9 @@ var addOns =
         "evalvillain",
         "exim",
         "formhandler",
+        "foxhound",
         "frontendscanner",
         "fuzz",
-        "fuzzai",
         "fuzzdb",
         "gettingStarted",
         "graaljs",
@@ -66,12 +60,16 @@ var addOns =
         "groovy",
         "grpc",
         "highlighter",
+        "httpsInfo",
         "imagelocationscanner",
+        "insights",
         "invoke",
         "jruby",
         "jsonview",
         "jython",
         "kotlin",
+        "llm",
+        "mcp",
         "network",
         "oast",
         "onlineMenu",
@@ -79,8 +77,8 @@ var addOns =
         "packpentester",
         "packscanrules",
         "paramdigger",
+        "params",
         "plugnhack",
-        "portscan",
         "postman",
         "pscan",
         "pscanrules",
@@ -100,7 +98,6 @@ var addOns =
         "scripts",
         "selenium",
         "sequence",
-        "simpleexample",
         "soap",
         "spider",
         "spiderAjax",
@@ -110,7 +107,6 @@ var addOns =
         "tips",
         "todo",
         "tokengen",
-        "treetools",
         "viewstate",
         "wappalyzer",
         "webdrivers",
@@ -118,7 +114,6 @@ var addOns =
         "webdrivers:webdrivermacos",
         "webdrivers:webdriverwindows",
         "websocket",
-        "webuipoc",
         "zest",
     )
 

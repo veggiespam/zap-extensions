@@ -9,7 +9,7 @@ zapAddOn {
         dependencies {
             addOns {
                 register("commonlib") {
-                    version.set(">= 1.29.0 & < 2.0.0")
+                    version.set(">= 1.43.0 & < 2.0.0")
                 }
             }
         }
@@ -57,7 +57,6 @@ zapAddOn {
 
     apiClientGen {
         api.set("org.zaproxy.addon.graphql.GraphQlApi")
-        options.set("org.zaproxy.addon.graphql.GraphQlParam")
         messages.set(file("src/main/resources/org/zaproxy/addon/graphql/resources/Messages.properties"))
     }
 }
@@ -76,7 +75,10 @@ dependencies {
     zapAddOn("spider")
     zapAddOn("wappalyzer")
 
-    implementation("com.graphql-java:graphql-java:22.3")
+    // Expose missing annotation GwtCompatible during compilation.
+    compileOnly("com.google.guava:guava:33.6.0-jre")
+
+    implementation(libs.graphql.graphqlJava)
 
     testImplementation(project(":testutils"))
     testImplementation(libs.log4j.core)

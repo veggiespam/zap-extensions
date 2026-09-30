@@ -5,3 +5,7 @@ extension: json
 sections:
  - statistics
  - sequencedetails
+ - afstate
+ - scriptdiagnostics
+ - scriptdiagnosticsscreenshots
+ - scriptdiagnosticsoutput

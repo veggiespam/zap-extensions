@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
 import org.zaproxy.addon.automation.AutomationEnvironment;
 import org.zaproxy.addon.automation.AutomationProgress;
@@ -36,6 +38,8 @@ import org.zaproxy.zap.extension.scripts.automation.ui.ScriptJobDialog;
 
 public class LoadDirScriptAction extends ScriptAction {
 
+    private static final Logger LOGGER = LogManager.getLogger(LoadDirScriptAction.class);
+
     public static final String NAME = "loaddir";
     private static final List<String> DISABLED_FIELDS =
             Arrays.asList(
@@ -43,7 +47,9 @@ public class LoadDirScriptAction extends ScriptAction {
                     ScriptJobDialog.SCRIPT_ENGINE_PARAM,
                     ScriptJobDialog.SCRIPT_NAME_PARAM,
                     ScriptJobDialog.SCRIPT_IS_INLINE_PARAM,
-                    ScriptJobDialog.SCRIPT_TARGET_PARAM);
+                    ScriptJobDialog.SCRIPT_TARGET_PARAM,
+                    ScriptJobDialog.SCRIPT_CONTEXT_PARAM,
+                    ScriptJobDialog.SCRIPT_USER_PARAM);
 
     public LoadDirScriptAction(ScriptJobParameters parameters) {
         super(parameters);

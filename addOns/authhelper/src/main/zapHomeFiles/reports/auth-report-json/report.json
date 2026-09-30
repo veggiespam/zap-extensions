@@ -7,7 +7,7 @@
 	,"summaryItems": [[#th:block th:each="sumItem, sumState: ${rptData.getSummaryItems()}"][#th:block th:if="${! sumState.first}"],[/th:block]
 		{
 			"description": [[${sumItem.description}]],
-			"passed": [[${sumItem.passed}]],
+			[#th:block th:if="${sumItem.value != null}"]"value": [[${sumItem.value}]][/th:block][#th:block th:unless="${sumItem.value != null}"]"passed": [[${sumItem.passed}]][/th:block],
 			"key": [[${sumItem.key}]]
 		}[/th:block]
 	]
@@ -30,12 +30,21 @@
 	,"statistics": [[#th:block th:each="statItem, statState: ${rptData.getStatistics()}"][#th:block th:if="${! statState.first}"],[/th:block]
 		{
 			"key": [[${statItem.key}]],
-			"scope": [[${statItem.scope}]],
+			"scope": [[${statItem.scope}]],[#th:block th:if="${statItem.site}"]
+			"site": [[${statItem.site}]],[/th:block]
 			"value": [[${statItem.value}]]
 		}[/th:block]
-	]
-	[/th:block]
-	[#th:block th:if="${reportData.isIncludeSection('diagnostics')}" th:with="diagnostics=${rptData.diagnostics}"]
+	][/th:block][#th:block th:if="${reportData.isIncludeSection('domains')}"]
+	,"domains": [[#th:block th:each="domain, domainsState: ${rptData.getDomains()}"][#th:block th:if="${! domainsState.first}"],[/th:block]
+		[[${domain}]][/th:block]
+	][/th:block][#th:block th:if="${reportData.isIncludeSection('domainspartiallyoutofscope')}"]
+	,"domainsPartiallyOutOfScope": [[#th:block th:each="domain, domainsState: ${rptData.getDomainsPartiallyOutOfScope()}"][#th:block th:if="${! domainsState.first}"],[/th:block]
+		[[${domain}]][/th:block]
+	][/th:block][#th:block th:if="${reportData.isIncludeSection('domainsoutofscope')}"]
+	,"domainsOutOfScope": [[#th:block th:each="domain, domainsState: ${rptData.getDomainsOutOfScope()}"][#th:block th:if="${! domainsState.first}"],[/th:block]
+		[[${domain}]][/th:block]
+	][/th:block][#th:block th:if="${reportData.isIncludeSection('diagnostics')}" th:with="diagnostics=${rptData.diagnostics}"][#th:block th:if="${reportData.isIncludeSection('diagnosticslogfile')}"]
+	,"logFile": [[${rptData.getLogContent()}]][/th:block]
 	,"diagnostics": [[#th:block th:each="entry, state: ${diagnostics}"][#th:block th:if="${! state.first}"],[/th:block]
 		{
 			"created": [[${entry.createTimestamp}]],
@@ -43,6 +52,7 @@
 			"context": [[${entry.context}]],
 			"user": [[${entry.user}]],
 			"script": [[${entry.script}]]
+			[#th:block th:if="${reportData.isIncludeSection('diagnosticsafplan')}"],"afPlan": [[${entry.afPlan}]][/th:block]
 			
 			[#th:block th:with="steps=${entry.steps}"]
 			,"steps": [[#th:block th:each="step, state: ${steps}"][#th:block th:if="${! state.first}"],[/th:block]
@@ -53,6 +63,7 @@
 					"description": [[${step.description}]]
 					[#th:block th:with="webElement=${step.webElement}"][#th:block th:if="${webElement}"]
 					,"webElement": {
+						"selector": {"type": [[${webElement.selectorType}]], "value": [[${webElement.selectorValue}]]},
 						"formIndex": [[${webElement.formIndex}]],
 						"tagName": [[${webElement.tagName}]],
 						"attributeType":  [[${webElement.attributeType}]],
@@ -66,6 +77,7 @@
 					[#th:block th:if="${reportData.isIncludeSection('diagnosticswebelements')}" th:with="webElements=${step.webElements}"]
 					,"webElements": [[#th:block th:each="webElement, state: ${webElements}"][#th:block th:if="${! state.first}"],[/th:block]
 						{
+							"selector": {"type": [[${webElement.selectorType}]], "value": [[${webElement.selectorValue}]]},
 							"formIndex": [[${webElement.formIndex}]],
 							"tagName": [[${webElement.tagName}]],
 							"attributeType":  [[${webElement.attributeType}]],
@@ -96,6 +108,7 @@
 					,"messages": [[#th:block th:each="entry, state: ${messages}" th:with="message=${helper.getHttpMessage(entry.messageId)}"][#th:block th:if="${! state.first}"],[/th:block]
 						{[#th:block th:if="${message}"]
 							"created": [[${entry.createTimestamp}]],
+							"rtt": [[${message.timeElapsedMillis}]],
 							"initiator": [[${entry.initiator}]],
 							"requestHeader": [[${message.requestHeader.toString()}]],
 							"requestBody": [[${message.requestBody.toString()}]],

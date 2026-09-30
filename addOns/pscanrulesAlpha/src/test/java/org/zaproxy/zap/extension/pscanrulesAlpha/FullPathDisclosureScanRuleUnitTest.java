@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.BDDMockito.given;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.URIException;
@@ -46,9 +47,15 @@ class FullPathDisclosureScanRuleUnitTest extends PassiveScannerTest<FullPathDisc
         // Given / When
         Map<String, String> tags = rule.getAlertTags();
         // Then
-        assertThat(tags.size(), is(equalTo(5)));
+        assertThat(tags.size(), is(equalTo(7)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG.getTag()),
+                is(equalTo(true)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG.getTag()),
                 is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.WSTG_V42_ERRH_01_ERR.getTag()), is(equalTo(true)));
@@ -56,8 +63,14 @@ class FullPathDisclosureScanRuleUnitTest extends PassiveScannerTest<FullPathDisc
         assertThat(tags.containsKey(PolicyTag.DEV_STD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_STD.getTag()), is(equalTo(true)));
         assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG.getValue())));
+        assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG.getValue())));
+        assertThat(
+                tags.get(CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.WSTG_V42_ERRH_01_ERR.getTag()),
                 is(equalTo(CommonAlertTag.WSTG_V42_ERRH_01_ERR.getValue())));
@@ -176,6 +189,19 @@ class FullPathDisclosureScanRuleUnitTest extends PassiveScannerTest<FullPathDisc
         // Then
         assertThat(alertsRaised, hasSize(1));
         assertEquals(defaultPath, alertsRaised.get(0).getEvidence());
+    }
+
+    @Test
+    void shouldHaveExpectedExampleAlerts() {
+        // Given / When
+        List<Alert> examples = rule.getExampleAlerts();
+        // Then
+        assertThat(examples.size(), is(equalTo(1)));
+        Alert alert = examples.get(0);
+        assertThat(alert.getName(), is(equalTo("Full Path Disclosure")));
+        assertThat(alert.getRisk(), is(equalTo(Alert.RISK_LOW)));
+        assertThat(alert.getAlertRef(), is(equalTo("110009")));
+        assertThat(alert.getCweId(), is(equalTo(209)));
     }
 
     @Override

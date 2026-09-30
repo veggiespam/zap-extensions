@@ -62,6 +62,7 @@ public class UserControlledOpenRedirectScanRule extends PluginPassiveScanner
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A01_INJECTION,
                                 CommonAlertTag.WSTG_V42_CLNT_04_OPEN_REDIR));
@@ -117,8 +118,8 @@ public class UserControlledOpenRedirectScanRule extends PluginPassiveScanner
         if (responseLocation.indexOf("://") > 0) {
             URL responseURL;
             try {
-                responseURL = new URL(responseLocation);
-            } catch (MalformedURLException e) {
+                responseURL = new java.net.URI(responseLocation).toURL();
+            } catch (java.net.URISyntaxException | MalformedURLException e) {
                 return;
             }
 

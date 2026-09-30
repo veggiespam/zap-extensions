@@ -55,6 +55,7 @@ public class InformationDisclosureDebugErrorsScanRule extends PluginPassiveScann
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A01_BROKEN_AC,
                                 CommonAlertTag.OWASP_2021_A01_BROKEN_AC,
                                 CommonAlertTag.OWASP_2017_A03_DATA_EXPOSED,
                                 CommonAlertTag.WSTG_V42_ERRH_01_ERR));
@@ -114,7 +115,7 @@ public class InformationDisclosureDebugErrorsScanRule extends PluginPassiveScann
         BufferedReader reader = null;
         File f = path.toFile();
         if (!f.exists()) {
-            LOGGER.error("No such file: {}", f.getAbsolutePath());
+            LOGGER.warn("No such file: {}", f.getAbsolutePath());
             return strings;
         }
         try {

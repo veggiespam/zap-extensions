@@ -53,13 +53,13 @@ import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.Random;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bouncycastle.asn1.DERIA5String;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.CRLDistPoint;
 import org.bouncycastle.asn1.x509.DistributionPoint;
@@ -130,6 +130,8 @@ public final class CertificateUtils {
      */
     private static final Duration SERVER_CERTIFICATE_START_ADJUSTMENT = Duration.ofDays(30);
 
+    private static final int CN_MAX_LENGTH = 64;
+
     private CertificateUtils() {}
 
     public static char[] getPassphrase() {
@@ -177,7 +179,7 @@ public final class CertificateUtils {
         X509v3CertificateBuilder certBuilder =
                 new JcaX509v3CertificateBuilder(
                         name,
-                        BigInteger.valueOf(new Random().nextInt()),
+                        BigInteger.valueOf(Math.abs(new SecureRandom().nextInt() + 0L)),
                         startDate,
                         expireDate,
                         name,
@@ -250,7 +252,8 @@ public final class CertificateUtils {
                     rootCaCert, rootCaPublicKey, rootCaPrivateKey, certData, serial, config);
         } catch (Exception e) {
             throw new GenerationException(
-                    "An error occurred while generating the server certificate:", e);
+                    "An error occurred while generating the server certificate: " + e.getMessage(),
+                    e);
         }
     }
 
@@ -280,8 +283,10 @@ public final class CertificateUtils {
         PublicKey publicKey = keyPair.getPublic();
 
         X500NameBuilder namebld = new X500NameBuilder(BCStyle.INSTANCE);
-        if (certData.getCommonName() != null) {
-            namebld.addRDN(BCStyle.CN, certData.getCommonName());
+        String commonName = certData.getCommonName();
+        boolean cnAdded = commonName != null && commonName.length() <= CN_MAX_LENGTH;
+        if (cnAdded) {
+            namebld.addRDN(BCStyle.CN, commonName);
         }
         namebld.addRDN(BCStyle.OU, "Zed Attack Proxy Project");
         namebld.addRDN(BCStyle.O, "ZAP");
@@ -303,6 +308,10 @@ public final class CertificateUtils {
                 Extension.subjectKeyIdentifier,
                 false,
                 new SubjectKeyIdentifier(publicKey.getEncoded()));
+        certGen.addExtension(
+                Extension.authorityKeyIdentifier,
+                false,
+                new AuthorityKeyIdentifier(rootCaPublicKey.getEncoded()));
         certGen.addExtension(Extension.basicConstraints, false, new BasicConstraints(false));
         certGen.addExtension(
                 Extension.extendedKeyUsage,
@@ -312,7 +321,7 @@ public final class CertificateUtils {
         if (subjectAlternativeNames.length > 0) {
             certGen.addExtension(
                     Extension.subjectAlternativeName,
-                    certData.isSubjectAlternativeNameIsCritical(),
+                    certData.isSubjectAlternativeNameIsCritical() || !cnAdded,
                     new GeneralNames(subjectAlternativeNames));
         }
 

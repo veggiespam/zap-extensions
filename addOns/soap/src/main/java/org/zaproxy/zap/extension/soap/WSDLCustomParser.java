@@ -19,12 +19,17 @@
  */
 package org.zaproxy.zap.extension.soap;
 
+import com.predic8.schema.Attribute;
+import com.predic8.schema.Choice;
+import com.predic8.schema.ComplexContent;
 import com.predic8.schema.ComplexType;
 import com.predic8.schema.Element;
-import com.predic8.schema.Schema;
+import com.predic8.schema.Extension;
+import com.predic8.schema.Sequence;
 import com.predic8.schema.SimpleType;
 import com.predic8.schema.restriction.BaseRestriction;
 import com.predic8.schema.restriction.facet.EnumerationFacet;
+import com.predic8.soamodel.ModelAccessException;
 import com.predic8.soamodel.WrongGrammarException;
 import com.predic8.wsdl.AbstractBinding;
 import com.predic8.wsdl.Binding;
@@ -53,6 +58,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.function.Supplier;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.URIException;
@@ -98,17 +104,17 @@ public class WSDLCustomParser {
     }
 
     /* Import a WSDL document from a URL synchronously. */
-    public void syncImportWsdlUrl(final String url) {
-        parseWSDLUrl(url);
+    public void syncImportWsdlUrl(final String url, int maxMessages) {
+        parseWSDLUrl(url, maxMessages);
     }
 
     /* Import a WSDL document from a local file synchronously. */
-    public void syncImportWsdlFile(final File file) {
-        parseWSDLFile(file);
+    public void syncImportWsdlFile(final File file, int maxMessages) {
+        parseWSDLFile(file, maxMessages);
     }
 
     /* Method called from external classes to import a WSDL file from an URL. */
-    public void extUrlWSDLImport(final String url, final String threadName) {
+    public void extUrlWSDLImport(final String url, final String threadName, int maxMessages) {
         if (url == null || url.trim().length() <= 0) return;
         // LOGGER.debug("Importing WSDL file from URL: {}", url);
         Thread t =
@@ -117,7 +123,7 @@ public class WSDLCustomParser {
                     public void run() {
                         // Thread name: THREAD_PREFIX + threadId++
                         this.setName(threadName);
-                        parseWSDLUrl(url);
+                        parseWSDLUrl(url, maxMessages);
                     }
                 };
         t.start();
@@ -131,19 +137,19 @@ public class WSDLCustomParser {
     }
 
     public boolean extContentWSDLImport(final String content, final boolean sendMessages) {
-        return parseWSDLContent(content, sendMessages);
+        return parseWSDLContent(content, sendMessages, 0);
     }
 
     /*
      * Method called from external classes to import a WSDL file from a local file.
      */
-    public void extFileWSDLImport(final File file, final String threadName) {
+    public void extFileWSDLImport(final File file, final String threadName, int maxMessages) {
         Thread t =
                 new Thread() {
                     @Override
                     public void run() {
                         this.setName(threadName);
-                        parseWSDLFile(file);
+                        parseWSDLFile(file, maxMessages);
                     }
                 };
         t.start();
@@ -171,7 +177,7 @@ public class WSDLCustomParser {
      * Generates WSDL definitions from a WSDL file and then it calls parsing
      * functions.
      */
-    private void parseWSDLFile(File file) {
+    private void parseWSDLFile(File file, int maxMessages) {
         if (file == null) return;
         try {
             if (View.isInitialised()) {
@@ -183,7 +189,7 @@ public class WSDLCustomParser {
             WSDLParser parser = new WSDLParser();
             final String path = file.getAbsolutePath();
             Definitions wsdl = parser.parse(path);
-            parseWSDL(wsdl, true);
+            parseWSDL(wsdl, true, maxMessages);
 
         } catch (ResourceDownloadException rde) {
             String exMsg =
@@ -202,7 +208,7 @@ public class WSDLCustomParser {
      * Generates WSDL definitions from a WSDL string and then it calls parsing
      * functions.
      */
-    private void parseWSDLUrl(String url) {
+    private void parseWSDLUrl(String url, int maxMessages) {
         if (url == null || url.trim().equals("")) return;
         try {
             if (View.isInitialised()) {
@@ -239,14 +245,14 @@ public class WSDLCustomParser {
             if (content.trim().isEmpty()) {
                 LOGGER.debug("Response from WSDL file request has no body content, url: {}", url);
             } else {
-                parseWSDLContent(content);
+                parseWSDLContent(content, true, maxMessages);
             }
         } catch (Exception e) {
             LOGGER.error("There was an error while parsing WSDL from URL. ", e);
         }
     }
 
-    private boolean parseWSDLContent(String content, boolean sendMessages) {
+    private boolean parseWSDLContent(String content, boolean sendMessages, int maxMessages) {
         if (content == null || content.trim().length() <= 0) {
             return false;
         } else {
@@ -257,7 +263,7 @@ public class WSDLCustomParser {
                         new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
                 Definitions wsdl = parser.parse(contentI);
                 contentI.close();
-                parseWSDL(wsdl, sendMessages);
+                parseWSDL(wsdl, sendMessages, maxMessages);
                 return true;
             } catch (WrongGrammarException wge) {
                 LOGGER.warn("Are you sure this is a WSDL? {}", wge.getMessage());
@@ -270,14 +276,15 @@ public class WSDLCustomParser {
     }
 
     private boolean parseWSDLContent(String content) {
-        return parseWSDLContent(content, true);
+        return parseWSDLContent(content, true, 0);
     }
 
     /* Parses WSDL definitions and identifies endpoints and operations. */
-    private void parseWSDL(Definitions wsdl, boolean sendMessages) {
+    private void parseWSDL(Definitions wsdl, boolean sendMessages, int maxMessages) {
         StringBuilder sb = new StringBuilder();
         List<Service> services = wsdl.getServices();
         keyIndex++;
+        int messages = 0;
 
         /* Endpoint identification. */
         for (Service service : services) {
@@ -303,6 +310,10 @@ public class WSDLCustomParser {
 
                     /* Identifies operations for each endpoint.. */
                     for (BindingOperation bindOp : operations) {
+                        if (maxMessages > 0 && messages >= maxMessages) {
+                            printOutput(sb);
+                            return;
+                        }
                         sb.append("|\t|-- SOAP 1.")
                                 .append(soapVersion)
                                 .append(" Operation: ")
@@ -325,6 +336,9 @@ public class WSDLCustomParser {
                                 new SOAPMsgConfig(wsdl, soapVersion, formParams, port, bindOp);
                         lastConfig = soapConfig;
                         HttpMessage requestMessage = createSoapRequest(soapConfig);
+                        if (requestMessage != null) {
+                            messages++;
+                        }
                         if (sendMessages) sendSoapRequest(requestMessage, sb);
                     } // bindingOperations loop
                 } // Binding check if
@@ -389,78 +403,154 @@ public class WSDLCustomParser {
         return null;
     }
 
-    private HashMap<String, String> fillParameters(Element element, String parent) {
+    private Map<String, String> fillParameters(Element element, String parent) {
+        if (element.getRef() != null) {
+            return fillFromRef(element, parent);
+        }
+        String xpath = parent != null ? parent + "/" + element.getName() : element.getName();
         HashMap<String, String> formParams = new HashMap<>();
         try {
-            /* Tries to parse it as a complex type first. */
-            String xpath;
-            if (parent != null) xpath = parent + "/" + element.getName();
-            else xpath = element.getName();
-            ComplexType ct = (ComplexType) element.getEmbeddedType();
-            /* Handles when ComplexType is not embedded but referenced by 'type'. */
-            if (ct == null) {
-                Schema currentSchema = element.getSchema();
-                ct = (ComplexType) currentSchema.getType(element.getType());
-                if (ct == null)
-                    throw new ClassCastException(
-                            "Complex Type is null after cast."); // Hashmap is empty here.
+            ComplexType ct = resolveComplexType(element);
+            if (ct != null) {
+                return fillFromComplexType(ct, xpath);
             }
-            for (Element e : ct.getSequence().getElements()) {
-                /* Recursive parsing for nested complex types. */
-                formParams.putAll(fillParameters(e, xpath));
-            }
-        } catch (ClassCastException cce) {
-            /* Handles simple types. */
-            SimpleType simpleType;
-            try {
-                simpleType = (SimpleType) element.getEmbeddedType();
-                if (simpleType == null) {
-                    Schema currentSchema = element.getSchema();
-                    simpleType = (SimpleType) currentSchema.getType(element.getType());
-                    if (simpleType == null) {
-                        /* It is not simple type, so it is treated as a plain element. */
-                        String xpath;
-                        if (parent != null) xpath = parent + "/" + element.getName();
-                        else xpath = element.getName();
-                        if (element.getType() != null)
-                            return addParameter(
-                                    xpath,
-                                    element.getType().getQualifiedName(),
-                                    element.getName(),
-                                    null);
-                        else return formParams;
-                    }
-                }
-            } catch (ClassCastException cce2) {
-                /* It is not simple type, so it is treated as a plain element. */
-                String xpath;
-                if (parent != null) xpath = parent + "/" + element.getName();
-                else xpath = element.getName();
-                return addParameter(
-                        xpath, element.getType().getQualifiedName(), element.getName(), null);
-            }
-            /* Handles enumeration restriction. */
-            BaseRestriction br = simpleType.getRestriction();
-            if (br != null) {
-                List<EnumerationFacet> enums = br.getEnumerationFacets();
-                if (enums != null && enums.size() > 0) {
-                    String defaultValue = enums.get(0).getValue();
-                    formParams.putAll(
-                            addParameter(
-                                    parent + "/" + element.getName(),
-                                    "string",
-                                    element.getName(),
-                                    defaultValue));
-                }
-            }
-            return formParams;
-        } catch (Exception e) {
+            return fillFromSimpleOrPlainElement(element, xpath);
+        } catch (RuntimeException e) {
             LOGGER.warn(
                     "There was an error when trying to parse element {} from WSDL file.",
                     element.getName(),
                     e);
         }
         return formParams;
+    }
+
+    private Map<String, String> fillFromRef(Element element, String parent) {
+        try {
+            Element resolved = element.getSchema().getElement(element.getRef());
+            if (resolved == null) {
+                LOGGER.warn("Could not resolve ref element {} from WSDL file.", element.getRef());
+                return new HashMap<>();
+            }
+            return fillParameters(resolved, parent);
+        } catch (ModelAccessException e) {
+            LOGGER.warn("Could not resolve ref element {} from WSDL file.", element.getRef(), e);
+            return new HashMap<>();
+        }
+    }
+
+    private ComplexType resolveComplexType(Element element) {
+        Object embedded = element.getEmbeddedType();
+        if (embedded instanceof ComplexType) {
+            return (ComplexType) embedded;
+        }
+        if (element.getType() == null) {
+            return null;
+        }
+        Object resolved = element.getSchema().getType(element.getType());
+        return resolved instanceof ComplexType ? (ComplexType) resolved : null;
+    }
+
+    private Map<String, String> fillFromComplexType(ComplexType ct, String xpath) {
+        HashMap<String, String> formParams = new HashMap<>();
+        if (ct.getSequence() != null) {
+            formParams.putAll(fillFromSequence(ct.getSequence(), xpath));
+        }
+        Object model = ct.getModel();
+        if (model instanceof ComplexContent && ((ComplexContent) model).hasExtension()) {
+            Extension ext = (Extension) ((ComplexContent) model).getDerivation();
+            if (ext.getBase() != null) {
+                try {
+                    Object baseType = ct.getSchema().getType(ext.getBase());
+                    if (baseType instanceof ComplexType) {
+                        formParams.putAll(fillFromComplexType((ComplexType) baseType, xpath));
+                    }
+                } catch (ModelAccessException e) {
+                    LOGGER.warn("Could not resolve base type {} from WSDL file.", ext.getBase(), e);
+                }
+            }
+            if (ext.getModel() instanceof Sequence) {
+                formParams.putAll(fillFromSequence((Sequence) ext.getModel(), xpath));
+            }
+        }
+        List<Attribute> attrs = ct.getAllAttributes();
+        if (attrs != null) {
+            for (Attribute attr : attrs) {
+                String attrName = attr.getName();
+                if (attrName == null) {
+                    continue;
+                }
+                String attrType = attr.getType() != null ? attr.getType().getLocalPart() : "string";
+                String attrValue = resolveAttributeValue(attr);
+                formParams.putAll(
+                        addParameter(xpath + "/@" + attrName, attrType, attrName, attrValue));
+            }
+        }
+        return formParams;
+    }
+
+    private Map<String, String> fillFromSequence(Sequence seq, String xpath) {
+        HashMap<String, String> formParams = new HashMap<>();
+        for (Element e : seq.getElements()) {
+            formParams.putAll(fillParameters(e, xpath));
+        }
+        for (Object particle : seq.getParticles()) {
+            if (particle instanceof Choice) {
+                List<Element> options = ((Choice) particle).getElements();
+                if (!options.isEmpty()) {
+                    formParams.putAll(fillParameters(options.get(0), xpath));
+                }
+            }
+        }
+        return formParams;
+    }
+
+    private Map<String, String> fillFromSimpleOrPlainElement(Element element, String xpath) {
+        Object embedded = element.getEmbeddedType();
+        SimpleType simpleType = null;
+        if (embedded instanceof SimpleType) {
+            simpleType = (SimpleType) embedded;
+        } else if (element.getType() != null) {
+            Object resolved = element.getSchema().getType(element.getType());
+            if (resolved instanceof SimpleType) {
+                simpleType = (SimpleType) resolved;
+            }
+        }
+        if (simpleType != null) {
+            BaseRestriction br = simpleType.getRestriction();
+            if (br != null) {
+                List<EnumerationFacet> enums = br.getEnumerationFacets();
+                if (enums != null && !enums.isEmpty()) {
+                    return addParameter(
+                            xpath, "string", element.getName(), enums.get(0).getValue());
+                }
+                String baseType = br.getBuildInTypeName();
+                if (baseType != null && !baseType.isEmpty()) {
+                    return addParameter(xpath, baseType, element.getName(), null);
+                }
+            }
+        }
+        if (element.getType() != null) {
+            return addParameter(
+                    xpath, element.getType().getQualifiedName(), element.getName(), null);
+        }
+        return addParameter(xpath, "string", element.getName(), null);
+    }
+
+    private static String resolveAttributeValue(Attribute attr) {
+        if (attr.getFixedValue() != null) {
+            return attr.getFixedValue();
+        }
+        SimpleType st = attr.getSimpleType();
+        if (st != null) {
+            BaseRestriction br = st.getRestriction();
+            if (br != null) {
+                List<EnumerationFacet> enums = br.getEnumerationFacets();
+                if (enums != null && !enums.isEmpty()) {
+                    return enums.get(0).getValue();
+                }
+            }
+        }
+        return null;
     }
 
     protected HashMap<String, String> addParameter(
@@ -496,24 +586,35 @@ public class WSDLCustomParser {
     }
 
     private String getDefaultValue(String paramType) {
-        switch (paramType) {
-            case "string":
-                return "paramValue";
-            case "int":
-            case "double":
-            case "long":
-                return "0";
-            case "date":
-                return dateFormat("yyyy-MM-dd");
-            case "dateTime":
-                return dateFormat("yyyy-MM-dd'T'hh:mm:ssZ");
-            default:
-                return "";
-        }
+        return switch (paramType) {
+            case "int",
+                    "integer",
+                    "decimal",
+                    "float",
+                    "double",
+                    "long",
+                    "short",
+                    "byte",
+                    "unsignedLong",
+                    "unsignedInt",
+                    "unsignedShort",
+                    "unsignedByte",
+                    "nonNegativeInteger",
+                    "nonPositiveInteger" ->
+                    "0";
+            case "positiveInteger" -> "1";
+            case "negativeInteger" -> "-1";
+            case "boolean" -> "true";
+            case "date" -> dateFormat("yyyy-MM-dd");
+            case "dateTime" -> dateFormat("yyyy-MM-dd'T'hh:mm:ssZ");
+            default -> "paramValue";
+        };
     }
 
     private String dateFormat(String format) {
-        return new SimpleDateFormat(format).format(dateSupplier.get());
+        SimpleDateFormat sdf = new SimpleDateFormat(format);
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return sdf.format(dateSupplier.get());
     }
 
     /* Generates a SOAP request associated to the specified binding operation. */
@@ -546,13 +647,6 @@ public class WSDLCustomParser {
             /* HTTP Request. */
             String endpointLocation = port.getAddress().getLocation();
             HttpMessage httpRequest = new HttpMessage(new URI(endpointLocation, true));
-            /* Body. */
-            HttpRequestBody httpReqBody = httpRequest.getRequestBody();
-            /* [MARK] Not sure if all servers would handle this encoding type. */
-            httpReqBody.append(
-                    "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\r\n"
-                            + writerSOAPReq.getBuffer().toString());
-            httpRequest.setRequestBody(httpReqBody);
             /* Header. */
             HttpRequestHeader httpReqHeader = httpRequest.getRequestHeader();
             httpReqHeader.setMethod("POST");
@@ -566,8 +660,11 @@ public class WSDLCustomParser {
                 if (!action.trim().equals("")) contentType += ";action=" + action;
                 httpReqHeader.setHeader(HttpHeader.CONTENT_TYPE, contentType);
             }
-            httpReqHeader.setContentLength(httpReqBody.length());
             httpRequest.setRequestHeader(httpReqHeader);
+            httpRequest.setRequestBody(
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\r\n"
+                            + writerSOAPReq.getBuffer().toString());
+            httpRequest.getRequestHeader().setContentLength(httpRequest.getRequestBody().length());
             return httpRequest;
         } catch (Exception e) {
             LOGGER.error(

@@ -196,12 +196,23 @@ class UrlCanonicalizerUnitTest {
                 "javascript:",
                 "javascript://Something",
                 "javascript:ignore()",
+                "mailto:",
                 "mailto:ignore@example.com",
+                "tel:",
                 "tel:+1-900-555-0191"
             })
     void shouldIgnoreURIsWithNoAuthority(String uri) {
         // Given / When
         String canonicalizedUri = UrlCanonicalizer.getCanonicalUrl(ctx, uri, BASE_URL);
+        // Then
+        assertThat(canonicalizedUri, canonicalizedUri, is(equalTo(null)));
+        assertThat(logEvents, not(hasItem(startsWith("WARN "))));
+    }
+
+    @Test
+    void shouldIgnoreTwoSlashUri() {
+        // Given / When
+        String canonicalizedUri = UrlCanonicalizer.getCanonicalUrl(ctx, "//", BASE_URL);
         // Then
         assertThat(canonicalizedUri, canonicalizedUri, is(equalTo(null)));
         assertThat(logEvents, not(hasItem(startsWith("WARN "))));

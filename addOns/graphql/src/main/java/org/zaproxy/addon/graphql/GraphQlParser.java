@@ -25,7 +25,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import graphql.introspection.IntrospectionQueryBuilder;
 import graphql.introspection.IntrospectionResultToSchema;
 import graphql.language.Document;
+import graphql.schema.GraphQLSchema;
+import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.SchemaPrinter;
+import graphql.schema.idl.UnExecutableSchemaGenerator;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -44,6 +47,7 @@ import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpSender;
 import org.zaproxy.addon.commonlib.CommonAlertTag;
 import org.zaproxy.zap.extension.alert.ExtensionAlert;
+import org.zaproxy.zap.utils.Stats;
 
 public class GraphQlParser {
 
@@ -60,22 +64,27 @@ public class GraphQlParser {
     private static final String INTROSPECTION_ALERT_REF = ExtensionGraphQl.TOOL_ALERT_ID + "-1";
     private static final Map<String, String> INTROSPECTION_ALERT_TAGS =
             CommonAlertTag.toMap(
+                    CommonAlertTag.API_2023_API8_SEC_MISCONFIG,
+                    CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG,
                     CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG,
                     CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private final URI endpointUrl;
+    private final GraphQlQueryMessageBuilder queryMsgBuilder;
     private final Requestor requestor;
     private final ExtensionGraphQl extensionGraphQl;
     private final GraphQlParam param;
     private boolean syncParse;
+    private int maxMessages;
 
     // For Unit Tests
     protected GraphQlParser(String endpointUrlStr) throws URIException {
         extensionGraphQl = new ExtensionGraphQl();
         param = extensionGraphQl.getParam();
-        requestor =
-                new Requestor(
-                        UrlBuilder.build(endpointUrlStr), HttpSender.MANUAL_REQUEST_INITIATOR);
+        endpointUrl = UrlBuilder.build(endpointUrlStr);
+        queryMsgBuilder = new GraphQlQueryMessageBuilder(endpointUrl);
+        requestor = new Requestor(queryMsgBuilder, HttpSender.MANUAL_REQUEST_INITIATOR);
     }
 
     public GraphQlParser(String endpointUrlStr, int initiator, boolean syncParse)
@@ -84,7 +93,9 @@ public class GraphQlParser {
     }
 
     public GraphQlParser(URI endpointUrl, int initiator, boolean syncParse) {
-        requestor = new Requestor(endpointUrl, initiator);
+        this.endpointUrl = endpointUrl;
+        queryMsgBuilder = new GraphQlQueryMessageBuilder(endpointUrl);
+        requestor = new Requestor(queryMsgBuilder, initiator);
         extensionGraphQl =
                 Control.getSingleton().getExtensionLoader().getExtension(ExtensionGraphQl.class);
         param = extensionGraphQl.getParam();
@@ -108,6 +119,7 @@ public class GraphQlParser {
             raiseIntrospectionAlert(importMessage);
         }
         parse(schemaSdl);
+        Stats.incCounter(GraphQlStats.INTROSPECTION_URL_IMPORTED);
     }
 
     public void importUrl(String schemaUrlStr) throws IOException {
@@ -117,7 +129,12 @@ public class GraphQlParser {
     public void importUrl(URI schemaUrl) throws IOException {
         HttpMessage importMessage = new HttpMessage(schemaUrl);
         requestor.send(importMessage);
-        parse(importMessage.getResponseBody().toString());
+        String schema = importMessage.getResponseBody().toString();
+        if (schema.stripLeading().startsWith("{")) {
+            schema = getSchemaFromIntrospectionResponse(schema);
+        }
+        parse(schema);
+        Stats.incCounter(GraphQlStats.SCHEMA_URL_IMPORTED);
     }
 
     public void importFile(String filePath) throws IOException {
@@ -134,6 +151,7 @@ public class GraphQlParser {
             schema = getSchemaFromIntrospectionResponse(schema);
         }
         parse(schema);
+        Stats.incCounter(GraphQlStats.SCHEMA_FILE_IMPORTED);
     }
 
     private static String getSchemaFromIntrospectionResponse(String response) throws IOException {
@@ -154,11 +172,23 @@ public class GraphQlParser {
         }
     }
 
-    public void parse(String schema) {
+    public void parse(String sdl) {
+        GraphQLSchema schema =
+                UnExecutableSchemaGenerator.makeUnExecutableSchema(new SchemaParser().parse(sdl));
+        var generator =
+                new GraphQlGenerator(
+                        extensionGraphQl.getValueGenerator(),
+                        schema,
+                        requestor,
+                        param,
+                        maxMessages);
         if (syncParse) {
-            fingerprint();
+            if (maxMessages <= 0) {
+                fingerprint();
+            }
+            detectCycles(schema, generator);
             if (param.getQueryGenEnabled()) {
-                generate(schema);
+                generate(generator);
             }
             return;
         }
@@ -166,9 +196,12 @@ public class GraphQlParser {
                 new ParserThread(THREAD_PREFIX + threadId.incrementAndGet()) {
                     @Override
                     public void run() {
-                        fingerprint();
+                        if (maxMessages <= 0) {
+                            fingerprint();
+                        }
+                        detectCycles(schema, generator);
                         if (param.getQueryGenEnabled()) {
-                            generate(schema);
+                            generate(generator);
                         }
                     }
                 };
@@ -176,17 +209,23 @@ public class GraphQlParser {
         t.startParser();
     }
 
-    private void fingerprint() {
-        var fingerprinter = new GraphQlFingerprinter(requestor.getEndpointUrl());
-        fingerprinter.fingerprint();
+    public void setMaxMessages(int maxMessages) {
+        this.maxMessages = maxMessages;
     }
 
-    private void generate(String schema) {
+    private void fingerprint() {
+        new GraphQlFingerprinter(endpointUrl, requestor).fingerprint();
+    }
+
+    private void detectCycles(GraphQLSchema schema, GraphQlGenerator generator) {
+        new GraphQlCycleDetector(schema, generator, queryMsgBuilder, param).detectCycles();
+    }
+
+    private void generate(GraphQlGenerator generator) {
         try {
-            GraphQlGenerator generator =
-                    new GraphQlGenerator(
-                            extensionGraphQl.getValueGenerator(), schema, requestor, param);
-            generator.checkServiceMethods();
+            if (maxMessages <= 0) {
+                generator.checkServiceMethods();
+            }
             generator.generateAndSend();
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);

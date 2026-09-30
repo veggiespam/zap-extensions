@@ -408,7 +408,7 @@ class SourceCodeDisclosureCve20121823ScanRuleUnitTest
         // Then
         assertThat(cwe, is(equalTo(20)));
         assertThat(wasc, is(equalTo(20)));
-        assertThat(tags.size(), is(equalTo(5)));
+        assertThat(tags.size(), is(equalTo(6)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A06_VULN_COMP.getTag()),
                 is(equalTo(true)));
@@ -432,12 +432,6 @@ class SourceCodeDisclosureCve20121823ScanRuleUnitTest
         List<Alert> alerts = rule.getExampleAlerts();
         // Then
         assertThat(alerts.size(), is(equalTo(1)));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 
     private HttpMessage httpMessage404NotFound() throws Exception {

@@ -21,88 +21,97 @@ package org.zaproxy.zap.testutils;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import org.apache.commons.httpclient.URI;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.parosproxy.paros.core.scanner.Alert;
 import org.parosproxy.paros.core.scanner.Plugin;
-import org.parosproxy.paros.network.HttpHeader;
-import org.parosproxy.paros.network.HttpMessage;
-import org.parosproxy.paros.network.HttpSender;
-import org.parosproxy.paros.network.HttpStatusCode;
 import org.zaproxy.zap.extension.alert.ExampleAlertProvider;
 
-interface ScanRuleTests {
+interface ScanRuleTests extends UrlTests {
 
     Object getScanRule();
 
     @TestFactory
     default Collection<DynamicTest> addScanRuleTests() {
         List<DynamicTest> tests = new ArrayList<>();
-        // XXX Enable once all rules pass.
-        // tests.add(dynamicTest("shouldHaveValidReferences", this::shouldHaveValidReferences));
+        tests.add(dynamicTest("shouldHaveValidReferences", this::shouldHaveValidReferences));
+        tests.add(
+                dynamicTest(
+                        "shouldHaveExpectedAlertRefsInExampleAlerts",
+                        this::shouldHaveExpectedAlertRefsInExampleAlerts));
         return tests;
     }
 
-    default void shouldHaveValidReferences() {
+    default void shouldHaveI18nNonEmptyName(String name, ResourceBundle extensionResourceBundle) {
+        assertThat(name, is(not(emptyOrNullString())));
+        assertThat(
+                "Name does not seem to be i18n'ed, not found in the resource bundle:" + name,
+                extensionResourceBundle.keySet().stream()
+                        .map(extensionResourceBundle::getString)
+                        .anyMatch(str -> str.equals(name)));
+    }
+
+    /**
+     * Returns the (1-based) alert ref indices to skip when checking example alerts are contiguous,
+     * e.g. for a retired alert ref that leaves a gap in the numbering.
+     *
+     * @return the indices to skip, or empty for no skips
+     */
+    default Set<Integer> getSkippedAlertRefs() {
+        return Set.of();
+    }
+
+    default void shouldHaveExpectedAlertRefsInExampleAlerts() {
         // Given / When
-        Set<String> references = getAllReferences(getScanRule());
+        List<Alert> alerts = getExampleAlerts(getScanRule());
         // Then
-        if (references.isEmpty()) {
+        if (alerts.size() <= 1) {
             return;
         }
 
-        List<AlertReferenceError> errors = new ArrayList<>();
-        for (String reference : references) {
-            if (!reference.startsWith(HttpHeader.HTTP)) {
-                errors.add(AlertReferenceError.Cause.NOT_LINK.create(reference, ""));
-                continue;
+        Set<Integer> skipped = getSkippedAlertRefs();
+        List<String> errors = new ArrayList<>();
+        int i = 0;
+        for (Alert alert : alerts) {
+            ++i;
+            while (skipped.contains(i)) {
+                ++i;
             }
-
-            URI uri;
-            try {
-                uri = new URI(reference, true);
-            } catch (Exception e) {
-                errors.add(AlertReferenceError.Cause.INVALID_URI.create(reference, e));
-                continue;
-            }
-
-            if (!HttpHeader.HTTPS.equals(uri.getScheme())) {
-                errors.add(AlertReferenceError.Cause.NOT_HTTPS.create(reference, ""));
-            } else if (false) {
-                fetchUrl(uri, reference, errors);
+            String alertRef = alert.getPluginId() + "-" + i;
+            if (!alertRef.equals(alert.getAlertRef())) {
+                errors.add(
+                        "Example Alert %s does not have expected ref: %s Has: %s"
+                                .formatted(i, alertRef, alert.getAlertRef()));
             }
         }
 
         assertThat(errors.toString(), errors, is(empty()));
     }
 
-    private static void fetchUrl(URI uri, String reference, List<AlertReferenceError> errors) {
-        try {
-            HttpMessage message = new HttpMessage(uri);
-            new HttpSender(0).sendAndReceive(message);
-            var responseHeader = message.getResponseHeader();
-            int statusCode = responseHeader.getStatusCode();
-            if (statusCode != HttpStatusCode.OK) {
-                errors.add(
-                        AlertReferenceError.Cause.UNEXPECTED_STATUS_CODE.create(
-                                reference, statusCode));
-            }
-        } catch (IOException e) {
-            errors.add(AlertReferenceError.Cause.IO_EXCEPTION.create(reference, e));
+    private static List<Alert> getExampleAlerts(Object scanRule) {
+        if (scanRule instanceof ExampleAlertProvider eap) {
+            return Optional.ofNullable(eap.getExampleAlerts()).orElse(List.of());
         }
+        return List.of();
+    }
+
+    default void shouldHaveValidReferences() {
+        shouldHaveValidUrls(getAllReferences(getScanRule()));
     }
 
     private static Set<String> getAllReferences(Object scanRule) {

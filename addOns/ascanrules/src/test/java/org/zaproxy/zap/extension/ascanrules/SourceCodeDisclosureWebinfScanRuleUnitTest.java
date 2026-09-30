@@ -28,10 +28,9 @@ import static org.hamcrest.Matchers.is;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Response;
 import java.io.ByteArrayInputStream;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.httpclient.URIException;
 import org.junit.jupiter.api.Test;
 import org.parosproxy.paros.core.scanner.Alert;
@@ -60,7 +59,10 @@ class SourceCodeDisclosureWebinfScanRuleUnitTest
         // Then
         assertThat(cwe, is(equalTo(541)));
         assertThat(wasc, is(equalTo(34)));
-        assertThat(tags.size(), is(equalTo(5)));
+        assertThat(tags.size(), is(equalTo(6)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG.getTag()),
                 is(equalTo(true)));
@@ -72,6 +74,9 @@ class SourceCodeDisclosureWebinfScanRuleUnitTest
                 is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_FULL.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.PENTEST.getTag()), is(equalTo(true)));
+        assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG.getValue())));
@@ -93,12 +98,6 @@ class SourceCodeDisclosureWebinfScanRuleUnitTest
         assertThat(webinfAlert.getAlertRef(), is(equalTo("10045-1")));
         Alert propsAlert = alerts.get(1);
         assertThat(propsAlert.getAlertRef(), is(equalTo("10045-2")));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 
     @Test
@@ -214,19 +213,15 @@ class SourceCodeDisclosureWebinfScanRuleUnitTest
         private static final byte[] JAVA_CLASS;
 
         static {
-            try {
-                JAVA_CLASS =
-                        Hex.decodeHex(
-                                ("cafebabe00000034000d0a0003000a07000b07000c0100063c696e69743e0100"
-                                                + "03282956010004436f646501000f4c696e654e756d6265725461626c6501000a"
-                                                + "536f7572636546696c65010006412e6a6176610c00040005010001410100106a"
-                                                + "6176612f6c616e672f4f626a6563740020000200030000000000010000000400"
-                                                + "05000100060000001d00010001000000052ab70001b100000001000700000006"
-                                                + "00010000000100010008000000020009")
-                                        .toCharArray());
-            } catch (DecoderException e) {
-                throw new RuntimeException(e);
-            }
+            JAVA_CLASS =
+                    HexFormat.of()
+                            .parseHex(
+                                    "cafebabe00000034000d0a0003000a07000b07000c0100063c696e69743e0100"
+                                            + "03282956010004436f646501000f4c696e654e756d6265725461626c6501000a"
+                                            + "536f7572636546696c65010006412e6a6176610c00040005010001410100106a"
+                                            + "6176612f6c616e672f4f626a6563740020000200030000000000010000000400"
+                                            + "05000100060000001d00010001000000052ab70001b100000001000700000006"
+                                            + "00010000000100010008000000020009");
         }
 
         public JavaClassResponse(String path) {

@@ -6,6 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 ### Changed
 - Updated with enthec upstream icon and pattern changes.
+- Dependency update.
+
+## [21.57.0] - 2026-08-20
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+- Dependency update.
+- Update tab and help icon.
+
+## [21.56.0] - 2026-07-06
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+- Dependency update.
+
+## [21.55.0] - 2026-05-06
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+- Dependency update.
+
+## [21.54.0] - 2026-03-31
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+
+## [21.53.0] - 2026-02-24
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+- Dependency update.
+
+## [21.52.0] - 2025-12-18
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+- Adjust warnings logged when a pattern incorrectly contains Confidence or Version tags, use just one punctuation character.
+
+## [21.51.0] - 2025-12-15
+### Added
+- A help page for the tech-detection (`wappalyzer`) automation framework job.
+
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [21.50.0] - 2025-12-03
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+
+## [21.49.0] - 2025-11-04
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+- Maintenance changes.
+- The Technology panel toolbar now includes a toggle button to link its displayed contents to the Sites Tree selection.
+
+### Fixed
+- Icon sizing in the Technology table when a transparent placeholder needs to be used.
+- Reduced usage of error level logging.
+
+## [21.48.0] - 2025-09-02
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+- During load the time taken to process the data files will be shown in human readable format (generally seconds), as well as milliseconds (ms).
+- Maintenance changes.
+
+## [21.47.0] - 2025-07-15
+### Changed
+- Updated with enthec upstream icon and pattern changes.
+
+## [21.46.0] - 2025-06-20
+### Changed
+- Updated with enthec upstream icon and pattern changes.
 
 ## [21.45.0] - 2025-03-04
 ### Changed
@@ -413,6 +479,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - First version
 
 
+[21.57.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.57.0
+[21.56.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.56.0
+[21.55.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.55.0
+[21.54.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.54.0
+[21.53.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.53.0
+[21.52.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.52.0
+[21.51.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.51.0
+[21.50.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.50.0
+[21.49.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.49.0
+[21.48.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.48.0
+[21.47.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.47.0
+[21.46.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.46.0
 [21.45.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.45.0
 [21.44.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.44.0
 [21.43.0]: https://github.com/zaproxy/zap-extensions/releases/wappalyzer-v21.43.0

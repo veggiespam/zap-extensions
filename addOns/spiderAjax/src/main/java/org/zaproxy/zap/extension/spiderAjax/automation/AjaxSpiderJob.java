@@ -51,7 +51,6 @@ import org.zaproxy.zap.extension.spiderAjax.AjaxSpiderParamElem;
 import org.zaproxy.zap.extension.spiderAjax.AjaxSpiderTarget;
 import org.zaproxy.zap.extension.spiderAjax.ExtensionAjax;
 import org.zaproxy.zap.extension.spiderAjax.SpiderListener;
-import org.zaproxy.zap.extension.spiderAjax.SpiderListener.ResourceState;
 import org.zaproxy.zap.extension.spiderAjax.SpiderThread;
 import org.zaproxy.zap.extension.spiderAjax.internal.ExcludedElement;
 import org.zaproxy.zap.users.User;
@@ -78,6 +77,11 @@ public class AjaxSpiderJob extends AutomationJob {
 
     private Data data;
     private Parameters parameters = new Parameters();
+    private boolean forceStop;
+    private volatile SpiderThread currentSpiderThread;
+    private String jobId;
+
+    private static int scanIdCounter = 0;
 
     public AjaxSpiderJob() {
         this.data = new Data(this, parameters);
@@ -270,7 +274,9 @@ public class AjaxSpiderJob extends AutomationJob {
         try {
             uri = new URI(uriStr);
         } catch (Exception e1) {
-            progress.error(Constant.messages.getString("automation.error.context.badurl", uriStr));
+            progress.error(
+                    Constant.messages.getString(
+                            "automation.error.context.badurl", uriStr, e1.getLocalizedMessage()));
             return;
         }
 
@@ -326,13 +332,22 @@ public class AjaxSpiderJob extends AutomationJob {
         AjaxSpiderTarget target = targetBuilder.build();
         JobSpiderListener listener = new JobSpiderListener();
 
+        forceStop = false;
         SpiderThread spiderThread =
                 getExtSpider()
                         .createSpiderThread(
                                 "Auto - " + getExtSpider().createDisplayName(target),
                                 target,
                                 listener);
+        currentSpiderThread = spiderThread;
         new Thread(spiderThread, "ZAP-AjaxSpiderAuto").start();
+        jobId = "ajaxspider-" + scanIdCounter++;
+
+        int waitAttempts = 0;
+        while (!spiderThread.isRunning() && waitAttempts < 20) {
+            this.sleep(250);
+            waitAttempts++;
+        }
 
         long endTime = Long.MAX_VALUE;
         if (JobUtils.unBox(this.getParameters().getMaxDuration()) > 0) {
@@ -344,7 +359,6 @@ public class AjaxSpiderJob extends AutomationJob {
         }
 
         // Wait for the ajax spider to finish
-        boolean forceStop = false;
         int numUrlsFound = 0;
         int lastCount = 0;
 
@@ -352,10 +366,12 @@ public class AjaxSpiderJob extends AutomationJob {
             this.sleep(500);
 
             numUrlsFound = listener.getMessagesFound();
+            // Should remove this at some point, but its almost certainly being used by existing AF
+            // jobs
             Stats.incCounter("spiderAjax.urls.added", numUrlsFound - lastCount);
             lastCount = numUrlsFound;
 
-            if (!spiderThread.isRunning()) {
+            if (!spiderThread.isRunning() || forceStop) {
                 break;
             }
             if (!this.runMonitorTests(progress) || System.currentTimeMillis() > endTime) {
@@ -368,9 +384,34 @@ public class AjaxSpiderJob extends AutomationJob {
             progress.info(Constant.messages.getString("automation.info.jobstopped", getType()));
         }
 
+        currentSpiderThread = null;
         progress.info(
                 Constant.messages.getString(
                         "automation.info.urlsfound", this.getType(), numUrlsFound));
+    }
+
+    @Override
+    public void stop() {
+        forceStop = true;
+    }
+
+    @Override
+    public boolean isLongRunningJob() {
+        return true;
+    }
+
+    @Override
+    public String getLongRunningJobId() {
+        return jobId;
+    }
+
+    @Override
+    public int getLongRunningJobProgress() {
+        SpiderThread spider = currentSpiderThread;
+        if (spider != null && spider.isRunning()) {
+            return 50;
+        }
+        return getStatus() == Status.COMPLETED ? 100 : 0;
     }
 
     private ContextWrapper getContextWrapper(

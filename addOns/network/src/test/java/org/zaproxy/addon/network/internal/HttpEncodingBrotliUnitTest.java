@@ -23,11 +23,16 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.FieldSource;
 
 /** Unit test for {@link HttpEncodingBrotli}. */
 @EnabledIf(
@@ -37,6 +42,12 @@ class HttpEncodingBrotliUnitTest {
 
     private static final byte[] CONTENT = "42".getBytes(StandardCharsets.UTF_8);
     private static final byte[] CONTENT_ENCODED = {-117, 0, -128, 52, 50, 3};
+
+    private static final byte[] EMPTY_CONTENT = {};
+    private static final byte[] EMPTY_CONTENT_ENCODED = {6};
+
+    static final List<Arguments> CONTENT_SOURCE =
+            List.of(arguments(CONTENT), arguments(EMPTY_CONTENT));
 
     private HttpEncodingBrotli encoding = HttpEncodingBrotli.getSingleton();
 
@@ -57,10 +68,43 @@ class HttpEncodingBrotliUnitTest {
     }
 
     @Test
+    void shouldEncodeEmptyContent() throws IOException {
+        // Given / When
+        byte[] encodedContent = encoding.encode(EMPTY_CONTENT);
+        // Then
+        assertThat(encodedContent, is(equalTo(EMPTY_CONTENT_ENCODED)));
+    }
+
+    @Test
+    void shouldDecodeEmptyContent() throws IOException {
+        // Given / When
+        byte[] decodedContent = encoding.decode(EMPTY_CONTENT_ENCODED);
+        // Then
+        assertThat(decodedContent, is(equalTo(EMPTY_CONTENT)));
+    }
+
+    @Test
+    void shouldSkipDecodePlainEmptyContent() throws IOException {
+        // Given / When
+        byte[] decodedContent = encoding.decode(EMPTY_CONTENT);
+        // Then
+        assertThat(decodedContent, is(equalTo(EMPTY_CONTENT)));
+    }
+
+    @Test
     void shouldThrowExceptionWhenDecodingIfNotProperlyEncoded() {
         // Given
         byte[] invalidContent = new byte[] {'I', 'n', 'v', 'a', 'l', 'i', 'd'};
         // When / Then
         assertThrows(IOException.class, () -> encoding.decode(invalidContent));
+    }
+
+    @ParameterizedTest
+    @FieldSource("CONTENT_SOURCE")
+    void shouldRoundTrip(byte[] original) throws IOException {
+        // Given / When
+        byte[] roundTripped = encoding.decode(encoding.encode(original));
+        // Then
+        assertThat(roundTripped, is(equalTo(original)));
     }
 }

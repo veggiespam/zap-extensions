@@ -4,6 +4,65 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+
+## [0.46.0] - 2026-07-06
+### Added
+- Added script diagnostics section to Traditional Reports.
+- Templates that include Insights now also identify the Insight that stopped the scan, if applicable.
+
+### Fixed
+- Invalid alerts, ones without a corresponding message, are now excluded from generated reports. Previously these could break templates that reference message fields (e.g. SARIF, modern, `*-plus`) (Issue 6880).
+
+### Changed
+- Help content related to the params add-on was updated (Issue 9210).
+
+## [0.45.0] - 2026-05-06
+### Fixed
+- The alert's systemic flag in JSON and XML reports now correctly reflects its state (Issue 9254).
+
+### Changed
+- Update dependency.
+- Formatted JavaScript files for consistency.
+
+## [0.44.0] - 2026-03-19
+### Added
+- "Other Info" to the modern HTML report
+
+### Changed
+- Maintenance changes.
+- "Other Info" sections of the HTML reports to split the text on newlines.
+
+## [0.43.0] - 2025-12-15
+### Added
+- Insights to the reports.
+
+### Changed
+- Update the automation framework `outputSummary` template to include missing field (`rules`).
+- Update minimum ZAP version to 2.17.0.
+
+## [0.42.0] - 2025-11-07
+### Changed
+- Update dependencies.
+- All relevant reports to support nodeName and systemic counts.
+- Do not try to validate the AF report file in the GUI as the plan may run on another system.
+
+## [0.41.0] - 2025-09-04
+### Changed
+- Corrected a minor typo and image alt tags in the help.
+
+### Added
+- An ISO 8601 date and time field (ex: "created": "2025-09-03T12:49:35.236211400Z") has been added to the Traditional JSON, Traditional JSON with Requests and Responses, Traditional XML, Traditional XML with Requests and Responses.
+
+## [0.40.0] - 2025-09-02
+### Changed
+- Provide/log details on report errors through the Automation Framework job.
+- Allow to include Automation Framework errors and warnings in the Traditional JSON Report with Requests and Responses report.
+
+## [0.39.0] - 2025-06-20
+### Changed
+- Caps fixed for Section Selections of the Risk and Confidence HTML report (Issue 2000).
+
 ### Added
 - The Automation Framework progress to the report data when run via an AF job.
 - Statistics to the traditional extended JSON and XML reports.
@@ -328,6 +387,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First version.
 
+[0.46.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.46.0
+[0.45.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.45.0
+[0.44.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.44.0
+[0.43.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.43.0
+[0.42.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.42.0
+[0.41.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.41.0
+[0.40.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.40.0
+[0.39.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.39.0
 [0.38.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.38.0
 [0.37.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.37.0
 [0.36.0]: https://github.com/zaproxy/zap-extensions/releases/reports-v0.36.0

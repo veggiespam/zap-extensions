@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 
+## [10] - 2026-06-12
+### Fixed
+- Send requests using ZAP instead of default Zest HTTP client implementation.
+
+## [9] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Allow to override the default alert threshold of the bundled policy.
+- Maintenance changes.
+
 ## [8] - 2025-01-10
 ### Added
 - Add Automation Framework jobs:
@@ -68,6 +78,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
 
+[10]: https://github.com/zaproxy/zap-extensions/releases/sequence-v10
+[9]: https://github.com/zaproxy/zap-extensions/releases/sequence-v9
 [8]: https://github.com/zaproxy/zap-extensions/releases/sequence-v8
 [7]: https://github.com/zaproxy/zap-extensions/releases/sequence-v7
 [6]: https://github.com/zaproxy/zap-extensions/releases/sequence-v6

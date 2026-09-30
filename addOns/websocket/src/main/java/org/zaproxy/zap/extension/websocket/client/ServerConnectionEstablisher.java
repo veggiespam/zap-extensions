@@ -64,8 +64,8 @@ public class ServerConnectionEstablisher {
      * acts as a WebSocket Client.
      *
      * @return Either a new WebSocketProxy which is acts as a client or null if something went wrong
-     * @throws Exception Extensive description for the reason it is not able to establish the
-     *     connection
+     * @throws IOException if an I/O error occurs while establishing the connection
+     * @throws RequestOutOfScopeException if the request is out of scope
      */
     public WebSocketProxy send(HandshakeConfig handshakeConfig)
             throws IOException, RequestOutOfScopeException {
@@ -116,14 +116,20 @@ public class ServerConnectionEstablisher {
                 }
             }
         } catch (final HttpMalformedHeaderException mhe) {
-            throw new IllegalArgumentException("Malformed header error.", mhe);
+            throw new IllegalArgumentException(
+                    Constant.messages.getString("websocket.manual_send.exception.malformedheader"),
+                    mhe);
         } catch (final UnknownHostException uhe) {
-            throw new IOException("Error forwarding to an Unknown host: " + uhe.getMessage(), uhe);
+            throw new IOException(
+                    Constant.messages.getString(
+                            "websocket.manual_send.exception.unknownhost", uhe.getMessage()),
+                    uhe);
         } catch (final SSLException sslEx) {
             throw sslEx;
         } catch (final IOException ioe) {
             throw new IOException(
-                    "IO error in sending request: " + ioe.getClass() + ": " + ioe.getMessage(),
+                    Constant.messages.getString(
+                            "websocket.manual_send.exception.io", ioe.getMessage()),
                     ioe);
         }
 

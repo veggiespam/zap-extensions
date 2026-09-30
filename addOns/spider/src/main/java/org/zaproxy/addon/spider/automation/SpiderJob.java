@@ -44,6 +44,7 @@ import org.parosproxy.paros.network.HttpStatusCode;
 import org.zaproxy.addon.automation.AutomationData;
 import org.zaproxy.addon.automation.AutomationEnvironment;
 import org.zaproxy.addon.automation.AutomationJob;
+import org.zaproxy.addon.automation.AutomationJob.Status;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.ContextWrapper;
 import org.zaproxy.addon.automation.jobs.JobData;
@@ -81,6 +82,10 @@ public class SpiderJob extends AutomationJob {
 
     private UrlRequester urlRequester =
             new UrlRequester(this.getName(), new HttpSender(HttpSender.SPIDER_INITIATOR));
+    private boolean forceStop;
+
+    private volatile Integer scanId;
+    private volatile SpiderScan currentScan;
 
     public SpiderJob() {
         this.data = new Data(this, parameters);
@@ -205,7 +210,9 @@ public class SpiderJob extends AutomationJob {
                 uri = new URI(urlStr, true);
             }
         } catch (Exception e1) {
-            progress.error(Constant.messages.getString("automation.error.context.badurl", urlStr));
+            progress.error(
+                    Constant.messages.getString(
+                            "automation.error.context.badurl", urlStr, e1.getLocalizedMessage()));
             return;
         }
         User user = this.getUser(this.getParameters().getUser(), progress);
@@ -230,50 +237,78 @@ public class SpiderJob extends AutomationJob {
             contextSpecificObjects.add(uri);
         }
 
-        int scanId = this.getExtSpider().startScan(target, user, contextSpecificObjects.toArray());
+        forceStop = false;
+        scanId = this.getExtSpider().startScan(target, user, contextSpecificObjects.toArray());
+        SpiderScan scan = this.getExtSpider().getScan(scanId);
+        try {
+            currentScan = scan;
 
-        long endTime = Long.MAX_VALUE;
-        if (parameters.getMaxDuration() != null && parameters.getMaxDuration() > 0) {
-            // The spider should stop, if it doesnt we will stop it (after a few seconds leeway)
-            endTime =
-                    System.currentTimeMillis()
-                            + TimeUnit.MINUTES.toMillis(parameters.getMaxDuration())
-                            + TimeUnit.SECONDS.toMillis(5);
-        }
+            long endTime = Long.MAX_VALUE;
+            if (parameters.getMaxDuration() != null && parameters.getMaxDuration() > 0) {
+                // The spider should stop, if it doesnt we will stop it (after a few seconds leeway)
+                endTime =
+                        System.currentTimeMillis()
+                                + TimeUnit.MINUTES.toMillis(parameters.getMaxDuration())
+                                + TimeUnit.SECONDS.toMillis(5);
+            }
 
-        // Wait for the spider to finish
-        SpiderScan scan;
-        boolean forceStop = false;
-        int numUrlsFound = 0;
-        int lastCount = 0;
+            // Wait for the spider to finish
+            int numUrlsFound = 0;
+            int lastCount = 0;
 
-        while (true) {
-            this.sleep(500);
+            while (true) {
+                this.sleep(500);
 
-            scan = this.getExtSpider().getScan(scanId);
+                numUrlsFound = scan.getNumberOfURIsFound();
+                Stats.incCounter(URLS_ADDED_STATS_KEY, numUrlsFound - lastCount);
+                lastCount = numUrlsFound;
+
+                if (scan.isStopped() || forceStop) {
+                    break;
+                }
+                if (!this.runMonitorTests(progress) || System.currentTimeMillis() > endTime) {
+                    forceStop = true;
+                    break;
+                }
+            }
+            if (forceStop) {
+                this.getExtSpider().stopScan(scanId);
+                progress.info(Constant.messages.getString("automation.info.jobstopped", getType()));
+            }
             numUrlsFound = scan.getNumberOfURIsFound();
-            Stats.incCounter(URLS_ADDED_STATS_KEY, numUrlsFound - lastCount);
-            lastCount = numUrlsFound;
 
-            if (scan.isStopped()) {
-                break;
-            }
-            if (!this.runMonitorTests(progress) || System.currentTimeMillis() > endTime) {
-                forceStop = true;
-                break;
-            }
+            progress.info(
+                    Constant.messages.getString(
+                            "automation.info.urlsfound", this.getName(), numUrlsFound));
+        } finally {
+            currentScan = null;
         }
-        if (forceStop) {
-            this.getExtSpider().stopScan(scanId);
-            progress.info(Constant.messages.getString("automation.info.jobstopped", getType()));
-        }
-        numUrlsFound = scan.getNumberOfURIsFound();
-
-        progress.info(
-                Constant.messages.getString(
-                        "automation.info.urlsfound", this.getName(), numUrlsFound));
 
         getExtSpider().setPanelSwitch(true);
+    }
+
+    @Override
+    public void stop() {
+        forceStop = true;
+    }
+
+    @Override
+    public boolean isLongRunningJob() {
+        return true;
+    }
+
+    @Override
+    public String getLongRunningJobId() {
+        return scanId != null ? "spider-" + scanId : null;
+    }
+
+    @Override
+    public int getLongRunningJobProgress() {
+        SpiderScan scan = currentScan;
+        if (scan != null) {
+            return scan.getProgress();
+        }
+        return getStatus() == Status.COMPLETED ? 100 : 0;
     }
 
     /**
@@ -393,13 +428,18 @@ public class SpiderJob extends AutomationJob {
                                 .getExtension(ExtensionHistory.class);
                 extHistory.addHistory(msg, HistoryReference.TYPE_SPIDER);
 
+                HistoryReference ref = msg.getHistoryRef();
+                if (ref == null) {
+                    progress.error(
+                            Constant.messages.getString(
+                                    "spider.automation.error.url.notpersisted", requester, url));
+                    return;
+                }
+
                 ThreadUtils.invokeAndWait(
                         () ->
                                 // Needs to be done on the EDT
-                                Model.getSingleton()
-                                        .getSession()
-                                        .getSiteTree()
-                                        .addPath(msg.getHistoryRef()));
+                                Model.getSingleton().getSession().getSiteTree().addPath(ref));
             } catch (ZapUnknownHostException e1) {
                 if (e1.isFromOutgoingProxy()) {
                     progress.error(

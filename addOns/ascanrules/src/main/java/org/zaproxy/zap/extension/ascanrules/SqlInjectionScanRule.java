@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -39,6 +38,7 @@ import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.core.scanner.AbstractAppParamPlugin;
+import org.parosproxy.paros.core.scanner.AbstractPlugin;
 import org.parosproxy.paros.core.scanner.Alert;
 import org.parosproxy.paros.core.scanner.Category;
 import org.parosproxy.paros.network.HttpHeader;
@@ -69,7 +69,6 @@ import org.zaproxy.zap.model.TechSet;
 public class SqlInjectionScanRule extends AbstractAppParamPlugin
         implements CommonActiveScanRuleInfo {
 
-    /** Prefix for internationalised messages used by this rule */
     private static final String MESSAGE_PREFIX = "ascanrules.sqlinjection.";
 
     private static final Map<String, String> ALERT_TAGS;
@@ -78,13 +77,18 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.API_2023_API10_UNSAFE_CONSUMPTION,
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A01_INJECTION,
-                                CommonAlertTag.WSTG_V42_INPV_05_SQLI));
+                                CommonAlertTag.WSTG_V42_INPV_05_SQLI,
+                                CommonAlertTag.HIPAA,
+                                CommonAlertTag.PCI_DSS));
         alertTags.put(PolicyTag.API.getTag(), "");
         alertTags.put(PolicyTag.DEV_CICD.getTag(), "");
         alertTags.put(PolicyTag.DEV_STD.getTag(), "");
         alertTags.put(PolicyTag.DEV_FULL.getTag(), "");
+        alertTags.put(PolicyTag.QA_CICD.getTag(), "");
         alertTags.put(PolicyTag.QA_STD.getTag(), "");
         alertTags.put(PolicyTag.QA_FULL.getTag(), "");
         alertTags.put(PolicyTag.SEQUENCE.getTag(), "");
@@ -92,31 +96,27 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         ALERT_TAGS = Collections.unmodifiableMap(alertTags);
     }
 
-    /** Did SQLInjection get found yet? */
     private boolean sqlInjectionFoundForUrl = false;
 
     private String sqlInjectionAttack = null;
     private HttpMessage refreshedmessage = null;
-    // what do we do at each attack strength?
-    // (some SQL Injection vulns would be picked up by multiple types of checks, and we skip out
-    // after the first alert for a URL)
+
     private boolean doSpecificErrorBased = false;
     private boolean doGenericErrorBased = false;
     private boolean doBooleanBased = false;
     private boolean doUnionBased = false;
     private boolean doExpressionBased = false;
     private boolean doOrderByBased = false;
-    // how many requests can we fire for each method? will be set depending on the attack strength
+
     private int doErrorMaxRequests = 0;
     private int doBooleanMaxRequests = 0;
     private int doUnionMaxRequests = 0;
     private int doExpressionMaxRequests = 0;
     private int doOrderByMaxRequests = 0;
-    // how many requests have we fired up?
+
     private int countErrorBasedRequests = 0;
     private int countExpressionBasedRequests = 0;
     private int countBooleanBasedRequests = 0;
-    private int countUnionBasedRequests = 0;
     private int countOrderByBasedRequests = 0;
 
     /**
@@ -152,8 +152,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         // TODO: add other specific UNION based error messages for Union here: PostgreSQL, Sybase,
         // DB2, Informix, etc
 
-        // DONE: we have implemented a MySQL specific scanner. See SQLInjectionMySQL
-        MySQL(
+        MYSQL(
                 "MySQL",
                 Tech.MySQL,
                 List.of(
@@ -165,197 +164,130 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                 List.of(
                         "\\QYou have an error in your SQL syntax\\E",
                         "\\QThe used SELECT statements have a different number of columns\\E")),
-
-        // TODO: Move this to the Microsoft SQL specific scan rule?
-        // Injection vulnerabilities
-        MsSQL(
+        MSSQL(
                 "Microsoft SQL Server",
                 Tech.MsSQL,
-                Arrays.asList(
-                        new String[] {
-                            "\\Qcom.microsoft.sqlserver.jdbc\\E",
-                            "\\Qcom.microsoft.jdbc\\E",
-                            "\\Qcom.inet.tds\\E",
-                            "\\Qcom.microsoft.sqlserver.jdbc\\E",
-                            "\\Qcom.ashna.jturbo\\E",
-                            "\\Qweblogic.jdbc.mssqlserver\\E",
-                            "\\Q[Microsoft]\\E",
-                            "\\Q[SQLServer]\\E",
-                            "\\Q[SQLServer 2000 Driver for JDBC]\\E",
-                            "\\Qnet.sourceforge.jtds.jdbc\\E", // see also be Sybase. could be
-                            // either!
-                            "\\Q80040e14\\E",
-                            "\\Q800a0bcd\\E",
-                            "\\Q80040e57\\E",
-                            "\\QODBC driver does not support\\E",
-                            "\\QAll queries in an SQL statement containing a UNION operator must have an equal number of expressions in their target lists\\E",
-                            "\\QAll queries combined using a UNION, INTERSECT or EXCEPT operator must have an equal number of expressions in their target lists\\E"
-                        }),
-                Arrays.asList(
-                        new String[] {
-                            "\\QAll queries in an SQL statement containing a UNION operator must have an equal number of expressions in their target lists\\E",
-                            "\\QAll queries combined using a UNION, INTERSECT or EXCEPT operator must have an equal number of expressions in their target lists\\E"
-                        })),
-
-        // TODO: Move this to the Oracle specific scan rule?
-        Oracle(
+                List.of(
+                        "\\Qcom.microsoft.sqlserver.jdbc\\E",
+                        "\\Qcom.microsoft.jdbc\\E",
+                        "\\Qcom.inet.tds\\E",
+                        "\\Qcom.ashna.jturbo\\E",
+                        "\\Qweblogic.jdbc.mssqlserver\\E",
+                        "\\Q[Microsoft]\\E",
+                        "\\Q[SQLServer]\\E",
+                        "\\Q[SQLServer 2000 Driver for JDBC]\\E",
+                        // see also be Sybase. could be either!
+                        "\\Qnet.sourceforge.jtds.jdbc\\E",
+                        "\\Q80040e14\\E",
+                        "\\Q800a0bcd\\E",
+                        "\\Q80040e57\\E",
+                        "\\QODBC driver does not support\\E",
+                        "\\QAll queries in an SQL statement containing a UNION operator must have an equal number of expressions in their target lists\\E",
+                        "\\QAll queries combined using a UNION, INTERSECT or EXCEPT operator must have an equal number of expressions in their target lists\\E"),
+                List.of(
+                        "\\QAll queries in an SQL statement containing a UNION operator must have an equal number of expressions in their target lists\\E",
+                        "\\QAll queries combined using a UNION, INTERSECT or EXCEPT operator must have an equal number of expressions in their target lists\\E")),
+        ORACLE(
                 "Oracle",
                 Tech.Oracle,
-                Arrays.asList(
-                        new String[] {
-                            "\\Qoracle.jdbc\\E",
-                            "\\QSQLSTATE[HY\\E",
-                            "\\QORA-00933\\E",
-                            "\\QORA-06512\\E", // indicates the line number of an error
-                            "\\QSQL command not properly ended\\E",
-                            "\\QORA-00942\\E", // table or view does not exist
-                            "\\QORA-29257\\E", // host unknown
-                            "\\QORA-00932\\E", // inconsistent datatypes
-                            "\\Qquery block has incorrect number of result columns\\E",
-                            "\\QORA-01789\\E"
-                        }),
-                Arrays.asList(
-                        new String[] {
-                            "\\Qquery block has incorrect number of result columns\\E",
-                            "\\QORA-01789\\E"
-                        })),
-
-        // TODO: implement a scan rule that uses DB2 specific functionality to detect SQLi
-        // vulnerabilities
-        DB2("IBM DB2", Tech.Db2, "\\Qcom.ibm.db2.jcc\\E", "\\QCOM.ibm.db2.jdbc\\E"),
-
-        // TODO: Move this to the Postgres specific scan rule?
-        PostgreSQL(
+                List.of(
+                        "\\Qoracle.jdbc\\E",
+                        "\\QSQLSTATE[HY\\E",
+                        "\\QORA-00933\\E",
+                        "\\QORA-06512\\E", // indicates the line number of an error
+                        "\\QSQL command not properly ended\\E",
+                        "\\QORA-00942\\E", // table or view does not exist
+                        "\\QORA-29257\\E", // host unknown
+                        "\\QORA-00932\\E", // inconsistent datatypes
+                        "\\Qquery block has incorrect number of result columns\\E",
+                        "\\QORA-01789\\E"),
+                List.of(
+                        "\\Qquery block has incorrect number of result columns\\E",
+                        "\\QORA-01789\\E")),
+        DB2("IBM DB2", Tech.Db2, List.of("\\Qcom.ibm.db2.jcc\\E", "\\QCOM.ibm.db2.jdbc\\E")),
+        POSTGRESQL(
                 "PostgreSQL",
                 Tech.PostgreSQL,
-                Arrays.asList(
-                        new String[] {
-                            "\\Qorg.postgresql.util.PSQLException\\E",
-                            "\\Qorg.postgresql\\E",
-                            "\\Qeach UNION query must have the same number of columns\\E",
-                            "\\Qunterminated quoted string at or near\\E",
-                            "\\Qsyntax error at or near\\E",
-                        }),
-                Arrays.asList(
-                        new String[] {
-                            "\\Qeach UNION query must have the same number of columns\\E"
-                        })),
-
-        // TODO: implement a scan rule that uses Sybase specific functionality to detect SQLi
-        // vulnerabilities
-        // Note: this scan rule  would also detect Microsoft SQL Server vulnerabilities, due to
-        // common
-        // syntax.
-        Sybase(
+                List.of(
+                        "\\Qorg.postgresql.util.PSQLException\\E",
+                        "\\Qorg.postgresql\\E",
+                        "\\Qeach UNION query must have the same number of columns\\E",
+                        "\\Qunterminated quoted string at or near\\E",
+                        "\\Qsyntax error at or near\\E"),
+                List.of("\\Qeach UNION query must have the same number of columns\\E")),
+        SYBASE(
                 "Sybase",
                 Tech.Sybase,
-                "\\Qcom.sybase.jdbc\\E",
-                "\\Qnet.sourceforge.jtds.jdbc\\E" // see also Microsoft SQL Server. could be either!
-                ),
-
-        // TODO: implement a scan rule that uses Informix specific functionality to detect SQLi
-        // vulnerabilities
-        Informix("Informix", Tech.Db, "\\Qcom.informix.jdbc\\E"),
-
-        // TODO: implement a scan rule  that uses Firebird specific functionality to detect SQLi
-        // vulnerabilities
-        Firebird("Firebird", Tech.Firebird, "\\Qorg.firebirdsql.jdbc\\E"),
-
-        // TODO: implement a scan rule that uses IDS Server specific functionality to detect SQLi
-        // vulnerabilities
-        IdsServer("IDS Server", Tech.Db, "\\Qids.sql\\E"),
-
-        // TODO: implement a scan rule that uses InstantDB specific functionality to detect SQLi
-        // vulnerabilities
-        InstantDB("InstantDB", Tech.Db, "\\Qorg.enhydra.instantdb.jdbc\\E", "\\Qjdbc.idb\\E"),
-
-        // TODO: implement a scan rule that uses Interbase specific functionality to detect SQLi
-        // vulnerabilities
-        Interbase("Interbase", Tech.Db, "\\Qinterbase.interclient\\E"),
-
-        // DONE: we have implemented a Hypersonic specific scanner. See SQLInjectionHypersonic
-        HypersonicSQL(
+                List.of(
+                        "\\Qcom.sybase.jdbc\\E",
+                        // see also Microsoft SQL Server. could be either!
+                        "\\Qnet.sourceforge.jtds.jdbc\\E")),
+        INFORMIX("Informix", Tech.Db, List.of("\\Qcom.informix.jdbc\\E")),
+        FIREBIRD("Firebird", Tech.Firebird, List.of("\\Qorg.firebirdsql.jdbc\\E")),
+        IDSSERVER("IDS Server", Tech.Db, List.of("\\Qids.sql\\E")),
+        INSTANTDB(
+                "InstantDB",
+                Tech.Db,
+                List.of("\\Qorg.enhydra.instantdb.jdbc\\E", "\\Qjdbc.idb\\E")),
+        INTERBASE("Interbase", Tech.Db, List.of("\\Qinterbase.interclient\\E")),
+        HYPERSONIC(
                 "Hypersonic SQL",
                 Tech.HypersonicSQL,
-                Arrays.asList(
-                        new String[] {
-                            "\\Qorg.hsql\\E",
-                            "\\QhSql.\\E",
-                            "\\QUnexpected token , requires FROM in statement\\E",
-                            "\\QUnexpected end of command in statement\\E",
-                            "\\QColumn count does not match in statement\\E", // TODO: too generic
-                            // to leave in???
-                            "\\QTable not found in statement\\E", // TODO: too generic to leave
-                            // in???
-                            "\\QUnexpected token:\\E" // TODO: too generic to leave in??? Works very
-                            // nicely in
-                            // Hypersonic cases, however
-                        }),
-                Arrays.asList(
-                        new String[] {
-                            "\\QUnexpected end of command in statement\\E", // needs a table name in
-                            // a UNION query. Like
-                            // Oracle?
-                            "\\QColumn count does not match in statement\\E"
-                        })),
-
-        // TODO: implement a scan rule that uses Sybase SQL Anywhere specific functionality to
-        // detect
-        // SQLi vulnerabilities
-        SybaseSQL("Sybase SQL Anywhere", Tech.Sybase, "\\Qsybase.jdbc.sqlanywhere\\E"),
-
-        // TODO: implement a scan rule that uses PointBase specific functionality to detect SQLi
-        // vulnerabilities
-        Pointbase("Pointbase", Tech.Db, "\\Qcom.pointbase.jdbc\\E"),
-
-        // TODO: implement a scan rule that uses Cloudbase specific functionality to detect SQLi
-        // vulnerabilities
-        Cloudscape(
+                List.of(
+                        "\\Qorg.hsql\\E",
+                        "\\QhSql.\\E",
+                        "\\QUnexpected token , requires FROM in statement\\E",
+                        "\\QUnexpected end of command in statement\\E",
+                        // TODO: too generic to leave in???
+                        "\\QColumn count does not match in statement\\E",
+                        // TODO: too generic to leave in???
+                        "\\QTable not found in statement\\E",
+                        // TODO: too generic to leave in???
+                        // Works very nicely in Hypersonic cases, however
+                        "\\QUnexpected token:\\E"),
+                List.of(
+                        // needs a table name in a UNION query. Like Oracle?
+                        "\\QUnexpected end of command in statement\\E",
+                        "\\QColumn count does not match in statement\\E")),
+        SYBASE_ANY("Sybase SQL Anywhere", Tech.Sybase, List.of("\\Qsybase.jdbc.sqlanywhere\\E")),
+        POINTBASE("Pointbase", Tech.Db, List.of("\\Qcom.pointbase.jdbc\\E")),
+        CLOUDSCAPE(
                 "Cloudscape",
                 Tech.Db,
-                "\\Qdb2j.\\E",
-                "\\QCOM.cloudscape\\E",
-                "\\QRmiJdbc.RJDriver\\E"),
-
-        // TODO: implement a scan rule that uses Ingres specific functionality to detect SQLi
-        // vulnerabilities
-        Ingres("Ingres", Tech.Db, "\\Qcom.ingres.jdbc\\E"),
-
-        SQLite(
+                List.of("\\Qdb2j.\\E", "\\QCOM.cloudscape\\E", "\\QRmiJdbc.RJDriver\\E")),
+        INGRES("Ingres", Tech.Db, List.of("\\Qcom.ingres.jdbc\\E")),
+        SQLITE(
                 "SQLite",
                 Tech.SQLite,
-                Arrays.asList(
-                        new String[] {
-                            "near \".+\": syntax error", // uses a regular expression..
-                            "SQLITE_ERROR",
-                            "\\QSELECTs to the left and right of UNION do not have the same number of result columns\\E"
-                        }),
-                Arrays.asList(
-                        new String[] {
-                            "\\QSELECTs to the left and right of UNION do not have the same number of result columns\\E"
-                        })),
-
+                List.of(
+                        "near \".+\": syntax error", // uses a regular expression..
+                        "SQLITE_ERROR",
+                        "\\QSELECTs to the left and right of UNION do not have the same number of result columns\\E"),
+                List.of(
+                        "\\QSELECTs to the left and right of UNION do not have the same number of result columns\\E")),
         // generic error message fragments that do not fingerprint the RDBMS, but that may indicate
         // SQL Injection, nonetheless
-        GenericRDBMS(
+        GENERIC(
                 "Generic SQL RDBMS",
                 Tech.Db,
-                "\\Qcom.ibatis.common.jdbc\\E",
-                "\\Qorg.hibernate\\E",
-                "\\Qsun.jdbc.odbc\\E",
-                "\\Q[ODBC Driver Manager]\\E",
-                "\\QODBC driver does not support\\E",
-                "\\QSystem.Data.OleDb\\E", // System.Data.OleDb.OleDbException
-                "\\Qjava.sql.SQLException\\E" // in case more specific messages were not detected!
-                );
+                List.of(
+                        "\\Qcom.ibatis.common.jdbc\\E",
+                        "\\Qorg.hibernate\\E",
+                        "\\Qsun.jdbc.odbc\\E",
+                        "\\Q[ODBC Driver Manager]\\E",
+                        "\\QODBC driver does not support\\E",
+                        "\\QSystem.Data.OleDb\\E", // System.Data.OleDb.OleDbException
+                        "\\Qjava.sql.SQLException\\E" // in case more specific messages were not
+                        // detected!
+                        ));
 
         private final String name;
         private final Tech tech;
         private final List<Pattern> errorPatterns;
         private final List<Pattern> unionErrorPatterns;
 
-        private RDBMS(String name, Tech tech, String... errorRegexes) {
-            this(name, tech, asList(errorRegexes), Collections.<String>emptyList());
+        private RDBMS(String name, Tech tech, List<String> errorRegexes) {
+            this(name, tech, errorRegexes, List.of());
         }
 
         private RDBMS(
@@ -368,7 +300,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
             } else {
                 errorPatterns = new ArrayList<>(errorRegexes.size());
                 for (String regex : errorRegexes) {
-                    errorPatterns.add(Pattern.compile(regex, AbstractAppParamPlugin.PATTERN_PARAM));
+                    errorPatterns.add(Pattern.compile(regex, AbstractPlugin.PATTERN_PARAM));
                 }
             }
 
@@ -377,8 +309,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
             } else {
                 unionErrorPatterns = new ArrayList<>(unionErrorRegexes.size());
                 for (String regex : unionErrorRegexes) {
-                    unionErrorPatterns.add(
-                            Pattern.compile(regex, AbstractAppParamPlugin.PATTERN_PARAM));
+                    unionErrorPatterns.add(Pattern.compile(regex, AbstractPlugin.PATTERN_PARAM));
                 }
             }
         }
@@ -392,7 +323,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         }
 
         public boolean isGeneric() {
-            return this == GenericRDBMS;
+            return this == GENERIC;
         }
 
         public List<Pattern> getErrorPatterns() {
@@ -401,13 +332,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
 
         public List<Pattern> getUnionErrorPatterns() {
             return unionErrorPatterns;
-        }
-
-        private static List<String> asList(String... strings) {
-            if (strings == null || strings.length == 0) {
-                return Collections.emptyList();
-            }
-            return Arrays.asList(strings);
         }
     }
 
@@ -491,6 +415,10 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         return Constant.messages.getString(MESSAGE_PREFIX + "name");
     }
 
+    private static String getName(String rdbms) {
+        return Constant.messages.getString(MESSAGE_PREFIX + "name.rdbms", rdbms);
+    }
+
     /**
      * Returns true if the tech is a child of Tech.Db
      *
@@ -557,9 +485,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         return Constant.messages.getString(MESSAGE_PREFIX + "refs");
     }
 
-    /* initialise
-     * Note that this method gets called each time the scanner is called.
-     */
     @Override
     public void init() {
         LOGGER.debug("Initialising");
@@ -649,7 +574,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         LOGGER.debug("Using a max of {} requests", doOrderByMaxRequests);
     }
 
-    /** scans for SQL Injection vulnerabilities */
     @Override
     public void scan(HttpMessage msg, String param, String origParamValue) {
         // Note: the "value" we are passed here is escaped. we need to unescape it before handling
@@ -668,7 +592,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
             countErrorBasedRequests = 0;
             countExpressionBasedRequests = 0;
             countBooleanBasedRequests = 0;
-            countUnionBasedRequests = 0;
             countOrderByBasedRequests = 0;
 
             List<SqlInjectionTestCase> testCases =
@@ -686,8 +609,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                 }
                 testCase.run(param, origParamValue);
             }
-
-            // ###############################
 
             // if a sql injection was found, we should check if the page is flagged as a login page
             // in any of the contexts.  if it is, raise an "SQL Injection - Authentication Bypass"
@@ -713,44 +634,36 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     // now loop, and see if the url is a login url in each of the contexts in turn..
                     for (Context context : contextList) {
                         URI loginUri = extAuth.getLoginRequestURIForContext(context);
-                        if (loginUri != null) {
-                            if (requestUri.getScheme().equals(loginUri.getScheme())
-                                    && requestUri.getHost().equals(loginUri.getHost())
-                                    && requestUri.getPort() == loginUri.getPort()
-                                    && requestUri.getPath().equals(loginUri.getPath())) {
-                                // we got this far.. only the method (GET/POST), user details, query
-                                // params, fragment, and POST params
-                                // are possibly different from the login page.
-                                loginUrl = true;
-                                break;
-                            }
+                        if (loginUri != null
+                                && (requestUri.getScheme().equals(loginUri.getScheme())
+                                        && requestUri.getHost().equals(loginUri.getHost())
+                                        && requestUri.getPort() == loginUri.getPort()
+                                        && requestUri.getPath().equals(loginUri.getPath()))) {
+                            // we got this far.. only the method (GET/POST), user details, query
+                            // params, fragment, and POST params
+                            // are possibly different from the login page.
+                            loginUrl = true;
+                            break;
                         }
                     }
                 }
                 if (loginUrl) {
-                    // raise the alert, using the custom name and description
-                    String vulnname =
-                            Constant.messages.getString(MESSAGE_PREFIX + "authbypass.name");
-                    String vulndesc =
-                            Constant.messages.getString(MESSAGE_PREFIX + "authbypass.desc");
-
-                    // raise the alert, using the attack string stored earlier for this purpose
                     newAlert()
                             .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                            .setName(vulnname)
-                            .setDescription(vulndesc)
+                            .setName(
+                                    Constant.messages.getString(MESSAGE_PREFIX + "authbypass.name"))
+                            .setDescription(
+                                    Constant.messages.getString(MESSAGE_PREFIX + "authbypass.desc"))
                             .setUri(refreshedmessage.getRequestHeader().getURI().toString())
                             .setParam(param)
                             .setAttack(sqlInjectionAttack)
                             .setMessage(getBaseMsg())
                             .raise();
-                } // not a login page
-            } // no sql Injection Found For Url
+                }
+            }
 
         } catch (Exception e) {
-            // Do not try to internationalise this.. we need an error message in any event..
-            // if it's in English, it's still better than not having it at all.
-            LOGGER.error("An error occurred checking a url for SQL Injection vulnerabilities", e);
+            LOGGER.warn("An error occurred checking a URL for SQL Injection vulnerabilities", e);
         }
     }
 
@@ -783,13 +696,10 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
             for (int prefixIndex = 0;
                     prefixIndex < prefixStrings.length && !sqlInjectionFoundForUrl;
                     prefixIndex++) {
-                // bale out if we were asked nicely
                 if (isStop()) {
-                    LOGGER.debug("Stopping the scan due to a user request");
                     return;
                 }
 
-                // new message for each value we attack with
                 HttpMessage msg1 = getNewMsg();
                 String sqlErrValue =
                         prefixStrings[prefixIndex] + SQL_CHECK_ERR[sqlErrorStringIndex];
@@ -804,8 +714,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             ex.getClass().getName(),
                             ex.getMessage(),
                             msg1.getRequestHeader().getURI());
-                    continue; // Something went wrong, continue to the next prefixString in the
-                    // loop
+                    continue; // Continue to the next prefixString
                 }
                 countErrorBasedRequests++;
 
@@ -849,9 +758,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                 // Note: do NOT check the HTTP error code just yet, as the result could come
                 // back with one of various codes.
                 for (RDBMS rdbms : RDBMS.values()) {
-                    // bale out if we were asked nicely
                     if (isStop()) {
-                        LOGGER.debug("Stopping the scan due to a user request");
                         return;
                     }
 
@@ -867,16 +774,15 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
 
                 if (this.doGenericErrorBased && !sqlInjectionFoundForUrl) {
                     Iterator<Pattern> errorPatternIterator =
-                            RDBMS.GenericRDBMS.getErrorPatterns().iterator();
+                            RDBMS.GENERIC.getErrorPatterns().iterator();
 
                     while (errorPatternIterator.hasNext() && !sqlInjectionFoundForUrl) {
                         if (isStop()) {
-                            LOGGER.debug("Stopping the scan due to a user request");
                             return;
                         }
 
                         Pattern errorPattern = errorPatternIterator.next();
-                        String errorPatternRDBMS = RDBMS.GenericRDBMS.getName();
+                        String errorPatternRDBMS = RDBMS.GENERIC.getName();
 
                         // if the "error message" occurs in the result of sending the modified
                         // query, but did NOT occur in the original result of the original query
@@ -884,7 +790,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         StringBuilder sb = new StringBuilder();
                         if (!matchBodyPattern(getBaseMsg(), errorPattern, null)
                                 && matchBodyPattern(msg1, errorPattern, sb)) {
-                            // Likely a SQL Injection. Raise it
                             String extraInfo =
                                     Constant.messages.getString(
                                             MESSAGE_PREFIX + "alert.errorbased.extrainfo",
@@ -895,7 +800,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             sqlInjectionAttack = sqlErrValue;
                             newAlert()
                                     .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                    .setName(getName() + " - " + errorPatternRDBMS)
+                                    .setName(getName(errorPatternRDBMS))
                                     .setParam(param)
                                     .setAttack(sqlInjectionAttack)
                                     .setOtherInfo(extraInfo)
@@ -912,7 +817,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                                             Boolean.TRUE);
 
                             sqlInjectionFoundForUrl = true;
-                            continue;
                         }
                     }
                 }
@@ -922,7 +826,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
 
     private void testExpressionBasedSqlInjection(String param, String origParamValue)
             throws IOException {
-        // ###############################
         // Check 4
         // New!  I haven't seen this technique documented anywhere else, but it's dead simple.
         // Let me explain.
@@ -948,7 +851,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     ex.getClass().getName(),
                     ex.getMessage(),
                     refreshedmessage.getRequestHeader().getURI());
-            return; // Something went wrong, no point continuing
+            return;
         }
 
         ComparableResponse normalResponse =
@@ -981,12 +884,9 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     expressionBasedAttack(
                             normalResponse,
                             param,
-                            origParamValue,
                             modifiedParamValueForAdd,
                             modifiedParamValueConfirmForAdd);
-                    // bale out if we were asked nicely
                     if (isStop()) {
-                        LOGGER.debug("Stopping the scan due to a user request");
                         return;
                     }
                     // MULT variant check the param value "2/2" gives same result as original
@@ -1007,12 +907,9 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         expressionBasedAttack(
                                 normalResponse,
                                 param,
-                                origParamValue,
                                 modifiedParamValueForMult,
                                 modifiedParamValueConfirmForMult);
-                        // bale out if we were asked nicely
                         if (isStop()) {
-                            LOGGER.debug("Stopping the scan due to a user request");
                             return;
                         }
                     }
@@ -1094,7 +991,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     ex.getClass().getName(),
                     ex.getMessage(),
                     refreshedmessage.getRequestHeader().getURI());
-            return; // Something went wrong, no point continuing
+            return;
         }
 
         ComparableResponse normalResponse =
@@ -1110,7 +1007,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         && countBooleanBasedRequests < doBooleanMaxRequests;
                 i++) {
             if (isStop()) {
-                LOGGER.debug("Stopping the scan due to a user request");
                 return;
             }
 
@@ -1131,7 +1027,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         ex.getClass().getName(),
                         ex.getMessage(),
                         msg2.getRequestHeader().getURI());
-                continue; // Something went wrong, continue to the next item in the loop
+                continue;
             }
             countBooleanBasedRequests++;
 
@@ -1139,7 +1035,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     new ComparableResponse(msg2, sqlBooleanAndTrueValue);
 
             if (isStop()) {
-                LOGGER.debug("Stopping the scan due to a user request");
                 return;
             }
 
@@ -1163,8 +1058,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             ex.getClass().getName(),
                             ex.getMessage(),
                             msg2AndFalse.getRequestHeader().getURI());
-                    continue; // Something went wrong, continue on to the next item in the
-                    // loop
+                    continue;
                 }
                 countBooleanBasedRequests++;
 
@@ -1180,17 +1074,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     // it's different (suggesting that the "AND 1 = 2" appended on gave
                     // different results because it restricted the data set to nothing
                     // Likely a SQL Injection. Raise it
-                    String extraInfo =
-                            Constant.messages.getString(
-                                            MESSAGE_PREFIX + "alert.booleanbased.extrainfo",
-                                            sqlBooleanAndTrueValue,
-                                            sqlBooleanAndFalseValue,
-                                            "")
-                                    + "\n"
-                                    + Constant.messages.getString(
-                                            MESSAGE_PREFIX
-                                                    + "alert.booleanbased.extrainfo.dataexists");
-
                     // raise the alert, and save the attack string for the "Authentication
                     // Bypass" alert, if necessary
                     sqlInjectionAttack = sqlBooleanAndTrueValue;
@@ -1198,7 +1081,16 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             .setConfidence(Alert.CONFIDENCE_MEDIUM)
                             .setParam(param)
                             .setAttack(sqlInjectionAttack)
-                            .setOtherInfo(extraInfo)
+                            .setOtherInfo(
+                                    Constant.messages.getString(
+                                                    MESSAGE_PREFIX + "alert.booleanbased.extrainfo",
+                                                    sqlBooleanAndTrueValue,
+                                                    sqlBooleanAndFalseValue,
+                                                    "")
+                                            + "\n"
+                                            + Constant.messages.getString(
+                                                    MESSAGE_PREFIX
+                                                            + "alert.booleanbased.extrainfo.dataexists"))
                             .setMessage(msg2)
                             .raise();
 
@@ -1214,7 +1106,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     // so consider the effect of adding comments to both the always true
                     // condition, and the always false condition
                     // the first value to try..
-                    // ZAP: Removed getURLDecode()
                     String orValue = origParamValue + SQL_LOGIC_OR_TRUE[i];
 
                     // this is where that comment comes in handy: if the RDBMS supports
@@ -1236,8 +1127,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                                 ex.getClass().getName(),
                                 ex.getMessage(),
                                 msg2OrTrue.getRequestHeader().getURI());
-                        continue; // Something went wrong, continue on to the next item in
-                        // the loop
+                        continue;
                     }
                     countBooleanBasedRequests++;
 
@@ -1252,18 +1142,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         // it's different (suggesting that the "OR 1 = 1" appended on gave
                         // different results because it broadened the data set from nothing
                         // to something
-                        // Likely a SQL Injection. Raise it
-                        String extraInfo =
-                                Constant.messages.getString(
-                                                MESSAGE_PREFIX + "alert.booleanbased.extrainfo",
-                                                sqlBooleanAndTrueValue,
-                                                orValue,
-                                                "")
-                                        + "\n"
-                                        + Constant.messages.getString(
-                                                MESSAGE_PREFIX
-                                                        + "alert.booleanbased.extrainfo.datanotexists");
-
                         // raise the alert, and save the attack string for the
                         // "Authentication Bypass" alert, if necessary
                         sqlInjectionAttack = orValue;
@@ -1271,7 +1149,17 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                                 .setConfidence(Alert.CONFIDENCE_MEDIUM)
                                 .setParam(param)
                                 .setAttack(sqlInjectionAttack)
-                                .setOtherInfo(extraInfo)
+                                .setOtherInfo(
+                                        Constant.messages.getString(
+                                                        MESSAGE_PREFIX
+                                                                + "alert.booleanbased.extrainfo",
+                                                        sqlBooleanAndTrueValue,
+                                                        orValue,
+                                                        "")
+                                                + "\n"
+                                                + Constant.messages.getString(
+                                                        MESSAGE_PREFIX
+                                                                + "alert.booleanbased.extrainfo.datanotexists"))
                                 .setMessage(msg2)
                                 .raise();
 
@@ -1315,7 +1203,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         && countBooleanBasedRequests < doBooleanMaxRequests;
                 i++) {
             if (isStop()) {
-                LOGGER.debug("Stopping the scan due to a user request");
                 return;
             }
 
@@ -1332,7 +1219,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         ex.getClass().getName(),
                         ex.getMessage(),
                         msg2.getRequestHeader().getURI());
-                continue; // Something went wrong, continue on to the next item in the loop
+                continue;
             }
             countBooleanBasedRequests++;
 
@@ -1359,7 +1246,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             ex.getClass().getName(),
                             ex.getMessage(),
                             msg2AndFalse.getRequestHeader().getURI());
-                    continue; // Something went wrong, continue on to the next item in the loop
+                    continue;
                 }
                 countBooleanBasedRequests++;
 
@@ -1379,30 +1266,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             "Check 2, {} html output for AND FALSE condition [{}] matches the (refreshed) original results",
                             (verificationUsingStripped ? "STRIPPED" : "UNSTRIPPED"),
                             sqlBooleanAndFalseValue);
-                    // Likely a SQL Injection. Raise it
-                    String extraInfo = null;
-                    if (verificationUsingStripped) {
-                        extraInfo =
-                                Constant.messages.getString(
-                                        MESSAGE_PREFIX + "alert.booleanbased.extrainfo",
-                                        sqlBooleanOrTrueValue,
-                                        sqlBooleanAndFalseValue,
-                                        "");
-                    } else {
-                        extraInfo =
-                                Constant.messages.getString(
-                                        MESSAGE_PREFIX + "alert.booleanbased.extrainfo",
-                                        sqlBooleanOrTrueValue,
-                                        sqlBooleanAndFalseValue,
-                                        "NOT ");
-                    }
-                    extraInfo =
-                            extraInfo
-                                    + "\n"
-                                    + Constant.messages.getString(
-                                            MESSAGE_PREFIX
-                                                    + "alert.booleanbased.extrainfo.datanotexists");
-
                     // raise the alert, and save the attack string for the "Authentication
                     // Bypass" alert, if necessary
                     sqlInjectionAttack = sqlBooleanOrTrueValue;
@@ -1410,7 +1273,11 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             .setConfidence(Alert.CONFIDENCE_MEDIUM)
                             .setParam(param)
                             .setAttack(sqlInjectionAttack)
-                            .setOtherInfo(extraInfo)
+                            .setOtherInfo(
+                                    assembleBooleanBasedExtraInfo(
+                                            sqlBooleanOrTrueValue,
+                                            sqlBooleanAndFalseValue,
+                                            verificationUsingStripped))
                             .setMessage(msg2)
                             .raise();
 
@@ -1422,26 +1289,49 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         }
     }
 
+    private static String assembleBooleanBasedExtraInfo(
+            String sqlBooleanOrTrueValue,
+            String sqlBooleanAndFalseValue,
+            boolean verificationUsingStripped) {
+        String extraInfo;
+        if (verificationUsingStripped) {
+            extraInfo =
+                    Constant.messages.getString(
+                            MESSAGE_PREFIX + "alert.booleanbased.extrainfo",
+                            sqlBooleanOrTrueValue,
+                            sqlBooleanAndFalseValue,
+                            "");
+        } else {
+            extraInfo =
+                    Constant.messages.getString(
+                            MESSAGE_PREFIX + "alert.booleanbased.extrainfo",
+                            sqlBooleanOrTrueValue,
+                            sqlBooleanAndFalseValue,
+                            "NOT ");
+        }
+        return extraInfo
+                + "\n"
+                + Constant.messages.getString(
+                        MESSAGE_PREFIX + "alert.booleanbased.extrainfo.datanotexists");
+    }
+
     private void testUnionBasedSqlInjection(String param, String origParamValue)
             throws IOException {
         // Check 3: UNION based
         // for each SQL UNION combination to try
-        for (int sqlUnionStringIndex = 0;
+        for (int sqlUnionStringIndex = 0, countUnionBasedRequests = 0;
                 sqlUnionStringIndex < SQL_UNION_APPENDAGES.length
                         && !sqlInjectionFoundForUrl
                         && doUnionBased
                         && countUnionBasedRequests < doUnionMaxRequests;
-                sqlUnionStringIndex++) {
+                sqlUnionStringIndex++, countUnionBasedRequests++) {
             if (isStop()) {
-                LOGGER.debug("Stopping the scan due to a user request");
                 return;
             }
 
-            // new message for each value we attack with
             HttpMessage msg3 = getNewMsg();
             String sqlUnionValue = origParamValue + SQL_UNION_APPENDAGES[sqlUnionStringIndex];
             setParameter(msg3, param, sqlUnionValue);
-            // send the message with the modified parameters
             try {
                 sendAndReceive(msg3, false); // do not follow redirects
             } catch (SocketException ex) {
@@ -1450,9 +1340,8 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         ex.getClass().getName(),
                         ex.getMessage(),
                         msg3.getRequestHeader().getURI());
-                continue; // Something went wrong, continue on to the next item in the loop
+                continue;
             }
-            countUnionBasedRequests++;
 
             String mResBodyNormalUnstripped = refreshedmessage.getResponseBody().toString();
             String mResBodyNormalStripped = this.stripOff(mResBodyNormalUnstripped, origParamValue);
@@ -1464,7 +1353,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
             // positives though.
             for (RDBMS rdbms : RDBMS.values()) {
                 if (isStop()) {
-                    LOGGER.debug("Stopping the scan due to a user request");
                     return;
                 }
 
@@ -1488,8 +1376,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
     }
 
     private void testOrderBySqlInjection(String param, String origParamValue) throws IOException {
-        // ###############################
-
         // check for columns used in the "order by" clause of a SQL statement. earlier tests
         // will likely not catch these
 
@@ -1522,7 +1408,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     ex.getClass().getName(),
                     ex.getMessage(),
                     refreshedmessage.getRequestHeader().getURI());
-            return; // Something went wrong, no point continuing
+            return;
         }
 
         String mResBodyNormalUnstripped = refreshedmessage.getResponseBody().toString();
@@ -1545,7 +1431,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         ex.getClass().getName(),
                         ex.getMessage(),
                         msg5.getRequestHeader().getURI());
-                return; // Something went wrong, no point continuing
+                return;
             }
             countOrderByBasedRequests++;
 
@@ -1556,17 +1442,16 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
 
             // set up two little arrays to ease the work of checking the unstripped output, and
             // then the stripped output
-            String normalBodyOutput[] = {mResBodyNormalUnstripped, mResBodyNormalStripped};
-            String ascendingBodyOutput[] = {
+            String[] normalBodyOutput = {mResBodyNormalUnstripped, mResBodyNormalStripped};
+            String[] ascendingBodyOutput = {
                 modifiedAscendingOutputUnstripped, modifiedAscendingOutputStripped
             };
-            boolean strippedOutput[] = {false, true};
+            boolean[] strippedOutput = {false, true};
 
             for (int booleanStrippedUnstrippedIndex = 0;
                     booleanStrippedUnstrippedIndex < 2;
                     booleanStrippedUnstrippedIndex++) {
                 if (isStop()) {
-                    LOGGER.debug("Stopping the scan due to a user request");
                     return;
                 }
 
@@ -1600,8 +1485,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                                 ex.getClass().getName(),
                                 ex.getMessage(),
                                 msg5Confirm.getRequestHeader().getURI());
-                        continue; // Something went wrong, continue on to the next item in the
-                        // loop
+                        continue;
                     }
                     countOrderByBasedRequests++;
 
@@ -1615,7 +1499,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
 
                     // set up two little arrays to ease the work of checking the unstripped
                     // output or the stripped output
-                    String confirmOrderByBodyOutput[] = {
+                    String[] confirmOrderByBodyOutput = {
                         confirmOrderByOutputUnstripped, confirmOrderByOutputStripped
                     };
 
@@ -1627,8 +1511,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                         // this means the fact we earlier reproduced the original page output
                         // with a modified parameter was not a coincidence
 
-                        // Likely a SQL Injection. Raise it
-                        String extraInfo = null;
+                        String extraInfo;
                         if (strippedOutput[booleanStrippedUnstrippedIndex]) {
                             extraInfo =
                                     Constant.messages.getString(
@@ -1679,18 +1562,17 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
             StringBuilder sb = new StringBuilder();
             if (!matchBodyPattern(getBaseMsg(), errorPattern, null)
                     && matchBodyPattern(msg1, errorPattern, sb)) {
-                // Likely a SQL Injection. Raise it
-                String extraInfo =
-                        Constant.messages.getString(
-                                MESSAGE_PREFIX + "alert.errorbased.extrainfo",
-                                rdbms.getName(),
-                                errorPattern.toString());
+
                 newAlert()
                         .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                        .setName(getName() + " - " + rdbms.getName())
+                        .setName(getName(rdbms.getName()))
                         .setParam(parameter)
                         .setAttack(attack)
-                        .setOtherInfo(extraInfo)
+                        .setOtherInfo(
+                                Constant.messages.getString(
+                                        MESSAGE_PREFIX + "alert.errorbased.extrainfo",
+                                        rdbms.getName(),
+                                        errorPattern.toString()))
                         .setEvidence(sb.toString())
                         .setMessage(msg1)
                         .raise();
@@ -1736,18 +1618,17 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
 
             if (!patternInOrig && patternInSQLUnion) {
                 // Likely a UNION Based SQL Injection (by error message). Raise it
-                String extraInfo =
-                        Constant.messages.getString(
-                                MESSAGE_PREFIX + "alert.unionbased.extrainfo",
-                                rdbms.getName(),
-                                errorPattern.toString());
                 newAlert()
                         .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                        .setName(getName() + " - " + rdbms.getName())
+                        .setName(getName(rdbms.getName()))
                         .setUri(uri.getEscapedURI())
                         .setParam(parameter)
                         .setAttack(attack)
-                        .setOtherInfo(extraInfo)
+                        .setOtherInfo(
+                                Constant.messages.getString(
+                                        MESSAGE_PREFIX + "alert.unionbased.extrainfo",
+                                        rdbms.getName(),
+                                        errorPattern.toString()))
                         .setEvidence(matcherSQLUnion.group())
                         .setMessage(msg)
                         .raise();
@@ -1765,7 +1646,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
     private void expressionBasedAttack(
             ComparableResponse normalResponse,
             String param,
-            String originalParam,
             String modifiedParamValue,
             String modifiedParamValueConfirm)
             throws IOException {
@@ -1782,7 +1662,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     ex.getClass().getName(),
                     ex.getMessage(),
                     msg.getRequestHeader().getURI());
-            return; // Something went wrong, no point continuing
+            return;
         }
         countExpressionBasedRequests++;
 
@@ -1815,7 +1695,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             ex.getClass().getName(),
                             ex.getMessage(),
                             msgConfirm.getRequestHeader().getURI());
-                    return; // Something went wrong
+                    return;
                 }
                 countExpressionBasedRequests++;
 
@@ -1828,13 +1708,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                     // this means the fact we earlier reproduced the original page output with a
                     // modified parameter was not a coincidence
 
-                    // Likely a SQL Injection. Raise it
-                    String extraInfo =
-                            Constant.messages.getString(
-                                    MESSAGE_PREFIX + "alert.expressionbased.extrainfo",
-                                    modifiedParamValue,
-                                    "");
-
                     // raise the alert, and save the attack string for the "Authentication Bypass"
                     // alert, if necessary
                     sqlInjectionAttack = modifiedParamValue;
@@ -1842,7 +1715,11 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                             .setConfidence(Alert.CONFIDENCE_MEDIUM)
                             .setParam(param)
                             .setAttack(sqlInjectionAttack)
-                            .setOtherInfo(extraInfo)
+                            .setOtherInfo(
+                                    Constant.messages.getString(
+                                            MESSAGE_PREFIX + "alert.expressionbased.extrainfo",
+                                            modifiedParamValue,
+                                            ""))
                             .setMessage(msg)
                             .raise();
                     sqlInjectionFoundForUrl = true;
@@ -1890,7 +1767,7 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
         return 0;
     }
 
-    private float locationHeaderHeuristic(ComparableResponse one, ComparableResponse two) {
+    private static float locationHeaderHeuristic(ComparableResponse one, ComparableResponse two) {
         if (one.getStatusCode() == two.getStatusCode()
                 && HttpStatusCode.isRedirection(one.getStatusCode())) {
             if (!Objects.equals(
@@ -1914,10 +1791,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
      * purposes, and causes issues when attempting to decode parameter values such as '%' (a single
      * percent character) This is mainly used for stripping off a testing string in HTTP response
      * for comparison against the original response. Reference: TestInjectionSQL
-     *
-     * @param body
-     * @param pattern
-     * @return
      */
     @Override
     protected String stripOff(String body, String pattern) {
@@ -1955,16 +1828,10 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
      */
     protected String stripOffOriginalAndAttackParam(
             String body, String originalPattern, String attackPattern) {
-        String result = this.stripOff(this.stripOff(body, attackPattern), originalPattern);
-        return result;
+        return this.stripOff(this.stripOff(body, attackPattern), originalPattern);
     }
 
-    /**
-     * decode method that is aware of %, and will decode it as simply %, if it occurs
-     *
-     * @param msg
-     * @return
-     */
+    /** Decode method that is aware of %, and will decode it as simply %, if it occurs */
     public static String getURLDecode(String msg) {
         String result = "";
         try {

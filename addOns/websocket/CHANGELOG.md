@@ -4,6 +4,34 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+
+## [38] - 2026-08-07
+### Changed
+- Maintenance changes.
+
+## [37] - 2026-05-07
+### Changed
+- Maintenance changes.
+- Formatted JavaScript files for consistency.
+
+## [36] - 2026-03-02
+### Fixed
+- Correct shutdown state.
+
+## [35] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [34] - 2025-11-04
+### Changed
+- Update alert reference to latest location.
+- Adjusted and internationalized the text in some exceptions/warning dialogs to use multiple lines and thus be more clear.
+
+### Fixed
+- Error logs to always include stack trace.
+
+## [33] - 2025-06-20
 ### Changed
 - Add website alert links to the help page (Issue 8189).
 - Replace usage of CWE-200 for the following rules (Issue 8712):
@@ -239,6 +267,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
 
+[38]: https://github.com/zaproxy/zap-extensions/releases/websocket-v38
+[37]: https://github.com/zaproxy/zap-extensions/releases/websocket-v37
+[36]: https://github.com/zaproxy/zap-extensions/releases/websocket-v36
+[35]: https://github.com/zaproxy/zap-extensions/releases/websocket-v35
+[34]: https://github.com/zaproxy/zap-extensions/releases/websocket-v34
+[33]: https://github.com/zaproxy/zap-extensions/releases/websocket-v33
 [32]: https://github.com/zaproxy/zap-extensions/releases/websocket-v32
 [31]: https://github.com/zaproxy/zap-extensions/releases/websocket-v31
 [30]: https://github.com/zaproxy/zap-extensions/releases/websocket-v30

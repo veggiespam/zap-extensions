@@ -54,6 +54,7 @@ import org.zaproxy.addon.postman.models.KeyValueData;
 import org.zaproxy.addon.postman.models.PostmanCollection;
 import org.zaproxy.addon.postman.models.Request;
 import org.zaproxy.addon.postman.models.Request.Url;
+import org.zaproxy.zap.utils.Stats;
 
 public class PostmanParser {
 
@@ -77,6 +78,12 @@ public class PostmanParser {
     public boolean importFromFile(
             final String filePath, final String variables, final boolean initViaUi)
             throws IOException {
+        return importFromFile(filePath, variables, initViaUi, 0);
+    }
+
+    public boolean importFromFile(
+            final String filePath, final String variables, final boolean initViaUi, int maxMessages)
+            throws IOException {
         File file = new File(filePath);
         if (!file.exists()) {
             throw new FileNotFoundException(
@@ -88,10 +95,17 @@ public class PostmanParser {
         }
 
         String collectionJson = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
-        return importCollection(collectionJson, variables, initViaUi);
+        Stats.incCounter("stats.postman.import.file");
+        return importCollection(collectionJson, variables, initViaUi, maxMessages);
     }
 
     public boolean importFromUrl(final String url, final String variables, final boolean initViaUi)
+            throws IllegalArgumentException, IOException {
+        return importFromUrl(url, variables, initViaUi, 0);
+    }
+
+    public boolean importFromUrl(
+            final String url, final String variables, final boolean initViaUi, int maxMessages)
             throws IllegalArgumentException, IOException {
         if (url.isEmpty()) {
             throw new IllegalArgumentException(
@@ -106,11 +120,12 @@ public class PostmanParser {
         }
 
         String collectionJson = requestor.getResponseBody(uri);
-        return importCollection(collectionJson, variables, initViaUi);
+        Stats.incCounter("stats.postman.import.url");
+        return importCollection(collectionJson, variables, initViaUi, maxMessages);
     }
 
     List<HttpMessage> getHttpMessages(
-            String collection, final String variables, List<String> errors)
+            String collection, final String variables, List<String> errors, int maxMessages)
             throws JsonProcessingException {
         collection = replaceVariables(collection, variables);
 
@@ -118,9 +133,14 @@ public class PostmanParser {
         List<HttpMessage> httpMessages = new ArrayList<>();
 
         extractHttpMessages(
-                postmanCollection.getItem(), httpMessages, errors, postmanCollection.getVariable());
+                postmanCollection.getItem(),
+                httpMessages,
+                errors,
+                postmanCollection.getVariable(),
+                maxMessages);
         if (httpMessages.isEmpty()) {
             errors.add(Constant.messages.getString("postman.import.error.noItem"));
+            Stats.incCounter("stats.postman.error.nomsgs");
         }
         return httpMessages;
     }
@@ -128,12 +148,23 @@ public class PostmanParser {
     public boolean importCollection(
             String collection, final String variables, final boolean initViaUi)
             throws JsonProcessingException {
+        return importCollection(collection, variables, initViaUi, 0);
+    }
+
+    public boolean importCollection(
+            String collection, final String variables, final boolean initViaUi, int maxMessages)
+            throws JsonProcessingException {
         List<String> errors = new ArrayList<>();
-        List<HttpMessage> httpMessages = getHttpMessages(collection, variables, errors);
+        List<HttpMessage> httpMessages =
+                getHttpMessages(collection, variables, errors, maxMessages);
 
         requestor.run(httpMessages, errors);
 
         outputErrors(errors, initViaUi);
+
+        if (!errors.isEmpty()) {
+            Stats.incCounter("stats.postman.errors", errors.size());
+        }
 
         return errors.isEmpty();
     }
@@ -201,7 +232,7 @@ public class PostmanParser {
     }
 
     static void extractHttpMessages(List<AbstractItem> items, List<HttpMessage> httpMessages) {
-        extractHttpMessages(items, httpMessages, new ArrayList<>(), null);
+        extractHttpMessages(items, httpMessages, new ArrayList<>(), null, 0);
     }
 
     static List<KeyValueData> getCombinedVarList(
@@ -223,9 +254,13 @@ public class PostmanParser {
             List<AbstractItem> items,
             List<HttpMessage> httpMessages,
             List<String> errors,
-            List<KeyValueData> parentVariables) {
+            List<KeyValueData> parentVariables,
+            int maxMessages) {
         if (items != null) {
             for (AbstractItem item : items) {
+                if (maxMessages > 0 && httpMessages.size() >= maxMessages) {
+                    return;
+                }
                 if (item instanceof Item) {
                     HttpMessage httpMessage =
                             extractHttpMessage((Item) item, errors, parentVariables);
@@ -239,7 +274,8 @@ public class PostmanParser {
                             itemGroup.getItem(),
                             httpMessages,
                             errors,
-                            getCombinedVarList(itemGroup.getVariable(), parentVariables));
+                            getCombinedVarList(itemGroup.getVariable(), parentVariables),
+                            maxMessages);
                 }
             }
         }
@@ -273,6 +309,7 @@ public class PostmanParser {
                             IMPORT_FORMAT_ERROR,
                             item.getName(),
                             Constant.messages.getString("postman.import.errorMsg.reqNotPresent")));
+            Stats.incCounter("stats.postman.error.noreq");
             return null;
         }
 
@@ -283,6 +320,7 @@ public class PostmanParser {
                             IMPORT_FORMAT_ERROR,
                             item.getName(),
                             Constant.messages.getString("postman.import.errorMsg.urlNotPresent")));
+            Stats.incCounter("stats.postman.error.nourl");
             return null;
         }
 
@@ -306,6 +344,7 @@ public class PostmanParser {
                             IMPORT_FORMAT_ERROR,
                             item.getName(),
                             Constant.messages.getString("postman.import.errorMsg.rawInvalid")));
+            Stats.incCounter("stats.postman.error.exception");
             return null;
         }
 
@@ -322,6 +361,7 @@ public class PostmanParser {
                 }
             }
         }
+        Stats.incCounter("stats.postman.messages");
 
         Body body = request.getBody();
         if (body == null || body.isDisabled()) {
@@ -423,6 +463,7 @@ public class PostmanParser {
                                 IMPORT_WARNING,
                                 item.getName(),
                                 e1.getClass().getName() + ": " + e1.getMessage()));
+                Stats.incCounter("stats.postman.error.badfile");
             }
         } else if (mode.equals(Body.GRAPHQL)) {
             if (body.getGraphQl() == null) {
@@ -503,6 +544,7 @@ public class PostmanParser {
                                 IMPORT_WARNING,
                                 itemName,
                                 "Could not read file: " + e.getMessage()));
+                Stats.incCounter("stats.postman.error.badfile");
                 return "";
             }
         } else {
@@ -528,6 +570,7 @@ public class PostmanParser {
                                     + e.getClass().getName()
                                     + ": "
                                     + e.getMessage()));
+            Stats.incCounter("stats.postman.error.badfiletype");
             return "";
         }
     }

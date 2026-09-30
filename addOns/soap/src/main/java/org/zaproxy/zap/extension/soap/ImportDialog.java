@@ -23,9 +23,6 @@ import java.awt.Font;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -36,15 +33,16 @@ import javax.swing.JPopupMenu;
 import javax.swing.JProgressBar;
 import javax.swing.JTextField;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.URIException;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.extension.AbstractDialog;
 import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.view.View;
+import org.zaproxy.addon.commonlib.UriUtils;
+import org.zaproxy.addon.commonlib.ZapUriException;
 import org.zaproxy.zap.utils.FontUtils;
 import org.zaproxy.zap.utils.ThreadUtils;
 import org.zaproxy.zap.utils.ZapHtmlLabel;
+import org.zaproxy.zap.utils.ZapNumberSpinner;
 import org.zaproxy.zap.view.LayoutHelper;
 
 @SuppressWarnings("serial")
@@ -54,6 +52,7 @@ public class ImportDialog extends AbstractDialog {
 
     private final ExtensionImportWSDL extSoap;
     private JTextField fieldWsdl;
+    private ZapNumberSpinner fieldMaxMessages;
     private JButton buttonChooseFile;
     private JButton buttonCancel;
     private JButton buttonImport;
@@ -81,6 +80,13 @@ public class ImportDialog extends AbstractDialog {
         fieldsPanel.add(
                 getChooseFileButton(),
                 LayoutHelper.getGBC(2, fieldsRow, 1, 0.5, new Insets(0, 4, 4, 0)));
+        fieldsRow++;
+        fieldsPanel.add(
+                new JLabel(Constant.messages.getString("soap.importDialog.labelMaxMessages")),
+                LayoutHelper.getGBC(0, fieldsRow, 1, 0.5, new Insets(4, 0, 4, 4)));
+        fieldsPanel.add(
+                getMaxMessagesField(),
+                LayoutHelper.getGBC(1, fieldsRow, 2, 0.5, new Insets(4, 4, 4, 0)));
 
         int row = 0;
         add(fieldsPanel, LayoutHelper.getGBC(0, row, 2, 1.0, new Insets(8, 8, 4, 8)));
@@ -115,12 +121,12 @@ public class ImportDialog extends AbstractDialog {
             return false;
         }
 
+        int maxMessages = getMaxMessagesField().getValue();
         try {
-            new URL(wsdlLocation).toURI();
-            new URI(wsdlLocation, true);
-            extSoap.extUrlWSDLImport(wsdlLocation);
+            UriUtils.isValid(wsdlLocation);
+            extSoap.extUrlWSDLImport(wsdlLocation, maxMessages);
             return true;
-        } catch (URIException | MalformedURLException | URISyntaxException e) {
+        } catch (ZapUriException e) {
             // Not a valid URI, try to import as a file
         }
 
@@ -133,7 +139,7 @@ public class ImportDialog extends AbstractDialog {
                     });
             return false;
         }
-        extSoap.fileUrlWSDLImport(file);
+        extSoap.fileUrlWSDLImport(file, maxMessages);
         return true;
     }
 
@@ -153,6 +159,13 @@ public class ImportDialog extends AbstractDialog {
             setContextMenu(fieldWsdl);
         }
         return fieldWsdl;
+    }
+
+    private ZapNumberSpinner getMaxMessagesField() {
+        if (fieldMaxMessages == null) {
+            fieldMaxMessages = new ZapNumberSpinner(0, 0, Integer.MAX_VALUE);
+        }
+        return fieldMaxMessages;
     }
 
     private JButton getChooseFileButton() {
@@ -252,10 +265,12 @@ public class ImportDialog extends AbstractDialog {
 
         getImportButton().setEnabled(!show);
         getWsdlField().setEnabled(!show);
+        getMaxMessagesField().setEnabled(!show);
         getChooseFileButton().setEnabled(!show);
     }
 
     void clearFields() {
         getWsdlField().setText("");
+        getMaxMessagesField().changeToDefaultValue();
     }
 }

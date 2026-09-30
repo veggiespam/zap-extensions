@@ -6,5 +6,6 @@
 <index version="2.0">
 	<indexitem text="Wappalyzer" target="addon.wappalyzer" />
 	<indexitem text="Wappalyzer API" target="addon.wappalyzer.api" />
-	<indexitem text="Wappalyzer Options" target="addon.wappalyzer.options" />
+	<indexitem text="Wappalyzer オプション" target="addon.wappalyzer.options" />
+	<indexitem text="Wappalyzer 自動化" target="addon.wappalyzer.automation" />
 </index>

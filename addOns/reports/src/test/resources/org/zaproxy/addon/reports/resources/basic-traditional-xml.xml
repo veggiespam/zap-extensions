@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<OWASPZAPReport programName="ZAP" version="Dev Build" generated="Mon, 11 Mar 2024 17:44:48">
+<OWASPZAPReport programName="ZAP" version="Dev Build" generated="Wed, 22 Oct 2025 17:09:39" created="2025-10-22T16:09:39.761512Z">
 	
 		<site name="http://example.com" host="example.com" port="80" ssl="false">
 			<alerts>
@@ -18,16 +18,19 @@
 							
 								<instance>
 									<uri>http://example.com/example_3</uri>
+									<nodeName></nodeName>
 									<method>GET</method>
 									<param>Test Param</param>
 									<attack>Test &quot;Attack\&quot;</attack>
 									<evidence>Test &lt;p&gt;Evidence</evidence>
-									<otherinfo>Test &apos;Other\</otherinfo>
+									<otherinfo>Test &apos;Other\
+Second line</otherinfo>
 								</instance>
 							
 							
 								<instance>
 									<uri>http://example.com/example_3</uri>
+									<nodeName></nodeName>
 									<method>GET</method>
 									<param>Test Param</param>
 									<attack>Test &quot;Attack\&quot;</attack>
@@ -37,8 +40,9 @@
 							
 						</instances>
 						<count>2</count>
+						<systemic>false</systemic>
 						<solution>&lt;p&gt;Test Solution&lt;/p&gt;</solution>
-						<otherinfo>&lt;p&gt;Test &apos;Other\&lt;/p&gt;</otherinfo>
+						<otherinfo>&lt;p&gt;Test &apos;Other\&lt;/p&gt;&lt;p&gt;Second line&lt;/p&gt;</otherinfo>
 						<reference>&lt;p&gt;Test Reference&lt;/p&gt;</reference>
 						<cweid>123</cweid>
 						<wascid>456</wascid>

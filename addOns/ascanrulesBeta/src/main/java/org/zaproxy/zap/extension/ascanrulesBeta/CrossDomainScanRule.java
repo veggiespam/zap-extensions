@@ -80,6 +80,7 @@ public class CrossDomainScanRule extends AbstractHostPlugin implements CommonAct
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG,
                                 CommonAlertTag.WSTG_V42_CONF_08_RIA_CROSS_DOMAIN));
@@ -154,12 +155,16 @@ public class CrossDomainScanRule extends AbstractHostPlugin implements CommonAct
 
             scanSilverlightCrossdomainPolicyFile(originalURI);
 
-        } catch (Exception e) {
-            // needed to catch exceptions from the "finally" statement
-            LOGGER.error(
+        } catch (IOException e) {
+            LOGGER.debug(
                     "Error scanning a node for Cross Domain misconfigurations: {}",
                     e.getMessage(),
                     e);
+        } catch (XPathExpressionException xei) {
+            LOGGER.error(
+                    "Error scanning a node for Cross Domain misconfigurations: {}",
+                    xei.getMessage(),
+                    xei);
         }
     }
 

@@ -19,14 +19,15 @@
  */
 package org.zaproxy.addon.automation;
 
+import java.awt.event.HierarchyEvent;
+import java.awt.event.HierarchyListener;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -34,12 +35,20 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.swing.Timer;
 import org.apache.commons.httpclient.URI;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -53,13 +62,16 @@ import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
 import org.parosproxy.paros.extension.SessionChangedListener;
 import org.parosproxy.paros.model.Model;
+import org.parosproxy.paros.model.OptionsParam;
 import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.network.HttpHeader;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpSender;
 import org.parosproxy.paros.network.HttpStatusCode;
 import org.parosproxy.paros.view.View;
-import org.yaml.snakeyaml.Yaml;
+import org.parosproxy.paros.view.WorkbenchPanel;
+import org.zaproxy.addon.automation.gui.AutomationMovedStatusPanel;
+import org.zaproxy.addon.automation.gui.AutomationOutputSource;
 import org.zaproxy.addon.automation.gui.AutomationPanel;
 import org.zaproxy.addon.automation.gui.OptionsPanel;
 import org.zaproxy.addon.automation.jobs.ActiveScanConfigJob;
@@ -67,13 +79,14 @@ import org.zaproxy.addon.automation.jobs.ActiveScanJob;
 import org.zaproxy.addon.automation.jobs.ActiveScanPolicyJob;
 import org.zaproxy.addon.automation.jobs.DelayJob;
 import org.zaproxy.addon.automation.jobs.ExitStatusJob;
-import org.zaproxy.addon.automation.jobs.ParamsJob;
 import org.zaproxy.addon.automation.jobs.RequestorJob;
 import org.zaproxy.zap.ZAP;
 import org.zaproxy.zap.ZAP.ProcessType;
 import org.zaproxy.zap.eventBus.Event;
 import org.zaproxy.zap.extension.ascan.ExtensionActiveScan;
 import org.zaproxy.zap.extension.script.ScriptVars;
+import org.zaproxy.zap.extension.stats.ExtensionStats;
+import org.zaproxy.zap.extension.stats.InMemoryStats;
 import org.zaproxy.zap.utils.Stats;
 
 public class ExtensionAutomation extends ExtensionAdaptor implements CommandLineListener {
@@ -109,14 +122,22 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     private AutomationParam param;
     private LinkedHashMap<Integer, AutomationPlan> plans = new LinkedHashMap<>();
     private List<AutomationPlan> runningPlans = Collections.synchronizedList(new ArrayList<>());
+    private final Map<String, AutomationJob> longRunningJobs = new ConcurrentHashMap<>();
+    private final Map<AutomationJob, CompletableFuture<String>> pendingScanIds =
+            new ConcurrentHashMap<>();
 
-    private CommandLineArgument[] arguments = new CommandLineArgument[4];
+    private CommandLineArgument[] arguments = new CommandLineArgument[5];
     private static final int ARG_AUTO_RUN_IDX = 0;
     private static final int ARG_AUTO_GEN_MIN_IDX = 1;
     private static final int ARG_AUTO_GEN_MAX_IDX = 2;
     private static final int ARG_AUTO_GEN_CONF_IDX = 3;
+    private static final int ARG_AUTO_CHECK_IDX = 4;
 
     private AutomationPanel automationPanel;
+    private AutomationOutputSource outputSource;
+    private AutomationMovedStatusPanel movedStatusPanel;
+    private final HierarchyListener movedStatusPanelHierarchyListener =
+            this::movedStatusPanelHierarchyListener;
 
     private static Integer exitOverride;
 
@@ -144,7 +165,6 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                                 .getExtension(ExtensionActiveScan.class)));
         registerAutomationJob(new ActiveScanJob());
         registerAutomationJob(new ActiveScanPolicyJob());
-        registerAutomationJob(new ParamsJob());
     }
 
     @Override
@@ -157,8 +177,14 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         extensionHook.addApiImplementor(new AutomationAPI(this));
 
         if (hasView()) {
-            extensionHook.getHookView().addStatusPanel(getAutomationPanel());
+            getView().getOutputPanel().registerOutputSource(getOutputSource());
+            extensionHook.getHookView().addWorkPanel(getAutomationPanel());
             extensionHook.getHookView().addOptionPanel(getOptionsPanel());
+            extensionHook.getHookView().addStatusPanel(getMovedStatusPanel());
+            View.getSingleton()
+                    .getWorkbench()
+                    .getTabbedFull()
+                    .addHierarchyListener(movedStatusPanelHierarchyListener);
         }
 
         extensionHook.addSessionListener(
@@ -166,6 +192,9 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
 
                     @Override
                     public void sessionChanged(Session session) {
+                        longRunningJobs.clear();
+                        pendingScanIds.clear();
+
                         // Work around for core bug - can be removed once the core is fixed and
                         // released
                         String authHeaderValueVar = System.getenv(ZAP_AUTH_HEADER_VALUE);
@@ -239,6 +268,13 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     public void unload() {
         super.unload();
         ZAP.getEventBus().unregisterPublisher(AutomationEventPublisher.getPublisher());
+        if (hasView()) {
+            getView().getOutputPanel().unregisterOutputSource(getOutputSource());
+            View.getSingleton()
+                    .getWorkbench()
+                    .getTabbedFull()
+                    .removeHierarchyListener(movedStatusPanelHierarchyListener);
+        }
     }
 
     @Override
@@ -254,6 +290,25 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
             automationPanel = new AutomationPanel(this);
         }
         return automationPanel;
+    }
+
+    private AutomationMovedStatusPanel getMovedStatusPanel() {
+        if (movedStatusPanel == null) {
+            movedStatusPanel = new AutomationMovedStatusPanel(getAutomationPanel());
+        }
+        return movedStatusPanel;
+    }
+
+    private void movedStatusPanelHierarchyListener(HierarchyEvent e) {
+        WorkbenchPanel workbench = View.getSingleton().getWorkbench();
+        if ((e.getChangeFlags() & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0) {
+            if (workbench.getWorkbenchLayout() == WorkbenchPanel.Layout.FULL) {
+                workbench.removePanel(getMovedStatusPanel(), WorkbenchPanel.PanelType.STATUS);
+            } else if (workbench.getPanels(WorkbenchPanel.PanelType.STATUS).stream()
+                    .noneMatch(panel -> panel instanceof AutomationMovedStatusPanel)) {
+                workbench.addPanel(getMovedStatusPanel(), WorkbenchPanel.PanelType.STATUS);
+            }
+        }
     }
 
     public void registerAutomationJob(AutomationJob job) {
@@ -353,6 +408,110 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         return Collections.unmodifiableList(runningPlans);
     }
 
+    protected void registerLongRunningJob(AutomationJob job) {
+        if (!job.isLongRunningJob()) {
+            throw new IllegalStateException("Job is not long running " + job.getName());
+        }
+        CompletableFuture<String> future = getScanIdFuture(job);
+        new Thread(
+                        () -> {
+                            long limit = TimeUnit.SECONDS.toMillis(10);
+                            for (long i = 0; i < limit; i += 200) {
+                                String id = job.getLongRunningJobId();
+                                if (id != null) {
+                                    longRunningJobs.put(id, job);
+                                    future.complete(id);
+                                    return;
+                                }
+                                if (job.getStatus() == AutomationJob.Status.COMPLETED) {
+                                    future.completeExceptionally(
+                                            new IllegalStateException(
+                                                    "job completed without starting a scan"));
+                                    return;
+                                }
+                                try {
+                                    Thread.sleep(200);
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                    future.completeExceptionally(e);
+                                    return;
+                                }
+                            }
+                            future.completeExceptionally(
+                                    new TimeoutException("Scan ID not available after timeout"));
+                        },
+                        "ZAP-AutoLongRunningJobInit")
+                .start();
+    }
+
+    /**
+     * Returns a future that completes with the scan ID once the given job has started.
+     *
+     * @param job the long-running job
+     * @return a future that resolves to the scan ID, or completes exceptionally on failure
+     * @since 0.59.0
+     */
+    public CompletableFuture<String> getScanIdFuture(AutomationJob job) {
+        return pendingScanIds.computeIfAbsent(job, k -> new CompletableFuture<>());
+    }
+
+    /**
+     * Returns all known IDs of long-running jobs that have been started. Jobs remain tracked after
+     * completion so their status can be queried.
+     *
+     * @return a list of job IDs
+     * @since 0.59.0
+     */
+    public List<String> getLongRunningJobIds() {
+        return new ArrayList<>(longRunningJobs.keySet());
+    }
+
+    /**
+     * Returns the progress for the specified long running job ID.
+     *
+     * @param id the job id
+     * @return the progress percentage (0-100), or -1 if the job is not found
+     * @since 0.59.0
+     */
+    public int getLongRunningJobProgress(String id) {
+        AutomationJob job = longRunningJobs.get(id);
+        return job != null ? job.getLongRunningJobProgress() : -1;
+    }
+
+    /**
+     * Returns the progress of all known long-running jobs.
+     *
+     * @return a map of job ID to progress percentage (0-100)
+     * @since 0.59.0
+     */
+    public Map<String, Integer> getAllLongRunningJobProgresses() {
+        Map<String, Integer> result = new HashMap<>();
+        for (Entry<String, AutomationJob> entry : longRunningJobs.entrySet()) {
+            result.put(entry.getKey(), entry.getValue().getLongRunningJobProgress());
+        }
+        return result;
+    }
+
+    /**
+     * Stops a long-running job by ID.
+     *
+     * @param id the job id
+     * @return {@code true} if the job was found and stopped, {@code false} otherwise
+     * @since 0.59.0
+     */
+    public boolean stopLongRunningJob(String id) {
+        AutomationJob job = longRunningJobs.get(id);
+        if (job == null) {
+            return false;
+        }
+        job.stop();
+        return true;
+    }
+
+    public void stopPlan(AutomationPlan plan) {
+        plan.stopPlan();
+    }
+
     public AutomationProgress runPlan(AutomationPlan plan, boolean resetProgress) {
         runningPlans.add(plan);
         if (resetProgress) {
@@ -382,7 +541,99 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
             return progress;
         }
 
+        // Apply any configs
+        Map<String, String> configs = env.getData().getConfigs();
+        if (!configs.isEmpty()) {
+            OptionsParam options = Model.getSingleton().getOptionsParam();
+            Long errorCount = null;
+            Long warnCount = null;
+            ExtensionStats extStats =
+                    Control.getSingleton().getExtensionLoader().getExtension(ExtensionStats.class);
+            InMemoryStats inMemoryStats = null;
+            if (extStats != null) {
+                inMemoryStats = extStats.getInMemoryStats();
+                if (inMemoryStats != null) {
+                    errorCount = inMemoryStats.getStat("stats.log.error");
+                    warnCount = inMemoryStats.getStat("stats.log.warn");
+                }
+            }
+
+            for (Entry<String, String> entry : configs.entrySet()) {
+                Object current = options.getConfig().getProperty(entry.getKey());
+                options.getConfig().setProperty(entry.getKey(), entry.getValue());
+                Stats.incCounter("stats.auto.config." + entry.getKey());
+                progress.info(
+                        Constant.messages.getString(
+                                "automation.info.configset",
+                                entry.getKey(),
+                                current,
+                                entry.getValue()));
+            }
+            options.reloadConfigParamSets();
+            Control.getSingleton().getExtensionLoader().optionsChangedAllPlugin(options);
+
+            if (inMemoryStats != null) {
+                // Check for any new warnings or errors
+                if (ObjectUtils.compare(errorCount, inMemoryStats.getStat("stats.log.error"))
+                        != 0) {
+                    progress.error(
+                            Constant.messages.getString("automation.env.error.config.error"));
+                }
+                if (ObjectUtils.compare(warnCount, inMemoryStats.getStat("stats.log.warn")) != 0) {
+                    progress.warn(Constant.messages.getString("automation.env.error.config.warn"));
+                }
+            }
+        }
+
+        ScheduledExecutorService durationTimer = null;
+        int maxDuration = env.getMaxDuration();
+        if (maxDuration > 0) {
+            Thread planThread = Thread.currentThread();
+            durationTimer =
+                    Executors.newSingleThreadScheduledExecutor(
+                            r -> new Thread(r, "ZAP-Automation-DurationTimer"));
+            durationTimer.schedule(
+                    () -> {
+                        if (plan.isStopping() || plan.getFinished() != null) {
+                            return;
+                        }
+
+                        progress.warn(
+                                Constant.messages.getString(
+                                        "automation.warn.maxduration", maxDuration));
+                        plan.stopPlan(false);
+                        planThread.interrupt();
+                    },
+                    maxDuration,
+                    TimeUnit.SECONDS);
+        }
+
+        try {
+            runJobs(plan, env, progress, jobsToRun);
+        } finally {
+            if (durationTimer != null) {
+                durationTimer.shutdownNow();
+            }
+        }
+        setPlanFinished(plan);
+        return progress;
+    }
+
+    private void runJobs(
+            AutomationPlan plan,
+            AutomationEnvironment env,
+            AutomationProgress progress,
+            List<AutomationJob> jobsToRun) {
         for (AutomationJob job : jobsToRun) {
+
+            if ((plan.isStopping() || env.isTimeToQuit())
+                    && (plan.isHardStopping() || !job.isAlwaysRun())) {
+                continue;
+            }
+
+            if (job.isAlwaysRun()) {
+                Thread.interrupted();
+            }
 
             if (!job.isEnabled()) {
                 progress.info(
@@ -402,6 +653,9 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                 timer.start();
             }
             try {
+                if (job.isLongRunningJob()) {
+                    registerLongRunningJob(job);
+                }
                 job.runJob(env, progress);
             } catch (Exception e) {
                 LOGGER.error(e.getMessage(), e);
@@ -425,12 +679,7 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                     Constant.messages.getString(
                             "automation.info.jobend", job.getType(), job.getFormattedTimeTaken()));
             progress.addRunJob(job);
-            if (env.isTimeToQuit()) {
-                break;
-            }
         }
-        setPlanFinished(plan);
-        return progress;
     }
 
     public void runPlanAsync(AutomationPlan plan) {
@@ -438,64 +687,22 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     }
 
     public AutomationPlan loadPlan(File f) throws IOException {
-        return new AutomationPlan(this, f);
+        return new AutomationPlan(this, f, false);
     }
 
-    public AutomationPlan loadPlan(InputStream in) throws AutomationJobException {
-        Yaml yaml = new Yaml();
-        LinkedHashMap<?, ?> data = yaml.load(in);
-        LinkedHashMap<?, ?> envData = (LinkedHashMap<?, ?>) data.get("env");
-        ArrayList<?> jobsData = (ArrayList<?>) data.get("jobs");
+    /**
+     * Loads a plan from the given input stream.
+     *
+     * @param in the input stream with the plan in YAML format.
+     * @return the plan.
+     * @since 0.4.0
+     */
+    public AutomationPlan loadPlan(InputStream in) {
+        return loadPlan(in, false);
+    }
 
-        AutomationProgress progress = new AutomationProgress();
-        AutomationEnvironment env = new AutomationEnvironment(envData, progress);
-
-        List<AutomationJob> jobsToRun = new ArrayList<>();
-
-        for (Object jobObj : jobsData) {
-            if (!(jobObj instanceof LinkedHashMap<?, ?>)) {
-                progress.error(Constant.messages.getString("automation.error.job.data", jobObj));
-                continue;
-            }
-            LinkedHashMap<?, ?> jobData = (LinkedHashMap<?, ?>) jobObj;
-
-            Object jobType = jobData.get("type");
-            if (jobType == null) {
-                progress.error(Constant.messages.getString("automation.error.job.notype", jobType));
-                continue;
-            }
-            AutomationJob job = jobs.get(jobType);
-            if (job != null) {
-                job = job.newJob();
-                Object jobName = jobData.get("name");
-                if (jobName != null) {
-                    if (jobName instanceof String) {
-                        job.setName((String) jobName);
-                    } else {
-                        progress.warn(
-                                Constant.messages.getString("automation.error.job.name", jobName));
-                    }
-                }
-
-                Object paramsObj = jobData.get("parameters");
-                if (paramsObj != null && !(paramsObj instanceof LinkedHashMap<?, ?>)) {
-                    progress.error(
-                            Constant.messages.getString("automation.error.job.data", paramsObj));
-                    continue;
-                }
-                job.setEnv(env);
-                job.setJobData(jobData);
-                job.verifyParameters(progress);
-                jobsToRun.add(job);
-
-                job.addTests(jobData.get("tests"), progress);
-            } else {
-                progress.error(
-                        Constant.messages.getString("automation.error.job.unknown", jobType));
-            }
-        }
-
-        return new AutomationPlan(env, jobsToRun, progress);
+    public AutomationPlan loadPlan(InputStream in, boolean quiet) {
+        return new AutomationPlan(this, in, quiet);
     }
 
     public void loadPlan(AutomationPlan plan, boolean setFocus, boolean run) {
@@ -533,50 +740,75 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     }
 
     /**
-     * Run the automation plan define by the given file, intended only to be used from the command
-     * line
+     * Load the automation plan defined by the given file, intended only to be used from the command
+     * line.
      *
      * @param filename the name of the file
+     * @param quiet if set then will not output info messages to the console
      * @return the automation progress
      */
-    protected AutomationProgress runAutomationFile(String filename) {
+    private AutomationPlan loadAutomationFile(String filename, boolean quiet) {
         File f = new File(filename);
         if (!f.exists() || !f.canRead()) {
             CommandLine.error(
                     Constant.messages.getString("automation.error.nofile", f.getAbsolutePath()));
+            setExitStatus(ERROR_EXIT_VALUE, "no such file", false);
             return null;
         }
         try {
-            AutomationPlan plan = new AutomationPlan(this, f);
-            this.displayPlan(plan);
-            this.runPlan(plan, false);
-            AutomationProgress progress = plan.getProgress();
-
-            if (progress.hasErrors()) {
-                CommandLine.info(Constant.messages.getString("automation.out.title.fail"));
-                for (String str : progress.getErrors()) {
-                    CommandLine.info(Constant.messages.getString("automation.out.info", str));
-                }
-            }
-            if (progress.hasWarnings()) {
-                CommandLine.info(Constant.messages.getString("automation.out.title.warn"));
-                for (String str : progress.getWarnings()) {
-                    CommandLine.info(Constant.messages.getString("automation.out.info", str));
-                }
-            }
-
-            if (!progress.hasErrors() && !progress.hasWarnings()) {
-                CommandLine.info(Constant.messages.getString("automation.out.title.good"));
-            }
-            return progress;
-
+            return new AutomationPlan(this, f, quiet);
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
             CommandLine.error(
                     Constant.messages.getString(
                             "automation.error.unexpected", f.getAbsolutePath(), e.getMessage()));
+            setExitStatus(ERROR_EXIT_VALUE, "exception reading file", false);
             return null;
         }
+    }
+
+    /**
+     * Run the automation plan defined by the given file, intended only to be used from the command
+     * line.
+     *
+     * @param filename the name of the file
+     * @return the automation progress
+     */
+    protected AutomationProgress runAutomationFile(String filename) {
+        try {
+            return this.runAutomationPlan(this.loadAutomationFile(filename, false));
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage(), e);
+            File f = new File(filename);
+            CommandLine.error(
+                    Constant.messages.getString(
+                            "automation.error.unexpected", f.getAbsolutePath(), e.getMessage()));
+            return null;
+        }
+    }
+
+    private AutomationProgress runAutomationPlan(AutomationPlan plan) {
+        this.displayPlan(plan);
+        this.runPlan(plan, false);
+        AutomationProgress progress = plan.getProgress();
+
+        if (progress.hasErrors()) {
+            CommandLine.info(Constant.messages.getString("automation.out.title.fail"));
+            for (String str : progress.getErrors()) {
+                CommandLine.info(Constant.messages.getString("automation.out.info", str));
+            }
+        }
+        if (progress.hasWarnings()) {
+            CommandLine.info(Constant.messages.getString("automation.out.title.warn"));
+            for (String str : progress.getWarnings()) {
+                CommandLine.info(Constant.messages.getString("automation.out.info", str));
+            }
+        }
+
+        if (!progress.hasErrors() && !progress.hasWarnings()) {
+            CommandLine.info(Constant.messages.getString("automation.out.title.good"));
+        }
+        return progress;
     }
 
     public static String getResourceAsString(String name) {
@@ -656,6 +888,14 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                         "-autogenconf <filename>  "
                                 + Constant.messages.getString(
                                         "automation.cmdline.autogenconf.help"));
+        arguments[ARG_AUTO_CHECK_IDX] =
+                new CommandLineArgument(
+                        "-autocheck",
+                        1,
+                        null,
+                        "",
+                        "-autocheck <source>      "
+                                + Constant.messages.getString("automation.cmdline.autocheck.help"));
         return arguments;
     }
 
@@ -675,12 +915,14 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         if (arguments[ARG_AUTO_GEN_CONF_IDX].isEnabled()) {
             generateConfigFile(arguments[ARG_AUTO_GEN_CONF_IDX].getArguments().firstElement());
         }
+        if (arguments[ARG_AUTO_CHECK_IDX].isEnabled()) {
+            checkPlanCommandLine(arguments[ARG_AUTO_CHECK_IDX].getArguments().firstElement());
+        }
     }
 
-    private void runPlanCommandLine(String source) {
+    private AutomationPlan loadPlanCommandLine(String source, boolean quiet) {
         URI uri = createUri(source);
         if (uri != null) {
-            Path file;
             try {
                 HttpMessage message = new HttpMessage(uri);
                 new HttpSender(HttpSender.MANUAL_REQUEST_INITIATOR).sendAndReceive(message);
@@ -690,19 +932,22 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                             1,
                             "non-200 response (" + statusCode + ") for remote plan: " + source,
                             true);
-                    return;
+                    return null;
                 }
 
-                file = Files.createTempFile("zap-af-plan-", ".yaml");
-                Files.write(file, message.getResponseBody().getBytes());
+                return this.loadPlan(
+                        new ByteArrayInputStream(message.getResponseBody().getBytes()), quiet);
+
             } catch (IOException e) {
                 setExitStatus(1, "I/O error getting remote plan: " + e.getMessage(), true);
-                return;
+                return null;
             }
-            source = file.toAbsolutePath().toString();
+        } else {
+            return loadAutomationFile(source, quiet);
         }
+    }
 
-        AutomationProgress progress = runAutomationFile(source);
+    private void setExitStatus(AutomationProgress progress) {
         if (exitOverride != null) {
             setExitStatus(exitOverride, "set by user", false);
         } else if (progress == null || progress.hasErrors()) {
@@ -710,6 +955,22 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         } else if (progress.hasWarnings()) {
             setExitStatus(WARN_EXIT_VALUE, "plan warnings", false);
         }
+    }
+
+    private void runPlanCommandLine(String source) {
+        AutomationPlan plan = loadPlanCommandLine(source, false);
+        if (plan != null) {
+            setExitStatus(runAutomationPlan(plan));
+        }
+    }
+
+    protected AutomationProgress checkPlanCommandLine(String source) {
+        AutomationPlan plan = loadPlanCommandLine(source, true);
+        if (plan != null) {
+            setExitStatus(plan.getProgress());
+            return plan.getProgress();
+        }
+        return null;
     }
 
     public static Integer getExitOverride() {
@@ -769,5 +1030,14 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     @Override
     public String getUIName() {
         return Constant.messages.getString("automation.name");
+    }
+
+    public AutomationOutputSource getOutputSource() {
+        if (outputSource == null) {
+            outputSource =
+                    new AutomationOutputSource(
+                            Constant.messages.getString("automation.output.name"));
+        }
+        return outputSource;
     }
 }

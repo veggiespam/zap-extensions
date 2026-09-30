@@ -11,12 +11,43 @@ ZAP by [Checkmarx](https://checkmarx.com/).
 [/th:block]
 [/th:block]
 
+[#th:block th:if="${reportData.isIncludeSection('insights') && reportData.reportObjects.get('insightsList') != null}"]
+## [(#{report.insights.title})]
+
+| [(#{report.insights.level})] | [(#{report.insights.reason})] | [(#{report.insights.site})] | [(#{report.insights.desc})] | [(#{report.insights.stat})] |
+| --- | --- | --- | --- | --- |
+[#th:block th:each="ins : ${reportData.reportObjects.get('insightsList')}"]| [(${ins.level})] | [(${ins.reason})] | [(${ins.site})] | [(${ins.description})] | [(${ins.statisticStr})] |
+[/th:block]
+[#th:block th:if="${reportData.reportObjects.get('stoppingInsight') != null}" th:with="stopping=${reportData.reportObjects.get('stoppingInsight')}"][(#{report.insights.stoppedby(${stopping.description}, ${stopping.site}, ${stopping.statisticStr})})]
+[/th:block]
+[/th:block]
+
+[#th:block th:if="${reportData.isIncludeSection('scriptdiagnostics') && reportData.reportObjects.get('scriptDiagnostics') != null}"]
+## [(#{report.scriptdiagnostics.title})]
+
+[#th:block th:each="run : ${reportData.reportObjects.get('scriptDiagnostics').runs}"]
+### [(${run.created})] ([(${run.outcome})])
+
+[(${run.summary})]
+
+[#th:block th:each="scr : ${run.scripts}"]
+#### [(${scr.order})]. [(${scr.scriptName})] ([(${scr.scriptType})])
+
+| [(#{report.scriptdiagnostics.step})] | [(#{report.scriptdiagnostics.line})] | [(#{report.scriptdiagnostics.kind})] | [(#{report.scriptdiagnostics.message})] |
+| --- | --- | --- | --- |
+[#th:block th:each="st : ${scr.steps}"][#th:block th:each="out : ${st.outputs}"]| [(${st.sourceStepIndex})] | [(${st.line})] | [(${out.kind})] | [(${out.message})] |
+[/th:block][/th:block]
+
+[/th:block]
+[/th:block]
+[/th:block]
+
 [#th:block th:if="${reportData.isIncludeSection('instancecount')}"]
 ## [(#{report.alerts.list})]
 
 | [(#{report.alerts.list.name})] | [(#{report.alerts.list.risklevel})] | [(#{report.alerts.list.numinstances})] |
 | --- | --- | --- |
-[#th:block th:each="alert: ${alertTree.children}"]| [(${alert.nodeName})] | [(${helper.getRiskString(alert.risk)})] | [(${alert.childCount})] |
+[#th:block th:each="alert: ${alertTree.children}"]| [(${alert.nodeName})] | [(${helper.getRiskString(alert.risk)})] | [#th:block th:if="${helper.isSystemic(alert)}"][(#{report.alerts.list.systemic})][/th:block][#th:block th:unless="${helper.isSystemic(alert)}"][(${alert.childCount})][/th:block] |
 [/th:block]
 [/th:block]
 
@@ -38,13 +69,15 @@ ZAP by [Checkmarx](https://checkmarx.com/).
 [(${alert.userObject.description})]
 [#th:block th:each="instance: ${alert.children}"]
 * [(#{report.alerts.detail.url})]: [(${#strings.replace(#uris.escapePath(instance.userObject.uri), ')', '&29')})]
+[#th:block th:if="${helper.getNodeName(instance.userObject) != null}"]  * [(#{report.alerts.detail.nodename})]: `[(${helper.getNodeName(instance.userObject)})]`[/th:block]
   * [(#{report.alerts.detail.method})]: `[(${instance.userObject.method})]`
   * [(#{report.alerts.detail.param})]: `[(${instance.userObject.param})]`
   * [(#{report.alerts.detail.attack})]: `[(${instance.userObject.attack})]`
   * [(#{report.alerts.detail.evidence})]: `[(${instance.userObject.evidence})]`
   * [(#{report.alerts.detail.otherinfo})]: `[(${instance.userObject.otherinfo})]`
 [/th:block]
-[(#{report.alerts.detail.instances})]: [(${alert.childCount})]
+[#th:block th:if="${helper.isSystemic(alert)}"][(#{report.alerts.detail.instances})]: [(#{report.alerts.list.systemic})][/th:block]
+[#th:block th:unless="${helper.isSystemic(alert)}"][(#{report.alerts.detail.instances})]: [(${alert.childCount})][/th:block]
 
 ### [(#{report.alerts.detail.solution})]
 

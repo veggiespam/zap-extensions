@@ -20,14 +20,13 @@
 package org.zaproxy.zap.extension.ascanrules;
 
 import java.io.IOException;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -60,6 +59,7 @@ public class PaddingOracleScanRule extends AbstractAppParamPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A04_CRYPTO_FAIL,
                                 CommonAlertTag.OWASP_2021_A02_CRYPO_FAIL,
                                 CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG,
                                 CommonAlertTag.WSTG_V42_CRYP_02_PADDING_ORACLE));
@@ -304,20 +304,20 @@ public class PaddingOracleScanRule extends AbstractAppParamPlugin
         HEX {
             // Hex strings are a-fA-F0-9. Although it's technically possible for a
             // base64 string to look like this, it's exceptionally unlikely.
+            private static final HexFormat HEX_FORMAT = HexFormat.of();
             private final Pattern HEX_PATTERN = Pattern.compile("^([a-fA-F0-9]{2})+$");
 
             @Override
             public String encode(byte[] value) {
-                return Hex.encodeHexString(value);
+                return HEX_FORMAT.formatHex(value);
             }
 
             @Override
             public byte[] decode(String value) {
                 if (HEX_PATTERN.matcher(value).matches()) {
                     try {
-                        return Hex.decodeHex(value.toCharArray());
-
-                    } catch (DecoderException ex) {
+                        return HEX_FORMAT.parseHex(value);
+                    } catch (IllegalArgumentException ex) {
                     }
                 }
 
@@ -334,7 +334,7 @@ public class PaddingOracleScanRule extends AbstractAppParamPlugin
 
             @Override
             public String encode(byte[] value) {
-                String encoded = Base64.encodeBase64URLSafeString(value);
+                String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(value);
                 int padding = (4 - (encoded.length() % 4)) % 4;
                 return encoded + Integer.toString(padding);
             }
@@ -345,8 +345,7 @@ public class PaddingOracleScanRule extends AbstractAppParamPlugin
                     // The last letter represents the length
                     int last = value.length() - 1;
                     if (((last + (int) value.charAt(last)) % 4) == 0) {
-                        Base64 decoder = new Base64(true);
-                        return decoder.decode(value.substring(0, last));
+                        return Base64.getUrlDecoder().decode(value.substring(0, last));
                     }
                 }
 
@@ -361,14 +360,14 @@ public class PaddingOracleScanRule extends AbstractAppParamPlugin
 
             @Override
             public String encode(byte[] value) {
-                return Base64.encodeBase64String(value);
+                return Base64.getEncoder().encodeToString(value);
             }
 
             @Override
             public byte[] decode(String value) {
                 if (BASE64_PATTERN.matcher(value).matches()) {
                     if ((value.length() % 4) == 0) {
-                        return Base64.decodeBase64(value);
+                        return Base64.getDecoder().decode(value);
                     }
                 }
 

@@ -111,6 +111,10 @@ td {
 .time-stamp {
 	float: right;
 }
+
+.script-diagnostic-screenshot {
+	display: block;
+}
 </style>
 </head>
 <body>
@@ -170,6 +174,85 @@ td {
 		<div class="spacer-lg"></div>
 	</th:block>
 
+	<th:block
+		th:if="${reportData.isIncludeSection('insights') &amp;&amp; reportData.reportObjects.get('insightsList') != null}">
+		<h3 th:text="#{report.insights.title}" class="left-header">Insights</h3>
+		<p class="insights-stopped"
+			th:if="${reportData.reportObjects.get('stoppingInsight') != null}"
+			th:with="stopping=${reportData.reportObjects.get('stoppingInsight')}"
+			th:text="#{report.insights.stoppedby(${stopping.description}, ${stopping.site}, ${stopping.statisticStr})}">Scan
+			stopped by Insight</p>
+		<table class="summary">
+			<tr>
+				<th th:text="#{report.insights.level}" height="24">Level</th>
+				<th th:text="#{report.insights.reason}">Reason</th>
+				<th th:text="#{report.insights.site}">Site</th>
+				<th th:text="#{report.insights.desc}">Description</th>
+				<th th:text="#{report.insights.stat}">Statistic</th>
+			</tr>
+			<th:block
+				th:each="ins, insState: ${reportData.reportObjects.get('insightsList')}">
+				<tr>
+					<td th:class="${'risk-' + (3 - ins.level.ordinal)}">
+						<div th:text="${ins.level}">Level</div>
+					</td>
+					<td>
+						<div th:text="${ins.reason}">Reason</div>
+					</td>
+					<td>
+						<div th:text="${ins.site}">Site</div>
+					</td>
+					<td>
+						<div th:text="${ins.description}">Description</div>
+					</td>
+					<td align="center">
+						<div th:text="${ins.statisticStr}">Statistic</div>
+					</td>
+				</tr>
+			</th:block>
+		</table>
+		<div class="spacer-lg"></div>
+	</th:block>
+
+	<th:block
+		th:if="${reportData.isIncludeSection('scriptdiagnostics') &amp;&amp; reportData.reportObjects.get('scriptDiagnostics') != null}">
+		<h3 th:text="#{report.scriptdiagnostics.title}" class="left-header">Script
+			Diagnostics</h3>
+		<th:block
+			th:each="run, runState: ${reportData.reportObjects.get('scriptDiagnostics').runs}">
+			<h4 th:text="${run.created + ' (' + run.outcome + ')'}">Run</h4>
+			<p th:text="${run.summary}">Summary</p>
+			<th:block th:each="scr: ${run.scripts}">
+				<h5
+					th:text="${scr.order + '. ' + scr.scriptName + ' (' + scr.scriptType + ')'}">Script</h5>
+				<table class="results">
+					<tr>
+						<th width="10%" th:text="#{report.scriptdiagnostics.step}">Step</th>
+						<th width="25%" th:text="#{report.scriptdiagnostics.line}">Line</th>
+						<th width="15%" th:text="#{report.scriptdiagnostics.kind}">Kind</th>
+						<th width="50%" th:text="#{report.scriptdiagnostics.message}">Message</th>
+					</tr>
+					<th:block th:each="st: ${scr.steps}">
+						<tr th:each="out: ${st.outputs}">
+							<td width="10%" th:text="${st.sourceStepIndex}">Step</td>
+							<td width="25%" th:text="${st.line}">Line</td>
+							<td width="15%" th:text="${out.kind}">Kind</td>
+							<td width="50%" th:text="${out.message}">Message</td>
+						</tr>
+						<tr
+							th:if="${reportData.isIncludeSection('scriptdiagnosticsscreenshots') &amp;&amp; st.screenshot != null}">
+							<td colspan="4"><img class="script-diagnostic-screenshot"
+								th:width="${helper.getPdfScriptDiagnosticScreenshotWidth(st.screenshot)}"
+								th:src="|data:image/png;base64,${st.screenshot}|" alt="" src="" />
+							</td>
+						</tr>
+					</th:block>
+				</table>
+			</th:block>
+			<div class="spacer-lg"></div>
+		</th:block>
+	</th:block>
+
 	<th:block th:if="${reportData.isIncludeSection('instancecount')}">
 		<h3 th:text="#{report.alerts.list}">Alerts</h3>
 		<table class="alerts">
@@ -186,7 +269,12 @@ td {
 						Name</a></td>
 				<td align="center" th:class="${'risk-' + alert.risk}"
 					th:text="${helper.getRiskString(alert.risk)}">Risk</td>
-				<td align="center" th:text="${alert.childCount}">Count</td>
+				<th:block th:if="${helper.isSystemic(alert)}">
+					<td align="center" th:text="#{report.alerts.list.systemic}">Systemic</td>
+				</th:block>
+				<th:block th:unless="${helper.isSystemic(alert)}">
+					<td align="center" th:text="${alert.childCount}">Count</td>
+				</th:block>
 			</tr>
 		</table>
 		<div class="spacer-lg"></div>
@@ -223,6 +311,15 @@ td {
 							th:text="${helper.escapeXml(instance.userObject.uri)}"
 							href="url.html">URL</a></td>
 					</tr>
+					<th:block
+						th:if="${helper.getNodeName(instance.userObject) != null}">
+						<tr>
+							<td th:text="#{report.alerts.detail.nodename}" width="20%"
+								class="indent2">Node Name</td>
+							<td th:text="${helper.getNodeName(instance.userObject)}"
+								width="80%">Node Name</td>
+						</tr>
+					</th:block>
 					<tr>
 						<td th:text="#{report.alerts.detail.method}" width="20%"
 							class="indent2">Method</td>
@@ -243,13 +340,21 @@ td {
 					<tr>
 						<td th:text="#{report.alerts.detail.otherinfo}" width="20%"
 							class="indent2">Other Info</td>
-						<td th:text="${helper.escapeXml(instance.userObject.otherinfo)}"
-							width="80%">Other Info</td>
+						<td width="80%"><th:block
+								th:each="other, state: ${#strings.arraySplit(instance.userObject.otherinfo != null ? instance.userObject.otherinfo : '', '\n')}">
+								<div th:text="${helper.escapeXml(other)}">Other Info</div>
+								<br th:if="${!state.last}" />
+							</th:block></td>
 					</tr>
 				</th:block>
 				<tr>
 					<td th:text="#{report.alerts.detail.instances}" width="20%">Instances</td>
-					<td th:text="${alert.childCount}" width="80%">Instances</td>
+					<th:block th:if="${helper.isSystemic(alert)}">
+						<td th:text="#{report.alerts.list.systemic}" width="80%">Systemic</td>
+					</th:block>
+					<th:block th:unless="${helper.isSystemic(alert)}">
+						<td th:text="${alert.childCount}" width="80%">Instances</td>
+					</th:block>
 				</tr>
 				<tr>
 					<td th:text="#{report.alerts.detail.solution}" width="20%">Solution</td>

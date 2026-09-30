@@ -19,6 +19,8 @@
  */
 package org.zaproxy.addon.pscan;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -40,6 +42,7 @@ import org.parosproxy.paros.extension.history.ProxyListenerLog;
 import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.network.HttpMessage;
+import org.zaproxy.addon.commonlib.ExtensionCommonlib;
 import org.zaproxy.addon.pscan.internal.AddOnScanRulesLoader;
 import org.zaproxy.addon.pscan.internal.DefaultStatsListener;
 import org.zaproxy.addon.pscan.internal.PassiveScannerOptions;
@@ -78,6 +81,7 @@ public class ExtensionPassiveScan2 extends ExtensionAdaptor {
     private static final List<Class<? extends Extension>> DEPENDENCIES =
             List.of(
                     ExtensionAlert.class,
+                    ExtensionCommonlib.class,
                     org.zaproxy.zap.extension.pscan.ExtensionPassiveScan.class);
 
     private AddOnScanRulesLoader scanRulesLoader;
@@ -99,10 +103,16 @@ public class ExtensionPassiveScan2 extends ExtensionAdaptor {
     private PassiveScanController psc;
     private boolean passiveScanEnabled;
 
+    private List<PassiveScanRuleProvider> pscanRuleProviders =
+            Collections.synchronizedList(new ArrayList<>());
+
+    private final GspmPassiveScanRegistrar gspmRegistrar;
+
     public ExtensionPassiveScan2() {
         super(NAME);
 
         scannersManager = new PassiveScannersManagerImpl();
+        gspmRegistrar = new GspmPassiveScanRegistrar(scannersManager);
         scanRuleManagerProxy =
                 new PassiveScanRuleManager() {
 
@@ -183,6 +193,7 @@ public class ExtensionPassiveScan2 extends ExtensionAdaptor {
         setPassiveController(passiveControllerProxy);
 
         scanRulesLoader = new AddOnScanRulesLoader(this);
+        gspmRegistrar.register();
     }
 
     @Override
@@ -359,6 +370,8 @@ public class ExtensionPassiveScan2 extends ExtensionAdaptor {
 
     @Override
     public void unload() {
+        gspmRegistrar.unregister();
+
         scanRulesLoader.unload();
 
         if (hasView()) {
@@ -415,6 +428,27 @@ public class ExtensionPassiveScan2 extends ExtensionAdaptor {
             return getPassiveScanController().getRunningTasks();
         }
         return List.of();
+    }
+
+    /**
+     * @since 0.4.0
+     */
+    public List<PassiveScanRuleProvider> getPscanRuleProviders() {
+        return pscanRuleProviders;
+    }
+
+    /**
+     * @since 0.4.0
+     */
+    public void addPscanRuleProvider(PassiveScanRuleProvider provider) {
+        pscanRuleProviders.add(provider);
+    }
+
+    /**
+     * @since 0.4.0
+     */
+    public void removePscanRuleProvider(PassiveScanRuleProvider provider) {
+        pscanRuleProviders.remove(provider);
     }
 
     private class ProxyListenerImpl implements ProxyListener {
@@ -485,6 +519,7 @@ public class ExtensionPassiveScan2 extends ExtensionAdaptor {
                     if (hasView()) {
                         getPolicyPanel().getPassiveScanTableModel().addScanner(pps);
                     }
+                    gspmRegistrar.ruleAdded(pps);
                 }
                 return added;
 
@@ -511,10 +546,14 @@ public class ExtensionPassiveScan2 extends ExtensionAdaptor {
                 removed = scanRuleManager.remove(name);
             }
 
-            if (scanner != null && hasView() && scanner instanceof PluginPassiveScanner) {
-                getPolicyPanel()
-                        .getPassiveScanTableModel()
-                        .removeScanner((PluginPassiveScanner) scanner);
+            if (scanner != null && scanner instanceof PluginPassiveScanner) {
+                PluginPassiveScanner pps = (PluginPassiveScanner) scanner;
+                if (hasView()) {
+                    getPolicyPanel().getPassiveScanTableModel().removeScanner(pps);
+                }
+                if (removed) {
+                    gspmRegistrar.ruleRemoved(pps.getPluginId());
+                }
             }
 
             return removed;

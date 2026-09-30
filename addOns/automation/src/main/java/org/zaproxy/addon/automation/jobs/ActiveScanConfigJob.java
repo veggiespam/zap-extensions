@@ -23,12 +23,18 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.core.scanner.ScannerParam;
+import org.parosproxy.paros.db.DatabaseException;
+import org.parosproxy.paros.model.Model;
 import org.zaproxy.addon.automation.AutomationData;
 import org.zaproxy.addon.automation.AutomationEnvironment;
 import org.zaproxy.addon.automation.AutomationJob;
@@ -41,12 +47,17 @@ import org.zaproxy.zap.extension.ascan.ExtensionActiveScan;
 public class ActiveScanConfigJob extends AutomationJob {
     private static final ObjectMapper OBJECT_MAPPER =
             JsonMapper.builder()
-                    .serializationInclusion(JsonInclude.Include.NON_DEFAULT)
+                    .defaultPropertyInclusion(
+                            JsonInclude.Value.construct(
+                                    JsonInclude.Include.NON_DEFAULT,
+                                    JsonInclude.Include.NON_DEFAULT))
                     .build()
                     .findAndRegisterModules();
 
     public static final String JOB_NAME = "activeScan-config";
     private static final String OPTIONS_METHOD_NAME = "getScannerParam";
+
+    private static final Logger LOGGER = LogManager.getLogger(ActiveScanConfigJob.class);
 
     private ExtensionActiveScan ascan;
 
@@ -82,8 +93,9 @@ public class ActiveScanConfigJob extends AutomationJob {
                     updateValue(data.getInputVectors(), jobData, key, progress);
                     break;
 
-                case "name":
-                case "type":
+                case "excludePaths":
+                    data.setExcludePaths(
+                            JobUtils.verifyRegexes(jobData.get(key), key.toString(), progress));
                     break;
 
                 default:
@@ -177,7 +189,13 @@ public class ActiveScanConfigJob extends AutomationJob {
 
     @Override
     public void runJob(AutomationEnvironment env, AutomationProgress progress) {
-        // Nothing to do, work done earlier in applyParameters.
+        try {
+            Model.getSingleton().getSession().setExcludeFromScanRegexs(data.getExcludePaths());
+        } catch (DatabaseException e) {
+            progress.error(
+                    Constant.messages.getString("automation.dialog.error.misc", e.getMessage()));
+            LOGGER.error(e.getMessage(), e);
+        }
     }
 
     @Override
@@ -245,6 +263,7 @@ public class ActiveScanConfigJob extends AutomationJob {
     public static class Data extends JobData {
         private final Parameters parameters;
         private final InputVectors inputVectors;
+        @Setter private List<String> excludePaths = new ArrayList<>();
 
         public Data(AutomationJob job, Parameters parameters, InputVectors inputVectors) {
             super(job);

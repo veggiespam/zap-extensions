@@ -5,6 +5,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 ### Changed
+- Dependency update.
+- Maintenance changes.
+- Update references and CVE links to avoid redirects.
+
+## [66] - 2026-05-06
+### Changed
+- The following scan rules now include example alert functionality for documentation generation purposes (Issue 6119) and alert references (Issue 7100):
+  - Insecure HTTP Method
+  - Session Fixation
+  - Proxy Disclosure
+- Dependency update.
+
+## [65] - 2026-04-14
+### Changed
+- Dependency update.
+- Maintenance changes.
+- The scan rules now have new tags for the OWASP Top 10 2025, and API Top 10 2023.
+- Depends on an updated version of the Common Library add-on.
+- The Possible Username Enumeration scan rule now includes example alert functionality for documentation generation purposes (Issue 6119).
+
+## [64] - 2025-12-15
+### Added
+- The following scan rules were added, having been promoted from Alpha:
+  - NoSQL Injection - MongoDB
+  - NoSQL Injection - MongoDB (Time Based)
+
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+### Removed
+- The following scan rules were removed, having been promoted to Release:
+  - Exponential Entity Expansion (Billion Laughs Attack)
+  - HTTP Only Site
+  - HTTPS Content Available via HTTP
+  - ShellShock - CVE-2014-6271
+
+## [63] - 2025-11-04
+### Added
+- SYSTEMIC tag to selected rules.
+
+### Changed
+- Depends on an updated version of the Common Library add-on.
+- Reduced usage of error level logging.
+
+## [62] - 2025-09-18
+### Added
+- QA CICD policy tag to selected rules.
+
+### Changed
+- Update alert references to latest locations to fix 404s and resolve redirections.
+
+## [61] - 2025-09-10
+### Changed
+- Add alert references to CORS Header scan rule alerts (Issue 7100).
+
+## [60] - 2025-09-02
+### Changed
+- Depends on an updated version of the Common Library add-on.
+- Add help details about behavior of scan rules which leverage OAST (Issue 8682)
+
+### Fixed
+- Error logs to always include stack trace.
+
+### Added
+- Rules (as applicable) have been tagged in relation to HIPAA and PCI DSS.
+- The 403 Bypass scan rule now has a CWE reference.
+- The Shell Shock scan rule now has the TEST_TIMING alert tag.
+
+## [59] - 2025-06-20
+### Changed
 - The extension now has a user friendly name for use in the GUI.
 - Depends on an updated version of the Common Library add-on.
 
@@ -573,6 +643,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Updated to support new addon format
 
+[66]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v66
+[65]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v65
+[64]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v64
+[63]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v63
+[62]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v62
+[61]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v61
+[60]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v60
+[59]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v59
 [58]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v58
 [57]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v57
 [56]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v56

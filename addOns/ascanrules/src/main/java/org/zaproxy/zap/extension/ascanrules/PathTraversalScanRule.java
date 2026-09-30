@@ -63,9 +63,12 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A01_BROKEN_AC,
                                 CommonAlertTag.OWASP_2021_A01_BROKEN_AC,
                                 CommonAlertTag.OWASP_2017_A05_BROKEN_AC,
-                                CommonAlertTag.WSTG_V42_ATHZ_01_DIR_TRAVERSAL));
+                                CommonAlertTag.WSTG_V42_ATHZ_01_DIR_TRAVERSAL,
+                                CommonAlertTag.HIPAA,
+                                CommonAlertTag.PCI_DSS));
         alertTags.put(PolicyTag.DEV_STD.getTag(), "");
         alertTags.put(PolicyTag.DEV_FULL.getTag(), "");
         alertTags.put(PolicyTag.QA_STD.getTag(), "");
@@ -82,6 +85,7 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
      */
     private static final ContentsMatcher WIN_PATTERN =
             new PatternContentsMatcher(Pattern.compile("\\[drivers\\]"));
+    private static final String WIN_DIR_EVIDENCE = "Windows";
     private static final String[] WIN_LOCAL_FILE_TARGETS = {
         // Absolute Windows file retrieval (we suppose C:\\)
         "c:/Windows/system.ini",
@@ -131,6 +135,7 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
     // Dot used to match 'x' or '!' (used in AIX)
     private static final ContentsMatcher NIX_PATTERN =
             new PatternContentsMatcher(Pattern.compile("root:.:0:0"));
+    private static final String NIX_DIR_EVIDENCE = "etc";
     private static final String[] NIX_LOCAL_FILE_TARGETS = {
         // Absolute file retrieval
         "/etc/passwd",
@@ -156,10 +161,9 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
         // ..%252F..%252F..%252F..%252F..%252F..%252F..%252F..%252F..%252F..%252Fetc%252Fpasswd%2500.jpg
     };
 
-    /*
-     * Windows/Unix/Linux/etc. local directory targets and detection pattern
-     */
-    private static final ContentsMatcher DIR_PATTERN = new DirNamesContentsMatcher();
+    private static final ContentsMatcher NIX_DIR_MATCHER = new DirNamesContentsMatcher(Tech.Linux);
+    private static final ContentsMatcher WIN_DIR_MATCHER =
+            new DirNamesContentsMatcher(Tech.Windows);
     private static final String[] WIN_LOCAL_DIR_TARGETS = {
         "c:/",
         "c:\\",
@@ -192,6 +196,8 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
      */
     private static final String[] LOCAL_FILE_RELATIVE_PREFIXES = {"", "/", "\\"};
 
+    private static final List<String> DIR_EVIDENCE_LIST =
+            List.of(NIX_DIR_EVIDENCE, WIN_DIR_EVIDENCE);
     /*
      * details of the vulnerability which we are attempting to find
      */
@@ -307,8 +313,7 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
 
                 for (int h = 0; h < winCount; h++) {
 
-                    if (sendAndCheckPayload(param, WIN_LOCAL_FILE_TARGETS[h], WIN_PATTERN, 1)
-                            || isStop()) {
+                    if (sendAndCheckPayload(param, WIN_LOCAL_FILE_TARGETS[h], WIN_PATTERN, 1)) {
                         // Dispose all resources
                         // Exit the scan rule
                         return;
@@ -317,22 +322,18 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
                     // to the input.
                     if (includeNullByteInjectionPayload) {
                         if (sendAndCheckPayload(
-                                        param,
-                                        WIN_LOCAL_FILE_TARGETS[h] + NULL_BYTE_CHARACTER,
-                                        WIN_PATTERN,
-                                        1)
-                                || isStop()) {
+                                param,
+                                WIN_LOCAL_FILE_TARGETS[h] + NULL_BYTE_CHARACTER,
+                                WIN_PATTERN,
+                                1)) {
                             return;
                         }
                         if (extension != null) {
                             if (sendAndCheckPayload(
-                                            param,
-                                            WIN_LOCAL_FILE_TARGETS[h]
-                                                    + NULL_BYTE_CHARACTER
-                                                    + extension,
-                                            WIN_PATTERN,
-                                            1)
-                                    || isStop()) {
+                                    param,
+                                    WIN_LOCAL_FILE_TARGETS[h] + NULL_BYTE_CHARACTER + extension,
+                                    WIN_PATTERN,
+                                    1)) {
                                 return;
                             }
                         }
@@ -347,8 +348,7 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
 
                     // Check if a there was a finding or the scan has been stopped
                     // if yes dispose resources and exit
-                    if (sendAndCheckPayload(param, NIX_LOCAL_FILE_TARGETS[h], NIX_PATTERN, 2)
-                            || isStop()) {
+                    if (sendAndCheckPayload(param, NIX_LOCAL_FILE_TARGETS[h], NIX_PATTERN, 2)) {
                         // Dispose all resources
                         // Exit the scan rule
                         return;
@@ -357,23 +357,19 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
                     // to the input
                     if (includeNullByteInjectionPayload) {
                         if (sendAndCheckPayload(
-                                        param,
-                                        NIX_LOCAL_FILE_TARGETS[h] + NULL_BYTE_CHARACTER,
-                                        NIX_PATTERN,
-                                        2)
-                                || isStop()) {
+                                param,
+                                NIX_LOCAL_FILE_TARGETS[h] + NULL_BYTE_CHARACTER,
+                                NIX_PATTERN,
+                                2)) {
                             return;
                         }
 
                         if (extension != null) {
                             if (sendAndCheckPayload(
-                                            param,
-                                            NIX_LOCAL_FILE_TARGETS[h]
-                                                    + NULL_BYTE_CHARACTER
-                                                    + extension,
-                                            NIX_PATTERN,
-                                            2)
-                                    || isStop()) {
+                                    param,
+                                    NIX_LOCAL_FILE_TARGETS[h] + NULL_BYTE_CHARACTER + extension,
+                                    NIX_PATTERN,
+                                    2)) {
                                 return;
                             }
                         }
@@ -387,8 +383,7 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
 
                     // Check if a there was a finding or the scan has been stopped
                     // if yes dispose resources and exit
-                    if (sendAndCheckPayload(param, NIX_LOCAL_DIR_TARGETS[h], DIR_PATTERN, 3)
-                            || isStop()) {
+                    if (sendAndCheckPayload(param, NIX_LOCAL_DIR_TARGETS[h], NIX_DIR_MATCHER, 3)) {
                         // Dispose all resources
                         // Exit the scan rule
                         return;
@@ -397,8 +392,7 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
             }
             if (inScope(Tech.Windows)) {
                 for (int h = 0; h < winDirCount; h++) {
-                    if (sendAndCheckPayload(param, WIN_LOCAL_DIR_TARGETS[h], DIR_PATTERN, 3)
-                            || isStop()) {
+                    if (sendAndCheckPayload(param, WIN_LOCAL_DIR_TARGETS[h], WIN_DIR_MATCHER, 3)) {
                         // Dispose all resources
                         // Exit the scan rule
                         return;
@@ -427,8 +421,7 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
                     if (sendAndCheckPayload(param, sslashPattern, WAR_PATTERN, 4)
                             || sendAndCheckPayload(param, bslashPattern, WAR_PATTERN, 4)
                             || sendAndCheckPayload(param, '/' + sslashPattern, WAR_PATTERN, 4)
-                            || sendAndCheckPayload(param, '\\' + bslashPattern, WAR_PATTERN, 4)
-                            || isStop()) {
+                            || sendAndCheckPayload(param, '\\' + bslashPattern, WAR_PATTERN, 4)) {
 
                         // Dispose all resources
                         // Exit the scan rule
@@ -573,6 +566,10 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
     private boolean sendAndCheckPayload(
             String param, String newValue, ContentsMatcher contentsMatcher, int check)
             throws IOException {
+        if (isStop()) {
+            return true;
+        }
+
         if (contentsMatcher.match(getContentsToMatch(getBaseMsg())) != null) {
             // Evidence already present, no point sending the payload/attack.
             return false;
@@ -659,12 +656,23 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
 
     private AlertBuilder createMatchedAlert(
             String param, String attack, String evidence, int check) {
-        return newAlert()
-                .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                .setParam(param)
-                .setAttack(attack)
-                .setEvidence(evidence)
-                .setAlertRef(getId() + "-" + check);
+        AlertBuilder builder =
+                newAlert()
+                        .setConfidence(Alert.CONFIDENCE_MEDIUM)
+                        .setParam(param)
+                        .setAttack(attack)
+                        .setEvidence(evidence)
+                        .setAlertRef(getId() + "-" + check);
+        if (DIR_EVIDENCE_LIST.contains(evidence)) {
+            builder.setOtherInfo(
+                    Constant.messages.getString(
+                            MESSAGE_PREFIX + "info",
+                            evidence,
+                            evidence.equals(WIN_DIR_EVIDENCE)
+                                    ? DirNamesContentsMatcher.WIN_MATCHES
+                                    : DirNamesContentsMatcher.NIX_MATCHES));
+        }
+        return builder;
     }
 
     @Override
@@ -706,49 +714,61 @@ public class PathTraversalScanRule extends AbstractAppParamPlugin
 
     private static class DirNamesContentsMatcher implements ContentsMatcher {
 
+        private static final String NIX_MATCHES =
+                String.join(", ", List.of("proc", NIX_DIR_EVIDENCE, "boot", "tmp", "home"));
+
+        private static final Pattern PROC_PATT = createNixPattern("proc");
+        private static final Pattern ETC_PATT = createNixPattern("etc");
+        private static final Pattern BOOT_PATT = createNixPattern("boot");
+        private static final Pattern TMP_PATT = createNixPattern("tmp");
+        private static final Pattern HOME_PATT = createNixPattern("home");
+
+        private static final String WIN_MATCHES =
+                String.join(", ", List.of(WIN_DIR_EVIDENCE, "Program Files"));
+
+        private static final Pattern PROGRAM_FILES_PATT =
+                Pattern.compile("Program\\sFiles", Pattern.CASE_INSENSITIVE);
+
+        private final Tech tech;
+
+        public DirNamesContentsMatcher(Tech tech) {
+            this.tech = tech;
+        }
+
         @Override
         public String match(String contents) {
-            String result = matchNixDirectories(contents);
-            if (result != null) {
-                return result;
+            if (this.tech == Tech.Linux) {
+                return matchNixDirectories(contents);
             }
-            return matchWinDirectories(contents);
+            if (this.tech == Tech.Windows) {
+                return matchWinDirectories(contents);
+            }
+            return null;
         }
 
         private static String matchNixDirectories(String contents) {
-            Pattern procPattern =
-                    Pattern.compile("(?:^|\\W)proc(?:\\W|$)", Pattern.CASE_INSENSITIVE);
-            Pattern etcPattern = Pattern.compile("(?:^|\\W)etc(?:\\W|$)", Pattern.CASE_INSENSITIVE);
-            Pattern bootPattern =
-                    Pattern.compile("(?:^|\\W)boot(?:\\W|$)", Pattern.CASE_INSENSITIVE);
-            Pattern tmpPattern = Pattern.compile("(?:^|\\W)tmp(?:\\W|$)", Pattern.CASE_INSENSITIVE);
-            Pattern homePattern =
-                    Pattern.compile("(?:^|\\W)home(?:\\W|$)", Pattern.CASE_INSENSITIVE);
-
-            Matcher procMatcher = procPattern.matcher(contents);
-            Matcher etcMatcher = etcPattern.matcher(contents);
-            Matcher bootMatcher = bootPattern.matcher(contents);
-            Matcher tmpMatcher = tmpPattern.matcher(contents);
-            Matcher homeMatcher = homePattern.matcher(contents);
-
-            if (procMatcher.find()
-                    && etcMatcher.find()
-                    && bootMatcher.find()
-                    && tmpMatcher.find()
-                    && homeMatcher.find()) {
-                return "etc";
+            if (PROC_PATT.matcher(contents).find()
+                    && ETC_PATT.matcher(contents).find()
+                    && BOOT_PATT.matcher(contents).find()
+                    && TMP_PATT.matcher(contents).find()
+                    && HOME_PATT.matcher(contents).find()) {
+                return NIX_DIR_EVIDENCE;
             }
 
             return null;
         }
 
         private static String matchWinDirectories(String contents) {
-            if (contents.contains("Windows")
-                    && Pattern.compile("Program\\sFiles").matcher(contents).find()) {
-                return "Windows";
+            if (contents.contains(WIN_DIR_EVIDENCE)
+                    && PROGRAM_FILES_PATT.matcher(contents).find()) {
+                return WIN_DIR_EVIDENCE;
             }
 
             return null;
+        }
+
+        private static Pattern createNixPattern(String subPatt) {
+            return Pattern.compile("(?:^|\\W)" + subPatt + "(?:\\W|$)", Pattern.CASE_INSENSITIVE);
         }
     }
 }

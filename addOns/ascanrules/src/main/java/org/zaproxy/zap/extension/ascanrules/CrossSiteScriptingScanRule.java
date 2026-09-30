@@ -21,6 +21,7 @@ package org.zaproxy.zap.extension.ascanrules;
 
 import static org.zaproxy.zap.extension.ascanrules.utils.Constants.NULL_BYTE_CHARACTER;
 
+import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,7 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.httpclient.URIException;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -59,12 +60,16 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A07_XSS,
-                                CommonAlertTag.WSTG_V42_INPV_01_REFLECTED_XSS));
+                                CommonAlertTag.WSTG_V42_INPV_01_REFLECTED_XSS,
+                                CommonAlertTag.HIPAA,
+                                CommonAlertTag.PCI_DSS));
         alertTags.put(PolicyTag.DEV_CICD.getTag(), "");
         alertTags.put(PolicyTag.DEV_STD.getTag(), "");
         alertTags.put(PolicyTag.DEV_FULL.getTag(), "");
+        alertTags.put(PolicyTag.QA_CICD.getTag(), "");
         alertTags.put(PolicyTag.QA_STD.getTag(), "");
         alertTags.put(PolicyTag.QA_FULL.getTag(), "");
         alertTags.put(PolicyTag.SEQUENCE.getTag(), "");
@@ -255,8 +260,8 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
             // Not an error, just means we probably attacked the redirect
             // location
             return null;
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+        } catch (IOException e) {
+            LOGGER.debug(e.getMessage(), e);
         }
 
         if (isStop()) {
@@ -383,7 +388,7 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
                 .raise();
     }
 
-    private boolean performDirectAttack(HttpMessage msg, String param, String value) {
+    private boolean performDirectAttack(HttpMessage msg, String param) {
         for (String scriptAlert : GENERIC_SCRIPT_ALERT_LIST) {
             List<HtmlContext> contexts2 = performAttack(msg, param, "'\"" + scriptAlert, null, 0);
             if (contexts2 == null) {
@@ -403,8 +408,7 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
         return false;
     }
 
-    private boolean performTagAttack(
-            HtmlContext context, HttpMessage msg, String param, String value) {
+    private boolean performTagAttack(HtmlContext context, HttpMessage msg, String param) {
 
         if (context.isInScriptAttribute()) {
             // Good chance this will be vulnerable
@@ -745,7 +749,7 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
                             .raise();
                 } else if (AlertThreshold.LOW.equals(this.getAlertThreshold())) {
                     HttpMessage ctx2Message = contexts.get(0).getMsg();
-                    if (StringUtils.containsIgnoreCase(
+                    if (Strings.CI.contains(
                             ctx.getMsg()
                                     .getResponseHeader()
                                     .getHeader(HttpFieldsNames.CONTENT_TYPE),
@@ -854,8 +858,9 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
         // In this case the parent effectively changes
         List<HtmlContext> context2 =
                 performAttack(msg, param, attackString1, context, HtmlContext.IGNORE_PARENT);
-        if (context2 == null) {
-            context2 = performAttack(msg, param, TAG_ONCLICK_ALERT, context, 0);
+
+        if (context2 == null || context2.isEmpty()) {
+            context2 = performAttack(msg, param, TAG_ONCLICK_ALERT, null, 0);
             if (context2 == null) {
                 return false;
             }
@@ -936,7 +941,7 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
                 contexts = hca.getHtmlContexts(value + Constant.getEyeCatcher(), null, 0);
             }
             if (contexts.isEmpty()) {
-                attackWorked = performDirectAttack(msg, param, value);
+                attackWorked = performDirectAttack(msg, param);
             }
 
             for (HtmlContext context : contexts) {
@@ -947,7 +952,7 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
                 }
                 if (context.getTagAttribute() != null) {
                     // its in a tag attribute - lots of attack vectors possible
-                    attackWorked = performTagAttack(context, msg, param, value);
+                    attackWorked = performTagAttack(context, msg, param);
 
                 } else if (context.isInAttributeName()) {
 
@@ -993,8 +998,8 @@ public class CrossSiteScriptingScanRule extends AbstractAppParamPlugin
                 attackHeader(msg, param, appendedValue ? value : "");
             }
 
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+        } catch (IOException e) {
+            LOGGER.debug(e.getMessage(), e);
         }
     }
 

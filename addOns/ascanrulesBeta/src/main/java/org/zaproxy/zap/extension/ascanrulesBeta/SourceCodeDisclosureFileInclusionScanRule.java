@@ -19,6 +19,7 @@
  */
 package org.zaproxy.zap.extension.ascanrulesBeta;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -144,6 +145,7 @@ public class SourceCodeDisclosureFileInclusionScanRule extends AbstractAppParamP
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG));
         alertTags.put(PolicyTag.QA_FULL.getTag(), "");
@@ -442,8 +444,8 @@ public class SourceCodeDisclosureFileInclusionScanRule extends AbstractAppParamP
                         "Not checking for EAR/WAR files for this request, since the Attack Strength is not HIGH or INSANE");
             }
 
-        } catch (Exception e) {
-            LOGGER.error(
+        } catch (IOException e) {
+            LOGGER.debug(
                     "Error scanning parameters for Source Code Disclosure: {}", e.getMessage(), e);
         }
     }

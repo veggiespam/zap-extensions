@@ -19,13 +19,14 @@
  */
 package org.zaproxy.zap.extension.ascanrules;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -57,9 +58,12 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A07_XSS,
-                                CommonAlertTag.WSTG_V42_INPV_02_STORED_XSS));
+                                CommonAlertTag.WSTG_V42_INPV_02_STORED_XSS,
+                                CommonAlertTag.HIPAA,
+                                CommonAlertTag.PCI_DSS));
         alertTags.put(PolicyTag.DEV_FULL.getTag(), "");
         alertTags.put(PolicyTag.QA_STD.getTag(), "");
         alertTags.put(PolicyTag.QA_FULL.getTag(), "");
@@ -144,8 +148,8 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
         setParameter(sourceMsg2, param, attack);
         try {
             sendAndReceive(sourceMsg2);
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+        } catch (IOException e) {
+            LOGGER.debug(e.getMessage(), e);
         }
 
         if (isStop()) {
@@ -155,8 +159,8 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
         HttpMessage sinkMsg2 = sinkMsg.cloneRequest();
         try {
             sendAndReceive(sinkMsg2);
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+        } catch (IOException e) {
+            LOGGER.debug(e.getMessage(), e);
         }
 
         if (isStop()) {
@@ -240,10 +244,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                     if (context2.getTagAttribute() != null
                                             && context2.isInScriptAttribute()) {
                                         // Yep, its vulnerable
-                                        newAlert()
-                                                .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                                .setParam(param)
-                                                .setAttack(context2.getTarget())
+                                        createAlert(param, context2.getTarget())
                                                 .setOtherInfo(otherInfo)
                                                 .setMessage(context2.getMsg())
                                                 .raise();
@@ -274,10 +275,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                 for (HtmlContext ctx : contexts2) {
                                     if (ctx.isInUrlAttribute()) {
                                         // Yep, its vulnerable
-                                        newAlert()
-                                                .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                                .setParam(param)
-                                                .setAttack(ctx.getTarget())
+                                        createAlert(param, ctx.getTarget())
                                                 .setEvidence(ctx.getTarget())
                                                 .setMessage(ctx.getMsg())
                                                 .raise();
@@ -307,10 +305,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                 }
 
                                 if (!contexts2.isEmpty()) {
-                                    newAlert()
-                                            .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                            .setParam(param)
-                                            .setAttack(contexts2.get(0).getTarget())
+                                    createAlert(param, contexts2.get(0).getTarget())
                                             .setOtherInfo(otherInfo)
                                             .setMessage(contexts2.get(0).getMsg())
                                             .raise();
@@ -341,10 +336,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
 
                                 if (!contexts2.isEmpty()) {
                                     // Yep, its vulnerable
-                                    newAlert()
-                                            .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                            .setParam(param)
-                                            .setAttack(contexts2.get(0).getTarget())
+                                    createAlert(param, contexts2.get(0).getTarget())
                                             .setOtherInfo(otherInfo)
                                             .setMessage(contexts2.get(0).getMsg())
                                             .raise();
@@ -375,10 +367,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
 
                                 if (!contexts2.isEmpty()) {
                                     // Yep, its vulnerable
-                                    newAlert()
-                                            .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                            .setParam(param)
-                                            .setAttack(contexts2.get(0).getTarget())
+                                    createAlert(param, contexts2.get(0).getTarget())
                                             .setOtherInfo(otherInfo)
                                             .setMessage(contexts2.get(0).getMsg())
                                             .raise();
@@ -406,10 +395,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
 
                             if (!contexts2.isEmpty()) {
                                 // Yep, its vulnerable
-                                newAlert()
-                                        .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                        .setParam(param)
-                                        .setAttack(contexts2.get(0).getTarget())
+                                createAlert(param, contexts2.get(0).getTarget())
                                         .setOtherInfo(otherInfo)
                                         .setMessage(contexts2.get(0).getMsg())
                                         .raise();
@@ -426,10 +412,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                                 HtmlContext.IGNORE_HTML_COMMENT);
                                 if (contexts2 != null && !contexts2.isEmpty()) {
                                     // Yep, its vulnerable
-                                    newAlert()
-                                            .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                            .setParam(param)
-                                            .setAttack(contexts2.get(0).getTarget())
+                                    createAlert(param, contexts2.get(0).getTarget())
                                             .setOtherInfo(otherInfo)
                                             .setMessage(contexts2.get(0).getMsg())
                                             .raise();
@@ -455,10 +438,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
 
                                 if (!contexts2.isEmpty()) {
                                     // Yep, its vulnerable
-                                    newAlert()
-                                            .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                            .setParam(param)
-                                            .setAttack(contexts2.get(0).getTarget())
+                                    createAlert(param, contexts2.get(0).getTarget())
                                             .setOtherInfo(otherInfo)
                                             .setMessage(contexts2.get(0).getMsg())
                                             .raise();
@@ -481,10 +461,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                                             .equalsIgnoreCase(
                                                                     context2.getParentTag())) {
                                                 // Yep, its vulnerable
-                                                newAlert()
-                                                        .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                                        .setParam(param)
-                                                        .setAttack(contexts2.get(0).getTarget())
+                                                createAlert(param, contexts2.get(0).getTarget())
                                                         .setEvidence(contexts2.get(0).getTarget())
                                                         .setMessage(contexts2.get(0).getMsg())
                                                         .raise();
@@ -508,10 +485,8 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                                             false);
                                             if (contexts3 != null && !contexts3.isEmpty()) {
                                                 attackWorked = true;
-                                                newAlert()
-                                                        .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                                        .setParam(param)
-                                                        .setAttack(
+                                                createAlert(
+                                                                param,
                                                                 getURLEncode(
                                                                         getURLEncode(
                                                                                 contexts3
@@ -547,10 +522,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
 
                                 if (!contexts2.isEmpty()) {
                                     // Yep, its vulnerable
-                                    newAlert()
-                                            .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                            .setParam(param)
-                                            .setAttack(contexts2.get(0).getTarget())
+                                    createAlert(param, contexts2.get(0).getTarget())
                                             .setOtherInfo(otherInfo)
                                             .setMessage(contexts2.get(0).getMsg())
                                             .raise();
@@ -572,10 +544,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                     }
                                     if (!contexts2.isEmpty()) {
                                         // Yep, its vulnerable
-                                        newAlert()
-                                                .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                                .setParam(param)
-                                                .setAttack(contexts2.get(0).getTarget())
+                                        createAlert(param, contexts2.get(0).getTarget())
                                                 .setOtherInfo(otherInfo)
                                                 .setMessage(contexts2.get(0).getMsg())
                                                 .raise();
@@ -594,10 +563,7 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                                     false,
                                                     true);
                                     if (contextsA != null && !contextsA.isEmpty()) {
-                                        newAlert()
-                                                .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                                .setParam(param)
-                                                .setAttack(contextsA.get(0).getTarget())
+                                        createAlert(param, contextsA.get(0).getTarget())
                                                 .setEvidence(contextsA.get(0).getTarget())
                                                 .setMessage(contextsA.get(0).getMsg())
                                                 .raise();
@@ -628,52 +594,27 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                                         if (ctx.getParentTag() != null) {
                                             // Yep, its vulnerable
                                             if (ctx.getMsg().getResponseHeader().isHtml()) {
-                                                newAlert()
-                                                        .setConfidence(Alert.CONFIDENCE_MEDIUM)
-                                                        .setParam(param)
-                                                        .setAttack(ctx.getTarget())
+                                                createAlert(param, ctx.getTarget())
                                                         .setEvidence(ctx.getTarget())
                                                         .setMessage(contexts2.get(0).getMsg())
                                                         .raise();
                                             } else {
                                                 HttpMessage ctx2Message = contexts2.get(0).getMsg();
-                                                if (StringUtils.containsIgnoreCase(
+                                                if (Strings.CI.contains(
                                                         ctx.getMsg()
                                                                 .getResponseHeader()
                                                                 .getHeader(
                                                                         HttpFieldsNames
                                                                                 .CONTENT_TYPE),
                                                         "json")) {
-                                                    newAlert()
-                                                            .setRisk(Alert.RISK_LOW)
-                                                            .setConfidence(Alert.CONFIDENCE_LOW)
-                                                            .setName(
-                                                                    Constant.messages.getString(
-                                                                            MESSAGE_PREFIX
-                                                                                    + "json.name"))
-                                                            .setDescription(
-                                                                    Constant.messages.getString(
-                                                                            MESSAGE_PREFIX
-                                                                                    + "json.desc"))
-                                                            .setParam(param)
-                                                            .setAttack(GENERIC_SCRIPT_ALERT)
-                                                            .setOtherInfo(
-                                                                    Constant.messages.getString(
-                                                                            MESSAGE_PREFIX
-                                                                                    + "otherinfo.nothtml"))
-                                                            .setSolution(getSolution())
+                                                    createJsonAlert(param)
                                                             .setMessage(ctx2Message)
                                                             .raise();
                                                 } else {
-                                                    newAlert()
-                                                            .setConfidence(Alert.CONFIDENCE_LOW)
-                                                            .setParam(param)
-                                                            .setAttack(ctx.getTarget())
-                                                            .setOtherInfo(
-                                                                    Constant.messages.getString(
-                                                                            MESSAGE_PREFIX
-                                                                                    + "otherinfo.nothtml"))
-                                                            .setEvidence(ctx.getTarget())
+                                                    createNotHtmlAlert(
+                                                                    param,
+                                                                    ctx.getTarget(),
+                                                                    ctx.getTarget())
                                                             .setMessage(ctx2Message)
                                                             .raise();
                                                 }
@@ -688,9 +629,49 @@ public class PersistentXssScanRule extends AbstractAppParamPlugin
                     }
                 }
             }
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+        } catch (IOException e) {
+            LOGGER.debug(e.getMessage(), e);
         }
+    }
+
+    private AlertBuilder createAlert(String param, String attack) {
+        return newAlert()
+                .setConfidence(Alert.CONFIDENCE_MEDIUM)
+                .setParam(param)
+                .setAttack(attack)
+                .setAlertRef(getId() + "-1");
+    }
+
+    private AlertBuilder createJsonAlert(String param) {
+        return newAlert()
+                .setRisk(Alert.RISK_LOW)
+                .setConfidence(Alert.CONFIDENCE_LOW)
+                .setName(Constant.messages.getString(MESSAGE_PREFIX + "json.name"))
+                .setDescription(Constant.messages.getString(MESSAGE_PREFIX + "json.desc"))
+                .setParam(param)
+                .setAttack(GENERIC_SCRIPT_ALERT)
+                .setOtherInfo(Constant.messages.getString(MESSAGE_PREFIX + "otherinfo.nothtml"))
+                .setSolution(getSolution())
+                .setAlertRef(getId() + "-2");
+    }
+
+    private AlertBuilder createNotHtmlAlert(String param, String attack, String evidence) {
+        return newAlert()
+                .setConfidence(Alert.CONFIDENCE_LOW)
+                .setParam(param)
+                .setAttack(attack)
+                .setOtherInfo(Constant.messages.getString(MESSAGE_PREFIX + "otherinfo.nothtml"))
+                .setEvidence(evidence)
+                .setAlertRef(getId() + "-3");
+    }
+
+    @Override
+    public List<Alert> getExampleAlerts() {
+        String param = "param";
+        return List.of(
+                createAlert(param, GENERIC_SCRIPT_ALERT).build(),
+                createJsonAlert(param).build(),
+                createNotHtmlAlert(param, GENERIC_SCRIPT_ALERT, GENERIC_SCRIPT_ALERT).build());
     }
 
     @Override

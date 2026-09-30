@@ -20,6 +20,20 @@ zapAddOn {
     manifest {
         author.set("ZAP Dev Team")
         url.set("https://www.zaproxy.org/docs/desktop/addons/zest/")
+        extensions {
+            register("org.zaproxy.zap.extension.zest.exim.ExtensionZestExim") {
+                classnames {
+                    allowed.set(listOf("org.zaproxy.zap.extension.zest.exim"))
+                }
+                dependencies {
+                    addOns {
+                        register("exim") {
+                            version.set(">=0.18.0")
+                        }
+                    }
+                }
+            }
+        }
         dependencies {
             addOns {
                 register("commonlib") {
@@ -32,10 +46,10 @@ zapAddOn {
                     version.set(">= 0.1.0 & < 1.0.0")
                 }
                 register("scripts") {
-                    version.set(">=45.2.0")
+                    version.set(">=45.21.0")
                 }
                 register("selenium") {
-                    version.set(">= 15.13.0")
+                    version.set(">= 15.44.0")
                 }
             }
         }
@@ -44,12 +58,13 @@ zapAddOn {
 
 dependencies {
     zapAddOn("commonlib")
+    zapAddOn("exim")
     zapAddOn("network")
     zapAddOn("pscan")
     zapAddOn("scripts")
     zapAddOn("selenium")
 
-    api("org.zaproxy:zest:0.30.0") {
+    api(libs.zest.zest) {
         // Provided by commonlib add-on.
         exclude(group = "com.fasterxml.jackson.core")
         exclude(group = "com.fasterxml.jackson.dataformat")
@@ -58,7 +73,7 @@ dependencies {
         // Provided by ZAP.
         exclude(group = "net.htmlparser.jericho", module = "jericho-html")
     }
-    implementation("org.owasp.jbrofuzz:jbrofuzz-core:2.5.1") {
+    implementation(libs.zest.jbrofuzzCore) {
         // Only "jbrofuzz-core" is needed.
         setTransitive(false)
     }

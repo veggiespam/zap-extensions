@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Changed
+- Use title capitalization for the Run Application menu (Issue 2000).
+
+## [17] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
 
 ## [16] - 2025-01-09
 ### Changed
@@ -84,6 +90,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First release as an add-on, previously bundled with ZAP core.
 
+[17]: https://github.com/zaproxy/zap-extensions/releases/invoke-v17
 [16]: https://github.com/zaproxy/zap-extensions/releases/invoke-v16
 [15]: https://github.com/zaproxy/zap-extensions/releases/invoke-v15
 [14]: https://github.com/zaproxy/zap-extensions/releases/invoke-v14

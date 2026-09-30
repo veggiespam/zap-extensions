@@ -35,16 +35,52 @@ zapAddOn {
     }
 }
 
+spotless {
+    java {
+        target(
+            fileTree(projectDir) {
+                include("src/**/*.java")
+                exclude("src/main/java/org/zaproxy/zap/extension/selenium/internal/FirefoxBinary.java")
+            },
+        )
+    }
+}
+
 dependencies {
     compileOnly(libs.log4j.core)
 
-    var seleniumVersion = "4.33.0"
-    selenium("org.seleniumhq.selenium:selenium-java:$seleniumVersion")
-    selenium("org.seleniumhq.selenium:htmlunit3-driver:4.32.0")
+    selenium(libs.selenium.seleniumJava)
+    selenium(libs.selenium.htmlunit3Driver) {
+        // Do not expose the newer version to dependents, exclude and change to implementation.
+        exclude(group = "org.apache.commons", module = "commons-lang3")
+    }
+    implementation("org.apache.commons:commons-lang3:3.18.0")
     implementation(libs.log4j.slf4j)
 
     zapAddOn("commonlib")
     zapAddOn("network")
 
     testImplementation(project(":testutils"))
+}
+
+val webdriverProjectPath =
+    when {
+        org.gradle.internal.os.OperatingSystem.current().isMacOsX -> ":addOns:webdrivers:webdrivermacos"
+        org.gradle.internal.os.OperatingSystem.current().isLinux -> ":addOns:webdrivers:webdriverlinux"
+        else -> ":addOns:webdrivers:webdriverwindows"
+    }
+
+tasks.register<Sync>("prepareTestWebdrivers") {
+    val wdProject = project(webdriverProjectPath)
+    dependsOn(wdProject.tasks.named("generateZapAddOnManifest"))
+    from(wdProject.layout.buildDirectory.dir("webdrivers"))
+    into(layout.buildDirectory.dir("test-zap-webdrivers"))
+}
+
+tasks.withType<Test>().configureEach {
+    if (name == "test") {
+        dependsOn("prepareTestWebdrivers")
+        systemProperties["zap.test.webdrivers.home"] =
+            layout.buildDirectory.dir("test-zap-webdrivers").get().asFile.absolutePath
+    }
 }

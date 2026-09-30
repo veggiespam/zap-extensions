@@ -6,9 +6,10 @@
 <toc version="2.0">
 	<tocitem text="ZAP ユーザーガイド" tocid="toplevelitem">
 		<tocitem text="アドオン" tocid="addons">
-			<tocitem text="探索テクノロジー" image="addon.wappalyzer.icon" target="addon.wappalyzer">
+			<tocitem text="テクノロジー検出" image="addon.wappalyzer.icon" target="addon.wappalyzer">
 				<tocitem text="API" target="addon.wappalyzer.api" />
-				<tocitem text="Options" target="addon.wappalyzer.options" />
+				<tocitem text="オプション" target="addon.wappalyzer.options" />
+				<tocitem text="自動化" target="addon.wappalyzer.automation" />
 			</tocitem>
 		</tocitem>
 	</tocitem>

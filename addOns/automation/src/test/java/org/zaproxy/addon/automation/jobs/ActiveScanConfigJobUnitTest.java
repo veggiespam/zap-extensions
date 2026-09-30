@@ -21,6 +21,8 @@ package org.zaproxy.addon.automation.jobs;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.anEmptyMap;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -32,11 +34,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.withSettings;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.quality.Strictness;
 import org.parosproxy.paros.core.scanner.ScannerParam;
+import org.parosproxy.paros.model.Model;
+import org.parosproxy.paros.model.Session;
 import org.yaml.snakeyaml.Yaml;
 import org.zaproxy.addon.automation.AutomationEnvironment;
 import org.zaproxy.addon.automation.AutomationJob;
@@ -292,8 +298,74 @@ class ActiveScanConfigJobUnitTest extends TestUtils {
         assertThat(iv.getCookieData().isEncodeCookieValues(), is(equalTo(encodeCookieValues)));
         verify(param).setEncodeCookieValues(encodeCookieValues);
 
-        verify(param).setTargetParamsInjectable(28);
+        verify(param).setTargetParamsInjectable(60);
         verify(param).setTargetParamsEnabledRPC(40);
+    }
+
+    @Test
+    void shouldVerifyAndApplyExcludes() throws Exception {
+        // Given
+        Session session = mock(Session.class);
+        Model model = mock(Model.class);
+        Model.setSingletonForTesting(model);
+        given(model.getSession()).willReturn(session);
+
+        AutomationProgress progress = new AutomationProgress();
+        String yamlStr =
+                """
+        		excludePaths:
+        		- http://www.example\\..*
+        		- .*\\.abc
+        		""";
+        Object data = new Yaml().load(yamlStr);
+
+        AutomationEnvironment env = mock(AutomationEnvironment.class);
+        env.create(session, progress);
+
+        job.setEnv(env);
+        job.setJobData(((LinkedHashMap<?, ?>) data));
+
+        // When
+        job.verifyParameters(progress);
+        job.runJob(env, progress);
+
+        // Then
+        assertThat(progress.hasWarnings(), is(equalTo(false)));
+        assertThat(progress.hasErrors(), is(equalTo(false)));
+
+        ArgumentCaptor<List<String>> result = ArgumentCaptor.captor();
+        verify(session).setExcludeFromScanRegexs(result.capture());
+        assertThat(result.getValue(), contains("http://www.example\\..*", ".*\\.abc"));
+    }
+
+    @Test
+    void shouldErrorOnBadExcludesRegex() throws Exception {
+        // Given
+        AutomationProgress progress = new AutomationProgress();
+        String yamlStr =
+                """
+        		excludePaths:
+        		- http://www.example\\..*
+        		- '*'
+        		""";
+        Object data = new Yaml().load(yamlStr);
+
+        AutomationEnvironment env = mock(AutomationEnvironment.class);
+
+        job.setEnv(env);
+        job.setJobData(((LinkedHashMap<?, ?>) data));
+
+        // When
+        job.verifyParameters(progress);
+
+        // Then
+        assertThat(progress.hasWarnings(), is(equalTo(false)));
+        assertThat(progress.hasErrors(), is(equalTo(true)));
+        assertThat(progress.getErrors().size(), is(equalTo(1)));
+        assertThat(
+                progress.getErrors().get(0),
+                containsString(
+                        "Invalid regex: * for key excludePaths : Dangling meta character '*' near index 0"));
     }
 
     private static void assertValidTemplate(String value) {

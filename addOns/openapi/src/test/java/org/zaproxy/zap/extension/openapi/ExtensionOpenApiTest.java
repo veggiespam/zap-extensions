@@ -32,10 +32,18 @@ import static org.mockito.BDDMockito.anyInt;
 import static org.mockito.BDDMockito.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.withSettings;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoHTTPD;
+import io.swagger.v3.core.util.Json;
+import io.swagger.v3.core.util.Json31;
+import io.swagger.v3.oas.models.OpenAPI;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -49,6 +57,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.mockito.quality.Strictness;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
@@ -214,18 +224,18 @@ class ExtensionOpenApiTest extends AbstractServerTest {
         assertThat(
                 context.getIncludeInContextRegexs(),
                 contains(
-                        expectedUrl + "/pet",
-                        expectedUrl + "/pet/findByStatus",
-                        expectedUrl + "/pet/findByTags",
+                        "\\Q" + expectedUrl + "/pet\\E",
+                        "\\Q" + expectedUrl + "/pet/findByStatus\\E",
+                        "\\Q" + expectedUrl + "/pet/findByTags\\E",
                         expectedUrl + "/pet/[^/?]+",
-                        expectedUrl + "/store/inventory",
-                        expectedUrl + "/store/order",
+                        "\\Q" + expectedUrl + "/store/inventory\\E",
+                        "\\Q" + expectedUrl + "/store/order\\E",
                         expectedUrl + "/store/order/[^/?]+",
-                        expectedUrl + "/user",
-                        expectedUrl + "/user/createWithArray",
-                        expectedUrl + "/user/createWithList",
-                        expectedUrl + "/user/login",
-                        expectedUrl + "/user/logout",
+                        "\\Q" + expectedUrl + "/user\\E",
+                        "\\Q" + expectedUrl + "/user/createWithArray\\E",
+                        "\\Q" + expectedUrl + "/user/createWithList\\E",
+                        "\\Q" + expectedUrl + "/user/login\\E",
+                        "\\Q" + expectedUrl + "/user/logout\\E",
                         expectedUrl + "/user/[^/?]+"));
     }
 
@@ -269,6 +279,111 @@ class ExtensionOpenApiTest extends AbstractServerTest {
                     getHtml(dir + name).getBytes(StandardCharsets.UTF_8));
         }
         return localDefinition.toFile();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3})
+    void shouldLimitMessagesFromFileWhenMaxMessagesSet(int maxMessages) throws Exception {
+        // Given
+        this.nano.addHandler(new EmptyServerHandler());
+        File file = createLocalDefinition("v3/PetStore_defn.json").toFile();
+        givenHistoryCanBePersisted();
+        // When
+        OpenApiResults results =
+                extensionOpenApi.importOpenApiDefinitionV2(
+                        file, null, false, -1, null, maxMessages);
+        // Then
+        assertThat(results.getHistoryReferences(), hasSize(maxMessages));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3})
+    void shouldLimitMessagesFromUrlWhenMaxMessagesSet(int maxMessages) throws Exception {
+        // Given
+        String path = "/PetStore/";
+        String defnName = "defn.json";
+        this.nano.addHandler(new DefnServerHandler(path, defnName, "v3/PetStore_defn.json"));
+        URI uri =
+                new URI("http://localhost:" + this.nano.getListeningPort() + path + defnName, true);
+        givenHistoryCanBePersisted();
+        // When
+        OpenApiResults results =
+                extensionOpenApi.importOpenApiDefinitionV2(uri, null, false, -1, null, maxMessages);
+        // Then - also includes the definition fetch
+        assertThat(results.getHistoryReferences(), hasSize(maxMessages + 1));
+    }
+
+    private void givenHistoryCanBePersisted() throws Exception {
+        RecordHistory recordHistory = mock(RecordHistory.class);
+        given(tableHistory.write(anyLong(), anyInt(), any()))
+                .willReturn(recordHistory, recordHistory);
+        given(model.getVariantFactory()).willReturn(new VariantFactory());
+    }
+
+    @Test
+    void shouldUseJsonMapperForOpenApi30Definition() throws Exception {
+        // Given
+        this.nano.addHandler(new EmptyServerHandler());
+        File file = createLocalDefinition("v3/PetStore_defn.json").toFile();
+        RecordHistory recordHistory = mock(RecordHistory.class);
+        given(tableHistory.write(anyLong(), anyInt(), any()))
+                .willReturn(recordHistory, recordHistory);
+        given(model.getVariantFactory()).willReturn(new VariantFactory());
+        ObjectMapper spyMapper = spy(Json.mapper());
+
+        try (MockedStatic<Json> jsonMock = mockStatic(Json.class)) {
+            jsonMock.when(Json::mapper).thenReturn(spyMapper);
+            // When
+            extensionOpenApi.importOpenApiDefinitionV2(file, null, false, -1, null);
+            // Then
+            verify(spyMapper, atLeastOnce()).writeValueAsString(any(OpenAPI.class));
+        }
+    }
+
+    @Test
+    void shouldUseJson31MapperForOpenApi31Definition() throws Exception {
+        // Given
+        this.nano.addHandler(new EmptyServerHandler());
+        File file = createLocalDefinition("v3/PetStore_defn_3.1.yaml").toFile();
+        RecordHistory recordHistory = mock(RecordHistory.class);
+        given(tableHistory.write(anyLong(), anyInt(), any()))
+                .willReturn(recordHistory, recordHistory);
+        given(model.getVariantFactory()).willReturn(new VariantFactory());
+        ObjectMapper spyMapper = spy(Json31.mapper());
+
+        try (MockedStatic<Json31> json31Mock = mockStatic(Json31.class)) {
+            json31Mock.when(Json31::mapper).thenReturn(spyMapper);
+            // When
+            extensionOpenApi.importOpenApiDefinitionV2(file, null, false, -1, null);
+            // Then
+            json31Mock.verify(Json31::mapper, atLeastOnce());
+            verify(spyMapper, atLeastOnce()).writeValueAsString(any(OpenAPI.class));
+        }
+    }
+
+    private class DefnServerHandler extends NanoServerHandler {
+
+        private final String defnName;
+        private final String defnFileName;
+        private final String port;
+
+        DefnServerHandler(String name, String defnName, String defnFileName) {
+            super(name);
+            this.defnName = defnName;
+            this.defnFileName = defnFileName;
+            this.port = String.valueOf(nano.getListeningPort());
+        }
+
+        @Override
+        protected NanoHTTPD.Response serve(NanoHTTPD.IHTTPSession session) {
+            String response;
+            if (session.getUri().endsWith(defnName)) {
+                response = getHtml(defnFileName, new String[][] {{"PORT", port}});
+            } else {
+                response = "";
+            }
+            return newFixedLengthResponse(response);
+        }
     }
 
     private static class EmptyServerHandler extends NanoServerHandler {

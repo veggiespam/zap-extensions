@@ -112,10 +112,11 @@ class GraphQlJobUnitTest extends TestUtils {
         Map<String, String> params = job.getCustomConfigParameters();
 
         // Then
-        assertThat(params.size(), is(equalTo(3)));
+        assertThat(params.size(), is(equalTo(4)));
         assertThat(params.get("endpoint"), is(equalTo("")));
         assertThat(params.get("schemaUrl"), is(equalTo("")));
         assertThat(params.get("schemaFile"), is(equalTo("")));
+        assertThat(params.get("maxMessages"), is(equalTo("0")));
     }
 
     @Test
@@ -126,6 +127,7 @@ class GraphQlJobUnitTest extends TestUtils {
         String endpoint = "https://example.com/graphql/";
         String schemaFile = "C:\\Users\\ZAPBot\\Documents\\test schema.graphql";
         String schemaUrl = "https://example.com/test%20file.graphql";
+        int maxMessages = 1;
         String yamlStr =
                 "parameters:\n"
                         + "  endpoint: "
@@ -135,7 +137,10 @@ class GraphQlJobUnitTest extends TestUtils {
                         + schemaFile
                         + "\n"
                         + "  schemaUrl: "
-                        + schemaUrl;
+                        + schemaUrl
+                        + "\n"
+                        + "  maxMessages: "
+                        + maxMessages;
         Yaml yaml = new Yaml();
         Object data = yaml.load(yamlStr);
 
@@ -149,6 +154,30 @@ class GraphQlJobUnitTest extends TestUtils {
         assertThat(job.getParameters().getEndpoint(), is(equalTo(endpoint)));
         assertThat(job.getParameters().getSchemaFile(), is(equalTo(schemaFile)));
         assertThat(job.getParameters().getSchemaUrl(), is(equalTo(schemaUrl)));
+        assertThat(job.getParameters().getMaxMessages(), is(equalTo(maxMessages)));
+        assertThat(progress.hasWarnings(), is(equalTo(false)));
+    }
+
+    @Test
+    void shouldWarnIfNegativeMaxMessages() {
+        // Given
+        mockMessages(new ExtensionGraphQl());
+        AutomationProgress progress = new AutomationProgress();
+        String yamlStr = "parameters:\n" + "  maxMessages: -1";
+        Yaml yaml = new Yaml();
+        Object data = yaml.load(yamlStr);
+
+        GraphQlJob job = new GraphQlJob();
+        job.setJobData(((LinkedHashMap<?, ?>) data));
+
+        // When
+        job.verifyParameters(progress);
+
+        // Then
+        assertThat(progress.hasWarnings(), is(equalTo(true)));
+        assertThat(
+                progress.getWarnings().get(0),
+                is(equalTo("Job graphql maxMessages must be zero or greater, was: -1")));
     }
 
     @Test
@@ -247,7 +276,7 @@ class GraphQlJobUnitTest extends TestUtils {
                 job.getConfigParameters(new GraphQlParamWrapper(), job.getParamMethodName());
 
         // Then
-        assertThat(params.size(), is(equalTo(9)));
+        assertThat(params.size(), is(equalTo(11)));
         assertThat(params.containsKey("queryGenEnabled"), is(equalTo(true)));
         assertThat(params.containsKey("argsType"), is(equalTo(true)));
         assertThat(params.containsKey("lenientMaxQueryDepthEnabled"), is(equalTo(true)));
@@ -257,6 +286,8 @@ class GraphQlJobUnitTest extends TestUtils {
         assertThat(params.containsKey("optionalArgsEnabled"), is(equalTo(true)));
         assertThat(params.containsKey("querySplitType"), is(equalTo(true)));
         assertThat(params.containsKey("requestMethod"), is(equalTo(true)));
+        assertThat(params.containsKey("cycleDetectionMode"), is(equalTo(true)));
+        assertThat(params.containsKey("maxCycleDetectionAlerts"), is(equalTo(true)));
     }
 
     @Test

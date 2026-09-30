@@ -20,16 +20,15 @@
 package org.zaproxy.zap.extension.fuzz.payloads.processor;
 
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import org.apache.commons.codec.binary.Hex;
-import org.zaproxy.zap.extension.fuzz.payloads.DefaultPayload;
+import java.util.HexFormat;
+import org.zaproxy.zap.extension.fuzz.payloads.Payload;
 
-public abstract class AbstractStringHashProcessor extends AbstractCharsetProcessor<DefaultPayload>
-        implements DefaultPayloadProcessor {
+public abstract class AbstractStringHashProcessor extends AbstractCharsetProcessor {
 
-    protected static final Hex HEX_ASCII = new Hex(StandardCharsets.US_ASCII.name());
+    private static final HexFormat HEX_FORMAT = HexFormat.of();
+    private static final HexFormat HEX_FORMAT_UPPERCASE = HexFormat.of().withUpperCase();
 
     private final boolean upperCase;
 
@@ -70,11 +69,12 @@ public abstract class AbstractStringHashProcessor extends AbstractCharsetProcess
     protected abstract MessageDigest getMessageDigest();
 
     @Override
-    public DefaultPayload process(DefaultPayload payload) {
+    public Payload process(Payload payload) {
         MessageDigest messageDigest = getMessageDigest();
         messageDigest.reset();
         messageDigest.update(payload.getValue().getBytes(getCharset()));
-        payload.setValue(Hex.encodeHexString(messageDigest.digest(), !upperCase));
+        HexFormat hexFormat = upperCase ? HEX_FORMAT_UPPERCASE : HEX_FORMAT;
+        payload.setValue(hexFormat.formatHex(messageDigest.digest()));
         return payload;
     }
 

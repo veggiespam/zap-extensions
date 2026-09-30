@@ -49,7 +49,7 @@ public class HeartBleedScanRule extends PluginPassiveScanner implements CommonPa
     private static Pattern openSSLversionPattern =
             Pattern.compile("Server:.*?(OpenSSL/([0-9.]+[a-z-0-9]+))", Pattern.CASE_INSENSITIVE);
 
-    /** vulnerable versions, courtesy of https://nvd.nist.gov/vuln/detail/CVE-2014-0160 */
+    /** vulnerable versions, courtesy of https://nvd.nist.gov/vuln/detail/cve-2014-0160 */
     static String[] openSSLvulnerableVersions = {
         "1.0.1-Beta1",
         "1.0.1-Beta2",
@@ -74,6 +74,7 @@ public class HeartBleedScanRule extends PluginPassiveScanner implements CommonPa
         Map<String, String> alertTags = new HashMap<>();
         alertTags.putAll(
                 CommonAlertTag.toMap(
+                        CommonAlertTag.OWASP_2025_A04_CRYPTO_FAIL,
                         CommonAlertTag.OWASP_2021_A06_VULN_COMP,
                         CommonAlertTag.OWASP_2017_A09_VULN_COMP,
                         CommonAlertTag.WSTG_V42_CRYP_01_TLS));

@@ -162,6 +162,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
 
     @Override
     protected SqlInjectionScanRule createScanner() {
+        mockMessages(new ExtensionAscanRules());
         return new SqlInjectionScanRule();
     }
 
@@ -174,7 +175,13 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
         // Then
         assertThat(cwe, is(equalTo(89)));
         assertThat(wasc, is(equalTo(19)));
-        assertThat(tags.size(), is(equalTo(11)));
+        assertThat(tags.size(), is(equalTo(16)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.API_2023_API10_UNSAFE_CONSUMPTION.getTag()),
+                is(equalTo(true)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A05_INJECTION.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A03_INJECTION.getTag()),
                 is(equalTo(true)));
@@ -183,13 +190,23 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
                 is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.WSTG_V42_INPV_05_SQLI.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(CommonAlertTag.HIPAA.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(CommonAlertTag.PCI_DSS.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.API.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(PolicyTag.DEV_CICD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.DEV_STD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.DEV_FULL.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(PolicyTag.QA_CICD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_STD.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_FULL.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.SEQUENCE.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.PENTEST.getTag()), is(equalTo(true)));
+        assertThat(
+                tags.get(CommonAlertTag.API_2023_API10_UNSAFE_CONSUMPTION.getTag()),
+                is(equalTo(CommonAlertTag.API_2023_API10_UNSAFE_CONSUMPTION.getValue())));
+        assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A05_INJECTION.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A05_INJECTION.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A03_INJECTION.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A03_INJECTION.getValue())));
@@ -199,6 +216,12 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
         assertThat(
                 tags.get(CommonAlertTag.WSTG_V42_INPV_05_SQLI.getTag()),
                 is(equalTo(CommonAlertTag.WSTG_V42_INPV_05_SQLI.getValue())));
+        assertThat(
+                tags.get(CommonAlertTag.HIPAA.getTag()),
+                is(equalTo(CommonAlertTag.HIPAA.getValue())));
+        assertThat(
+                tags.get(CommonAlertTag.PCI_DSS.getTag()),
+                is(equalTo(CommonAlertTag.PCI_DSS.getValue())));
     }
 
     @Test
@@ -279,7 +302,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
     @Test
     void allErrorsListShouldBeComplete() {
         Stream.of(SqlInjectionScanRule.RDBMS.values())
-                .filter(db -> !db.equals(SqlInjectionScanRule.RDBMS.GenericRDBMS))
+                .filter(db -> !db.equals(SqlInjectionScanRule.RDBMS.GENERIC))
                 .forEach(
                         db ->
                                 db.getErrorPatterns().stream()
@@ -536,7 +559,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
             String normalValue = "payload";
             String andTrueValue = normalValue + SqlInjectionScanRule.SQL_LOGIC_AND_TRUE[0];
             String andFalseValue = normalValue + SqlInjectionScanRule.SQL_LOGIC_AND_FALSE[0];
-            String ORTrueValue = normalValue + SqlInjectionScanRule.SQL_LOGIC_OR_TRUE[0];
+            String orTrueValue = normalValue + SqlInjectionScanRule.SQL_LOGIC_OR_TRUE[0];
 
             UrlParamValueHandler handler =
                     UrlParamValueHandler.builder()
@@ -547,7 +570,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
                             .thenReturnHtml("normal response")
                             .whenParamValueIs(andFalseValue)
                             .thenReturnHtml(constructReflectedResponse("normal response"))
-                            .whenParamValueIs(ORTrueValue)
+                            .whenParamValueIs(orTrueValue)
                             .thenReturnHtml("different response")
                             .build();
             nano.addHandler(handler);
@@ -703,7 +726,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
             String normalValue = "normal";
             String andTrueValue = normalValue + SqlInjectionScanRule.SQL_LOGIC_AND_TRUE[0];
             String andFalseValue = normalValue + SqlInjectionScanRule.SQL_LOGIC_AND_FALSE[0];
-            String ORTrueValue = normalValue + SqlInjectionScanRule.SQL_LOGIC_OR_TRUE[0];
+            String orTrueValue = normalValue + SqlInjectionScanRule.SQL_LOGIC_OR_TRUE[0];
 
             UrlParamValueHandler handler =
                     UrlParamValueHandler.builder()
@@ -714,8 +737,8 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
                             .thenReturnHtml(constructReflectedResponse(andTrueValue) + normalValue)
                             .whenParamValueIs(andFalseValue)
                             .thenReturnHtml(constructReflectedResponse(andFalseValue) + normalValue)
-                            .whenParamValueIs(ORTrueValue)
-                            .thenReturnHtml(constructReflectedResponse(ORTrueValue) + normalValue)
+                            .whenParamValueIs(orTrueValue)
+                            .thenReturnHtml(constructReflectedResponse(orTrueValue) + normalValue)
                             .build();
             nano.addHandler(handler);
             rule.init(getHttpMessage("/?param=" + normalValue), parent);
@@ -873,18 +896,14 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
             paramValueToResponseMap.put(
                     normalPayload,
                     () -> {
-                        final Response response =
-                                newFixedLengthResponse(
-                                        Status.REDIRECT, NanoHTTPD.MIME_HTML, "normal");
-                        return response;
+                        return newFixedLengthResponse(
+                                Status.REDIRECT, NanoHTTPD.MIME_HTML, "normal");
                     });
             paramValueToResponseMap.put(
                     attackPayload,
                     () -> {
-                        final Response response =
-                                newFixedLengthResponse(
-                                        Status.REDIRECT, NanoHTTPD.MIME_HTML, "normal");
-                        return response;
+                        return newFixedLengthResponse(
+                                Status.REDIRECT, NanoHTTPD.MIME_HTML, "normal");
                     });
             paramValueToResponseMap.put(
                     verificationPayload,
@@ -1347,8 +1366,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
                     (Supplier<Response>)
                             MapUtils.getObject(
                                     paramValueToResponseMap, actualParamValue, fallbackResponse);
-            Response response = responseFn.get();
-            return response;
+            return responseFn.get();
         }
     }
 }

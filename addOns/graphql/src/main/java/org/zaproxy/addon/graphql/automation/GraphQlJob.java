@@ -50,6 +50,7 @@ public class GraphQlJob extends AutomationJob {
     private static final String PARAM_ENDPOINT = "endpoint";
     private static final String PARAM_SCHEMA_URL = "schemaUrl";
     private static final String PARAM_SCHEMA_FILE = "schemaFile";
+    private static final String PARAM_MAX_MESSAGES = "maxMessages";
 
     private static final String RESOURCES_DIR = "/org/zaproxy/addon/graphql/resources/";
 
@@ -72,6 +73,14 @@ public class GraphQlJob extends AutomationJob {
                 this.getName(),
                 null,
                 progress);
+
+        if (getParameters().getMaxMessages() < 0) {
+            progress.warn(
+                    Constant.messages.getString(
+                            "graphql.automation.warn.maxMessages",
+                            getName(),
+                            getParameters().getMaxMessages()));
+        }
     }
 
     @Override
@@ -80,7 +89,9 @@ public class GraphQlJob extends AutomationJob {
                 this.parameters,
                 JobUtils.getJobOptions(this, progress),
                 this.getName(),
-                new String[] {PARAM_ENDPOINT, PARAM_SCHEMA_URL, PARAM_SCHEMA_FILE},
+                new String[] {
+                    PARAM_ENDPOINT, PARAM_SCHEMA_URL, PARAM_SCHEMA_FILE, PARAM_MAX_MESSAGES
+                },
                 progress,
                 this.getPlan().getEnv());
     }
@@ -91,6 +102,7 @@ public class GraphQlJob extends AutomationJob {
         map.put(PARAM_ENDPOINT, "");
         map.put(PARAM_SCHEMA_URL, "");
         map.put(PARAM_SCHEMA_FILE, "");
+        map.put(PARAM_MAX_MESSAGES, "0");
         return map;
     }
 
@@ -108,6 +120,7 @@ public class GraphQlJob extends AutomationJob {
             GraphQlParser parser =
                     new GraphQlParser(endpointUrl, HttpSender.MANUAL_REQUEST_INITIATOR, true);
             parser.addRequesterListener(new HistoryPersister());
+            parser.setMaxMessages(getParameters().getMaxMessages());
 
             String schemaFile = this.getParameters().getSchemaFile();
             String schemaUrl = this.getParameters().getSchemaUrl();
@@ -217,17 +230,20 @@ public class GraphQlJob extends AutomationJob {
         private String endpoint;
         private String schemaUrl;
         private String schemaFile;
+        private int maxMessages;
         private Boolean queryGenEnabled = GraphQlParam.DEFAULT_QUERY_GEN_ENABLED;
         private Integer maxQueryDepth = GraphQlParam.DEFAULT_MAX_QUERY_DEPTH;
         private Boolean lenientMaxQueryDepthEnabled = GraphQlParam.DEFAULT_LENIENT_MAX_QUERY_DEPTH;
         private Integer maxAdditionalQueryDepth = GraphQlParam.DEFAULT_MAX_ADDITIONAL_QUERY_DEPTH;
         private Integer maxArgsDepth = GraphQlParam.DEFAULT_MAX_ARGS_DEPTH;
         private Boolean optionalArgsEnabled = GraphQlParam.DEFAULT_OPTIONAL_ARGS;
-        private String argsType =
-                GraphQlParam.DEFAULT_ARGS_TYPE.toString().toLowerCase(Locale.ROOT);
+        private String argsType = GraphQlParam.DEFAULT_ARGS_TYPE.name().toLowerCase(Locale.ROOT);
         private String querySplitType =
-                GraphQlParam.DEFAULT_QUERY_SPLIT_TYPE.toString().toLowerCase(Locale.ROOT);
+                GraphQlParam.DEFAULT_QUERY_SPLIT_TYPE.name().toLowerCase(Locale.ROOT);
         private String requestMethod =
-                GraphQlParam.DEFAULT_REQUEST_METHOD.toString().toLowerCase(Locale.ROOT);
+                GraphQlParam.DEFAULT_REQUEST_METHOD.name().toLowerCase(Locale.ROOT);
+        private String cycleDetectionMode =
+                GraphQlParam.DEFAULT_CYCLE_DETECTION_MODE.name().toLowerCase(Locale.ROOT);
+        private Integer maxCycleDetectionAlerts = GraphQlParam.DEFAULT_MAX_CYCLE_DETECTION_ALERTS;
     }
 }

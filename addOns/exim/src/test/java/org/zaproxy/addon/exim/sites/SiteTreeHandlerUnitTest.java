@@ -36,6 +36,7 @@ import java.io.File;
 import java.io.StringWriter;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -60,6 +61,7 @@ import org.parosproxy.paros.model.SiteMap;
 import org.parosproxy.paros.model.SiteNode;
 import org.parosproxy.paros.network.HtmlParameter;
 import org.parosproxy.paros.network.HttpMessage;
+import org.zaproxy.addon.exim.ExporterOptions;
 import org.zaproxy.addon.exim.ExporterResult;
 import org.zaproxy.zap.extension.ascan.VariantFactory;
 import org.zaproxy.zap.model.Context;
@@ -71,6 +73,14 @@ import org.zaproxy.zap.utils.I18N;
 /** Unit test for {@link SitesTreeHandler}. */
 class SiteTreeHandlerUnitTest {
 
+    private static final byte[] MULTIPART_BODY_BYTES =
+            """
+            -----------12345\r
+            Content-Disposition: form-data; name="x"\r\n\r
+            Data
+            -----------12345--\r
+            """
+                    .getBytes();
     private SiteMap siteMap;
     private Session session;
     private StandardParameterParser spp;
@@ -247,6 +257,68 @@ class SiteTreeHandlerUnitTest {
     }
 
     @Test
+    void shouldOutputNodesInContext() throws Exception {
+        // Given
+        String expectedYaml =
+                """
+                - node: Sites
+                  children:
+                  - node: http://www.example.org
+                    url: http://www.example.org
+                    method: GET
+                    children:
+                    - node: a
+                      url: http://www.example.org/a
+                      method: GET
+                      children:
+                      - node: b
+                        children:
+                        - node: GET:file
+                          url: http://www.example.org/a/b/file
+                          method: GET
+                          responseLength: 21
+                          statusCode: 200
+                """;
+        HttpMessage msg =
+                new HttpMessage(
+                        "GET http://www.example.org/a/b/file HTTP/1.1",
+                        "".getBytes(),
+                        "HTTP/1.1 200 OK",
+                        "".getBytes());
+        siteMap.addPath(getHref(msg));
+        siteMap.addPath(
+                getHref(
+                        new HttpMessage(
+                                "GET http://www.example.com/a/b/file HTTP/1.1",
+                                "".getBytes(),
+                                "HTTP/1.1 200 OK",
+                                "".getBytes())));
+
+        StringWriter sw = new StringWriter();
+        Context ctx = mock();
+        given(ctx.isInContext(any(SiteNode.class)))
+                .willAnswer(
+                        invocation -> {
+                            SiteNode node = invocation.getArgument(0);
+                            if (node.getHierarchicNodeName().startsWith("http://www.example.com")
+                                    || "b".equals(node.getNodeName())) {
+                                return false;
+                            }
+                            return true;
+                        });
+        ExporterOptions options =
+                ExporterOptions.builder().setOutputFile(Paths.get("/")).setContext(ctx).build();
+        ExporterResult result = new ExporterResult();
+
+        // When
+        SitesTreeHandler.exportSitesTree(sw, siteMap, result, options);
+
+        // Then
+        assertThat(sw.toString(), is(expectedYaml));
+        assertThat(result.getCount(), is(5));
+    }
+
+    @Test
     void shouldOutputNodeWithMultipartFormData() throws Exception {
         // Given
         String expectedYaml =
@@ -256,17 +328,19 @@ class SiteTreeHandlerUnitTest {
                         + "    url: https://www.example.com\n"
                         + "    method: GET\n"
                         + "    children:\n"
-                        + "    - node: \"POST:/(bb,dd)(multipart/form-data)\"\n"
+                        + "    - node: \"POST:/(bb,dd)(multipart:x)\"\n"
                         + "      url: https://www.example.com/?bb=bcc&dd=ee\n"
                         + "      method: POST\n"
                         + "      responseLength: 61\n"
-                        + "      statusCode: 200\n";
+                        + "      statusCode: 200\n"
+                        + "      data: x\n";
         HttpMessage msg =
                 new HttpMessage(
-                        "POST https://www.example.com/?bb=bcc&dd=ee HTTP/1.1\r\n"
-                                + "Content-Type: multipart/form-data; boundary=-----------12345\r\n",
-                        "-----------12345\nThis doesnt really matter\n-----------12345--"
-                                .getBytes(),
+                        """
+                        POST https://www.example.com/?bb=bcc&dd=ee HTTP/1.1
+                        Content-Type: multipart/form-data; boundary=-----------12345
+                        """,
+                        MULTIPART_BODY_BYTES,
                         "HTTP/1.1 200 OK\r\n" + "content-length: 20",
                         "12345678901234567890".getBytes());
         siteMap.addPath(getHref(msg));
@@ -370,14 +444,11 @@ class SiteTreeHandlerUnitTest {
         assertThat(siteMap.getRoot().getChildAt(0).getChildCount(), is(0));
     }
 
-    private EximSiteNode getExImSiteNode(String url, String method) {
-        EximSiteNode node = new EximSiteNode();
-        node.setMethod(method);
-        node.setUrl(url);
+    private static EximSiteNode getExImSiteNode(String url, String method) {
         return getExImSiteNode(url, method, method + ":" + url);
     }
 
-    private EximSiteNode getExImSiteNode(String url, String method, String name) {
+    private static EximSiteNode getExImSiteNode(String url, String method, String name) {
         EximSiteNode node = new EximSiteNode();
         node.setNode(name);
         node.setMethod(method);
@@ -453,21 +524,21 @@ class SiteTreeHandlerUnitTest {
                 new HttpMessage(
                         "POST https://www.example.com/?bb=bcc&dd=ee HTTP/1.1\r\n"
                                 + "Content-Type: multipart/form-data; boundary=-----------12345\r\n",
-                        "-----------12345\nThis doesnt really matter\n-----------12345--"
-                                .getBytes(),
+                        MULTIPART_BODY_BYTES,
                         "HTTP/1.1 200 OK\r\n" + "content-length: 20",
                         "12345678901234567890".getBytes());
         siteMap.addPath(getHref(msg));
-        PruneSiteResult res = new PruneSiteResult();
-
-        // When
-        SitesTreeHandler.pruneSiteNodes(
+        EximSiteNode node =
                 getExImSiteNode(
                         "https://www.example.com/?bb=bcc&dd=ee",
                         "POST",
-                        "POST:/(bb,dd)(multipart/form-data)"),
-                res,
-                siteMap);
+                        "POST:/(bb,dd)(multipart:x)");
+        node.setData("x");
+
+        PruneSiteResult res = new PruneSiteResult();
+
+        // When
+        SitesTreeHandler.pruneSiteNodes(node, res, siteMap);
 
         // Then
         assertThat(res.getReadNodes(), is(1));
@@ -563,14 +634,14 @@ class SiteTreeHandlerUnitTest {
 
     static Stream<Arguments> specialNodeNames() {
         return Stream.of(
-                Arguments.of("\"", "POST:\"()"),
-                Arguments.of("'", "POST:'()"),
-                Arguments.of("\\", "POST:\\()"),
-                Arguments.of("\n", "|-\n        POST:\n        ()"),
-                Arguments.of("\r", "\"POST:\\r()\""),
-                Arguments.of("\u0001", "\"POST:\\x01()\""),
-                Arguments.of("\u0002", "\"POST:\\x02()\""),
-                Arguments.of("\u0003", "\"POST:\\x03()\""));
+                Arguments.of("\"", "POST:\""),
+                Arguments.of("'", "POST:'"),
+                Arguments.of("\\", "POST:\\"),
+                Arguments.of("\n", "|\n        POST:"),
+                Arguments.of("\r", "\"POST:\\r\""),
+                Arguments.of("\u0001", "\"POST:\\x01\""),
+                Arguments.of("\u0002", "\"POST:\\x02\""),
+                Arguments.of("\u0003", "\"POST:\\x03\""));
     }
 
     @ParameterizedTest

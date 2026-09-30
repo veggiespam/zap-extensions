@@ -22,6 +22,8 @@ package org.zaproxy.addon.network.internal.cert;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.equalToCompressingWhiteSpace;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
@@ -40,6 +42,9 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Date;
+import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -126,6 +131,32 @@ class CertificateUtilsUnitTest {
     }
 
     @Test
+    void shouldOmitCnWhenDomainNameExceedsLimit() throws Exception {
+        // Given
+        CertConfig config = new CertConfig(Duration.ofDays(60));
+        KeyStore rootCaKeyStore =
+                CertificateUtils.stringToKeystore(NetworkTestUtils.FISH_CERT_BASE64_STR);
+        X509Certificate rootCaCert = CertificateUtils.getCertificate(rootCaKeyStore);
+        PublicKey rootCaPublicKey = rootCaCert.getPublicKey();
+        PrivateKey rooCaPrivateKey = CertificateUtils.getPrivateKey(rootCaKeyStore);
+        String longHostname = "a".repeat(65) + ".example.org";
+        CertData certData = new CertData(longHostname);
+        // When
+        KeyStore keyStore =
+                CertificateUtils.createServerKeyStore(
+                        rootCaCert, rootCaPublicKey, rooCaPrivateKey, certData, 1L, config);
+        // Then
+        X509Certificate serverCert = CertificateUtils.getCertificate(keyStore);
+        assertThat(serverCert.getSubjectX500Principal().getName(), not(containsString("CN=")));
+        assertThat(
+                serverCert.getSubjectAlternativeNames().toString(),
+                containsString("[2, " + longHostname + "]"));
+        assertThat(
+                serverCert.getCriticalExtensionOIDs(),
+                hasItem(Extension.subjectAlternativeName.getId()));
+    }
+
+    @Test
     void shouldCreateServerCertificateWithGivenValidity() throws Exception {
         // Given
         Duration validity = Duration.ofDays(60);
@@ -146,6 +177,33 @@ class CertificateUtilsUnitTest {
         Date certExpiredDate =
                 new Date(System.currentTimeMillis() + validity.plusDays(1L).toMillis());
         assertThat(certNotAfter.before(certExpiredDate), is(equalTo(true)));
+    }
+
+    @Test
+    void shouldCreateServerCertificateWithAuthorityKeyIdentifier() throws Exception {
+        // Given
+        CertConfig config = new CertConfig(Duration.ofDays(60));
+        KeyStore rootCaKeyStore =
+                CertificateUtils.stringToKeystore(NetworkTestUtils.FISH_CERT_BASE64_STR);
+        X509Certificate rootCaCert = CertificateUtils.getCertificate(rootCaKeyStore);
+        PublicKey rootCaPublicKey = rootCaCert.getPublicKey();
+        PrivateKey rooCaPrivateKey = CertificateUtils.getPrivateKey(rootCaKeyStore);
+        CertData certData = new CertData("example.org");
+        // When
+        KeyStore keyStore =
+                CertificateUtils.createServerKeyStore(
+                        rootCaCert, rootCaPublicKey, rooCaPrivateKey, certData, 1L, config);
+        // Then
+        assertThat(keyStore, is(notNullValue()));
+        X509Certificate cert = CertificateUtils.getCertificate(keyStore);
+        byte[] actualExtensionValue =
+                cert.getExtensionValue(Extension.authorityKeyIdentifier.getId());
+        AuthorityKeyIdentifier actualAki =
+                AuthorityKeyIdentifier.getInstance(
+                        JcaX509ExtensionUtils.parseExtensionValue(actualExtensionValue));
+        AuthorityKeyIdentifier expectedAki =
+                new AuthorityKeyIdentifier(rootCaPublicKey.getEncoded());
+        assertThat(actualAki.getEncoded(), is(equalTo(expectedAki.getEncoded())));
     }
 
     @Test
@@ -377,7 +435,7 @@ class CertificateUtilsUnitTest {
         // When
         String pem = CertificateUtils.keyStoreToCertificatePem(keyStore);
         // Then
-        assertThat(pem, is(equalTo(CERTIFICATE_PEM)));
+        assertThat(pem, is(equalToCompressingWhiteSpace(CERTIFICATE_PEM)));
     }
 
     @Test
@@ -412,7 +470,7 @@ class CertificateUtilsUnitTest {
         // When
         CertificateUtils.keyStoreToCertificatePem(keyStore, file);
         // Then
-        assertThat(contents(file), is(equalTo(CERTIFICATE_PEM)));
+        assertThat(contents(file), is(equalToCompressingWhiteSpace(CERTIFICATE_PEM)));
     }
 
     @Test

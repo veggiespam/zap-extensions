@@ -4,7 +4,44 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Changed
+- Simplify tab names in the Automation Framework job dialogue (Issue 9408).
+- Update dependency.
 
+## [0.34.0] - 2026-08-12
+### Added
+- Allow users to limit the number of GraphQL messages to import (`maxMessages`). Ex: If testing authentication, access, etc.
+
+### Changed
+- Update dependency.
+- Maintenance changes.
+
+## [0.33.0] - 2026-04-14
+### Changed
+- The alerts now have new tags for the OWASP Top 10 2025, and API Top 10 2023.
+    - The "OWASP_2023_API4" tag was dropped in favor of the new unified mapping entry "API_2023_API4_UNRESTRICTED_RESOURCE_CONSUMPTION". This may be a breaking change for users that depended on the tag to define scan policies.
+- Depends on an updated version of the Common Library add-on.
+
+## [0.32.0] - 2026-03-02
+### Added
+- Support for importing an introspection query response JSON from a URL (Issue 9249).
+
+## [0.31.0] - 2026-02-11
+### Fixed
+- Tech Detection integration was not working due to handler reset on each run.
+
+## [0.30.0] - 2026-02-03
+### Added
+- GraphQL Cycle detection: Imported schemas are processed for circular type references, and an alert is created for each unique circular relationship that is found.
+  The cycle detection exhaustiveness and the maximum number of alerts raised are configurable.
+
+## [0.29.0] - 2025-12-15
+### Added
+- Statistics for GraphQL schema imports and message additions.
+
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Dependency updates.
 
 ## [0.28.0] - 2025-03-26
 ### Fixed
@@ -220,6 +257,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Import a GraphQL Schema
   - Generate Queries from an imported Schema
 
+[0.34.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.34.0
+[0.33.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.33.0
+[0.32.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.32.0
+[0.31.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.31.0
+[0.30.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.30.0
+[0.29.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.29.0
 [0.28.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.28.0
 [0.27.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.27.0
 [0.26.0]: https://github.com/zaproxy/zap-extensions/releases/graphql-v0.26.0

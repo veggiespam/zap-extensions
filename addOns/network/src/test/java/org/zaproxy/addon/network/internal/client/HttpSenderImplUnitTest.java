@@ -33,7 +33,6 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
-import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -333,7 +332,7 @@ class HttpSenderImplUnitTest {
                     assertThrows(
                             ZapUnknownHostException.class,
                             () -> method.sendWith(httpSender, message));
-            assertThat(exception.getMessage(), startsWith(host));
+            assertThat(exception.getMessage(), containsString(host));
             assertThat(exception.isFromOutgoingProxy(), is(equalTo(false)));
         }
 
@@ -420,7 +419,7 @@ class HttpSenderImplUnitTest {
         void shouldBeSentWithExistingHostHeaderRemainingInPlace(SenderMethod method)
                 throws Exception {
             // Given
-            message.getRequestHeader().setHeader("Host", "localhost:" + serverPort);
+            message.getRequestHeader().setHeader("host", "localhost:" + serverPort);
             message.getRequestHeader().setContentLength(message.getRequestBody().length());
             // When
             method.sendWith(httpSender, message);
@@ -448,7 +447,7 @@ class HttpSenderImplUnitTest {
         void shouldBeSentWithUpdatedHostHeaderRemainingInPlace(SenderMethod method)
                 throws Exception {
             // Given
-            message.getRequestHeader().setHeader("Host", "example.org:" + serverPort);
+            message.getRequestHeader().setHeader("host", "example.org:" + serverPort);
             message.getRequestHeader().setContentLength(message.getRequestBody().length());
             // When
             method.sendWith(httpSender, message);
@@ -499,7 +498,7 @@ class HttpSenderImplUnitTest {
                 "org.zaproxy.addon.network.internal.client.HttpSenderImplUnitTest#sendAndReceiveMethods")
         void shouldBeSentWithIncorrectContentLength(SenderMethod method) throws Exception {
             // Given
-            message.getRequestHeader().setHeader("Host", "localhost:" + serverPort);
+            message.getRequestHeader().setHeader("host", "localhost:" + serverPort);
             message.getRequestHeader().setContentLength(42);
             server.setFixedLengthMessage(61);
             // When
@@ -528,7 +527,7 @@ class HttpSenderImplUnitTest {
         void shouldBeUpdatedWithExactContentLengthHeaderCase(
                 String requestMethod, SenderMethod method) throws Exception {
             // Given
-            message.getRequestHeader().setHeader("Host", "localhost:" + serverPort);
+            message.getRequestHeader().setHeader("host", "localhost:" + serverPort);
             message.getRequestHeader().addHeader("content-length", "0");
             message.getRequestHeader().addHeader("OtherHeader", "SomeValue");
             // When
@@ -851,6 +850,18 @@ class HttpSenderImplUnitTest {
         void shouldHaveTimingsSet(SenderMethod method) throws Exception {
             // Given
             long now = System.currentTimeMillis();
+            defaultHandler =
+                    (ctx, msg) -> {
+                        msg.setResponseHeader(DEFAULT_SERVER_HEADER);
+                        msg.setResponseBody(SERVER_RESPONSE);
+                        msg.getResponseHeader().setContentLength(msg.getResponseBody().length());
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    };
+            server.setHttpMessageHandler(defaultHandler);
             // When
             method.sendWith(httpSender, message);
             // Then
@@ -1470,6 +1481,20 @@ class HttpSenderImplUnitTest {
         @ParameterizedTest
         @MethodSource(
                 "org.zaproxy.addon.network.internal.client.HttpSenderImplUnitTest#sendAndReceiveMethods")
+        void shouldPreserveExistingHeaderNameCase(SenderMethod method) throws Exception {
+            // Given
+            message.getRequestHeader().setHeader("HoSt", "example.com");
+            // When
+            method.sendWith(httpSender, message);
+            // Then
+            assertThat(
+                    messageReceived.getRequestHeader().toString(),
+                    containsString("a: 1\r\nHoSt: " + serverHost + "\r\nb: 2\r\n\r\n"));
+        }
+
+        @ParameterizedTest
+        @MethodSource(
+                "org.zaproxy.addon.network.internal.client.HttpSenderImplUnitTest#sendAndReceiveMethods")
         void shouldBeEnabledByDefaultAndRemoveDuplicatedHostHeaders(SenderMethod method)
                 throws Exception {
             // Given
@@ -1727,7 +1752,7 @@ class HttpSenderImplUnitTest {
                             () -> httpSender.sendAndReceive(message));
             assertThat(proxy.getReceivedMessages(), hasSize(0));
             assertThat(server.getReceivedMessages(), hasSize(0));
-            assertThat(exception.getMessage(), startsWith(proxyHost));
+            assertThat(exception.getMessage(), containsString(proxyHost));
             assertThat(exception.isFromOutgoingProxy(), is(equalTo(true)));
         }
 
@@ -2156,29 +2181,26 @@ class HttpSenderImplUnitTest {
         private static final String EXPECTED_COOKIE_HEADER =
                 "a=\"a-value\"; b=b-value\"; c=\"c-value; d=d -value; e=e-v; f=f-value; F=F-value; g=\"g; \"nameA=value; nameB\"=value; \"nameC\"=value; name a=value; name     c=value     c; X; W=";
 
+        private static final List<String> RAW_COOKIES =
+                List.of(
+                        "a=\"a-value\";",
+                        "b=b-value\"",
+                        "c=\"c-value       ",
+                        "d=d -value",
+                        "e=e-v;alue",
+                        "f=f-value",
+                        "F=F-value        ",
+                        "g=\"g;-valu\"e",
+                        "\"nameA=value",
+                        "nameB\"=value",
+                        "\"nameC\"=value",
+                        "      name a     =value",
+                        "name     c =  value     c ",
+                        "=X",
+                        "W=");
+
         @BeforeEach
         void setup() throws Exception {
-            server.setHttpMessageHandler(
-                    (ctx, msg) -> {
-                        msg.setResponseHeader(
-                                "HTTP/1.1 200\r\ncontent-length: 0\r\n"
-                                        + "Set-Cookie: a=\"a-value\";\r\n"
-                                        + "Set-Cookie: b=b-value\"\r\n"
-                                        + "Set-Cookie: c=\"c-value       \r\n"
-                                        + "Set-Cookie: d=d -value\r\n"
-                                        + "Set-Cookie: e=e-v;alue\r\n"
-                                        + "Set-Cookie: f=f-value\r\n"
-                                        + "Set-Cookie: F=F-value        \r\n"
-                                        + "Set-Cookie: g=\"g;-valu\"e\r\n"
-                                        + "Set-Cookie: \"nameA=value\r\n"
-                                        + "Set-Cookie: nameB\"=value\r\n"
-                                        + "Set-Cookie: \"nameC\"=value\r\n"
-                                        + "Set-Cookie:       name a     =value\r\n"
-                                        + "Set-Cookie: name     c =  value     c \r\n"
-                                        + "Set-Cookie: =X\r\n"
-                                        + "Set-Cookie: W=\r\n");
-                    });
-
             message.setRequestHeader("GET " + getServerUri("/") + " HTTP/1.1");
             httpSender.setUseGlobalState(false);
         }
@@ -2188,6 +2210,21 @@ class HttpSenderImplUnitTest {
             server.close();
         }
 
+        private void serverSetsCookies(SenderMethod method) throws Exception {
+            for (String cookie : RAW_COOKIES) {
+                server.setHttpMessageHandler(
+                        (ctx, msg) ->
+                                msg.setResponseHeader(
+                                        """
+                                        HTTP/1.1 200\r\n
+                                        content-length: 0\r\n
+                                        set-cookie: %s\r\n\r\n
+                                        """
+                                                .formatted(cookie)));
+                method.sendWith(httpSender, message);
+            }
+        }
+
         @ParameterizedTest
         @MethodSource(
                 "org.zaproxy.addon.network.internal.client.HttpSenderImplUnitTest#sendAndReceiveMethods")
@@ -2195,7 +2232,7 @@ class HttpSenderImplUnitTest {
             // Given
             httpSender.setUseCookies(false);
             // When
-            method.sendWith(httpSender, message);
+            serverSetsCookies(method);
             method.sendWith(httpSender, message);
             // Then
             assertThat(message.getRequestHeader().getHeader("cookie"), is(nullValue()));
@@ -2208,7 +2245,7 @@ class HttpSenderImplUnitTest {
             // Given
             httpSender.setUseCookies(true);
             // When
-            method.sendWith(httpSender, message);
+            serverSetsCookies(method);
             method.sendWith(httpSender, message);
             // Then
             assertThat(message.getRequestHeader().getHeader("cookie"), is(not(nullValue())));
@@ -2221,7 +2258,7 @@ class HttpSenderImplUnitTest {
             // Given
             httpSender.setUseCookies(true);
             // When
-            method.sendWith(httpSender, message);
+            serverSetsCookies(method);
             method.sendWith(httpSender, message);
             // Then
             assertThat(
@@ -2236,7 +2273,7 @@ class HttpSenderImplUnitTest {
             // Given
             httpSender.setUseCookies(true);
             // When
-            method.sendWith(httpSender, message);
+            serverSetsCookies(method);
             method.sendWith(httpSender, message);
             method.sendWith(httpSender, message);
             method.sendWith(httpSender, message);

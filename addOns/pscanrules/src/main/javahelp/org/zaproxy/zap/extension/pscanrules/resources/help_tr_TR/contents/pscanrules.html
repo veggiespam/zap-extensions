@@ -89,7 +89,6 @@ Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10015/">10015</a>.
   </li>
   <li>Low Threshold:
     <ul>
-      <li>Meta Content-Type Charset Missing - The response doesn't contain a META Content-Type declaration, which may overlook older clients.</li>
       <li>Meta Charset Versus Meta Content-Type Charset - The response contains both a META Content-Type declaration and a META Charset declaration, and they don't match.</li>
     </ul>
   </li>
@@ -197,7 +196,7 @@ The Content Security Policy (CSP) passive scan rule parses and analyzes CSP head
 or weakness. This rule leverages HtmlUnit's <a href="https://github.com/HtmlUnit/htmlunit-csp">htmlunit-csp</a> 
 library to perform it's parsing and assessment of CSPs.
 <p>
-If a response has multiple CSPs they are analyzed individually, as there is no sure way to intersect/merge the policies and further different browsers have varying levels of CSP support and enforcement.
+If a response has multiple Content-Security-Policy headers or CSP META definitions, they are analyzed together using browser-style intersection: a resource is allowed only if every policy allows it.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/ContentSecurityPolicyScanRule.java">ContentSecurityPolicyScanRule.java</a>
 <br>
@@ -299,10 +298,7 @@ Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10024/">10024</a>.
 Identifies the existence of sensitive details within the Referrer header field of HTTP requests
 (this may include parameters, document names, directory names, etc.).
 <p>
-Note: In the case of suspected credit card identifiers in the Referrer value, the potential credit card numbers are looked up against a Bank Identification
-Number List (BINList). If a match is found the alert is raised at High confidence and additional details are added to the 'Other Information' field in the alert,
-otherwise the alerts will have Medium confidence.
-See: <a href="https://github.com/iannuttall/binlist-data">binlist-data</a> for more information.
+Note: For suspected credit card values see the <a href="https://www.zaproxy.org/docs/desktop/addons/common-library/">Common Library</a> add-on help (BIN List).
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/InformationDisclosureReferrerScanRule.java">InformationDisclosureReferrerScanRule.java</a>
 <br>
@@ -318,6 +314,14 @@ Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10027/">10027</a>.
 
+<h2 id="id-10009">In Page Banner Information Leak</h2>
+Analyzes response body content for the presence of web or application server banners (when the responses have error status codes).<br>
+If the Threshold is Low then status 200 - Ok responses are analyzed as well.<br>
+The presence of such banners may facilitate more targeted attacks against known vulnerabilities.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/InPageBannerInfoLeakScanRule.java">InPageBannerInfoLeakScanRule.java</a><br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10009/">10009</a>
+
 <h2 id="id-10105">Insecure Authentication</h2>
 HTTP basic or digest authentication has been used over an unsecured connection. The credentials can be read and then reused by someone with access to the network.
 <p>
@@ -332,6 +336,16 @@ Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90001/">90001</a>.
 
+<h2 id="id-90002">Java Serialization Object</h2>
+Java Serialization Object (JSO) is a way to save and exchange objects between Java applications.<br>
+Different problems are associated with JSO. Sensitive data can leak to the stream of bytes.<br>
+An attacker can also modify the data and exploit JSO to do a Remote Code Execution on the server.<br>
+JSO should not be used by Java programs. Strong controls must be done on serialized data.<br>
+JSO are a type of vulnerabilities associated to A8:2017-Insecure Deserialization.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/JsoScanRule.java">JsoScanRule.java</a><br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90002/">90002</a>
+
 <h2 id="id-10040">Mixed Content</h2>
 For content served via HTTPS analyse all the src attributes in the response looking for those sourced
 via plain HTTP.
@@ -342,14 +356,16 @@ Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10040/">10040</a>.
 
 <h2 id="id-10109">Modern Web Application</h2>
 This raises an informational alert if a site appears to be a modern web application.<br>
-It does not indicate any potential vulnerabilities but it could indicate that the ajax spider might be more effective at exploring this site compared to the traditional spider.
+It does not indicate any potential vulnerabilities but it could indicate that the modern spider might be more effective at exploring this site compared to the traditional spider.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/ModernAppDetectionScanRule.java">ModernAppDetectionScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10109/">10109</a>.
 
-<h2 id="id-10028">Open Redirect</h2>
-This check looks at user-supplied input in query string parameters and POST data to identify where open redirects might be possible. Open redirects occur when an application allows user-supplied input (e.g. http://nottrusted.com) to control an offsite redirect. This is generally a pretty accurate way to find where 301 or 302 redirects could be exploited by spammers or phishing attacks.
+<h2 id="id-10028">Off-site Redirect</h2>
+This check looks at user-supplied input in query string parameters and POST data to identify where open redirects might be possible. Open redirects occur when an application allows user-supplied input (e.g. http://nottrusted.com) to control an off-site destination. This is generally a pretty accurate way to find where 301 or 302 redirects could be exploited by spammers or phishing attacks.
+<p>
+<strong>NOTE</strong>: For the purposes of the passive check the authority portion of the origin and destination were compared. Manual testing may be required to validate the impact of this finding.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/UserControlledOpenRedirectScanRule.java">UserControlledOpenRedirectScanRule.java</a>
 <br>
@@ -358,22 +374,19 @@ Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10028/">10028</a>.
 <h2 id="id-10062">PII Disclosure</h2>
 PII is information like credit card number, SSN etc. This check currently reports only numbers which match credit card numbers and pass Luhn checksum, which gives high confidence, that this is a credit card number.
 <br>
-At MEDIUM and HIGH threshold it attempts to use three characters of context on each side of potential matches to exclude matches within decimal like content.
+At MEDIUM and HIGH threshold it attempts to use three characters of context on each side of potential matches to exclude matches within decimal like content or content which includes underscores.
 At LOW threshold, alerts will be raised for such matches.
 <p>
 At MEDIUM and HIGH threshold, the following content types are evaluated:
 <ul>
-    <li>HTML</li>
+    <li>HTML (visible text and script blocks)</li>
     <li>JSON</li>
     <li>XML</li>
 </ul>
 Image and CSS files are always ignored.
-Every other content type is evaluated at LOW threshold.
+Every other content type is evaluated at LOW threshold. Additionally at LOW threshold the entire HTML response is evaluated.
 <p>
-Note: In the case of suspected credit card values, the potential credit card numbers are looked up against a Bank Identification Number List 
-(BINList). If a match is found the alert is raised at High confidence and additional details are added to the 'Other Information' field in the 
-alert, otherwise the alerts will have Medium confidence.
-See: <a href="https://github.com/iannuttall/binlist-data">binlist-data</a> for more information.
+Note: For suspected credit card values see the <a href="https://www.zaproxy.org/docs/desktop/addons/common-library/">Common Library</a> add-on help (BIN List).
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/PiiScanRule.java">PiiScanRule.java</a>
 <br>
@@ -451,6 +464,16 @@ is not greater than 8 characters in length then the parameter is ignored
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/InfoSessionIdUrlScanRule.java">InfoSessionIdUrlScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/3/">3</a>.
+
+<h2 id="id-90003">Sub Resource Integrity Attribute Missing</h2>
+This rule checks whether the integrity attribute in the script or the link element served by an external resource (for example: CDN) is missing.<br>
+It helps mitigate an attack where the CDN has been compromised and content has been replaced by malicious content.<br>
+Note: A suggested integrity hash value will be present in the relevant Alert's Other Info details if it can be resolved to a script in the Sites Tree.
+<p>
+This rule supports <b>Trusted Domains</b>, check "General Configuration" for more information.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/SubResourceIntegrityAttributeScanRule.java">SubResourceIntegrityAttributeScanRule.java</a><br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90003/">90003</a>
 
 <h2 id="id-10035">Strict Transport Security Header</h2>
 This rule checks HTTPS responses for the presence of a HTTP Strict Transport Security (HSTS) header and tests for various implementation concerns, 
@@ -573,5 +596,22 @@ Which indicates the use/exposure of Symfony's Profiler. Symfony's Profiler provi
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/XDebugTokenScanRule.java">XDebugTokenScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10056/">10056</a>.
+
+<h2 id="id-10116">ZAP is Out of Date</h2>
+This checks to make sure you are using the latest version of ZAP.<br>
+If your ZAP install is out of date then it will raise one alert on each domain with a severity based on how many versions
+out of date it is.<br>
+<ul>
+<li>1 version: Low Risk
+<li>2 versions: Medium Risk
+<li>3+ versions: High Risk
+<li>More that one year: High Risk (just for date stamped versions, such as the nightly or weekly releases)
+</ul>
+
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/pscanrules/src/main/java/org/zaproxy/zap/extension/pscanrules/ZapVersionScanRule.java">ZapVersionScanRule.java</a>
+<br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10116/">10116</a>.
+
 </body>
 </html>

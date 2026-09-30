@@ -23,17 +23,21 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.withSettings;
 
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
@@ -46,6 +50,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.quality.Strictness;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.extension.ExtensionLoader;
 import org.parosproxy.paros.model.Model;
@@ -54,7 +59,13 @@ import org.parosproxy.paros.network.HttpMessage;
 import org.zaproxy.zap.extension.script.ExtensionScript;
 import org.zaproxy.zap.extension.script.ScriptType;
 import org.zaproxy.zap.extension.script.ScriptWrapper;
+import org.zaproxy.zap.testutils.TestUtils;
 import org.zaproxy.zap.utils.ZapXmlConfiguration;
+import org.zaproxy.zest.core.v1.ZestClientLaunch;
+import org.zaproxy.zest.core.v1.ZestComment;
+import org.zaproxy.zest.core.v1.ZestElement;
+import org.zaproxy.zest.core.v1.ZestJSON;
+import org.zaproxy.zest.core.v1.ZestScript;
 
 /** Unit test for {@link ExtensionZest}. */
 class ExtensionZestUnitTest {
@@ -73,6 +84,37 @@ class ExtensionZestUnitTest {
         given(sw.getEngineName()).willReturn(null);
         // When/ Then
         assertDoesNotThrow(() -> extension.scriptAdded(sw, false));
+    }
+
+    @Test
+    void shouldConvertBlankStringToNullElement() {
+        // Given / When
+        ZestElement element = extension.convertStringToElement("  ");
+        // Then
+        assertThat(element, is(nullValue()));
+    }
+
+    @Test
+    void shouldHandleUnloadWithScriptWithNoEngineName() {
+        initWithScriptWithoutEngine();
+        assertDoesNotThrow(() -> extension.unload());
+    }
+
+    @Test
+    void shouldHandleOptionsLoadedWithScriptWithNoEngineName() {
+        initWithScriptWithoutEngine();
+        assertDoesNotThrow(() -> extension.optionsLoaded());
+    }
+
+    private void initWithScriptWithoutEngine() {
+        ExtensionScript extensionScript = mock();
+        ExtensionLoader extLoader = mock();
+        Control.initSingletonForTesting(any(), extLoader);
+        given(extLoader.getExtension(ExtensionScript.NAME)).willReturn(extensionScript);
+
+        ScriptType scriptType = mock();
+        given(extensionScript.getScriptTypes()).willReturn(List.of(scriptType));
+        given(extensionScript.getScripts(scriptType)).willReturn(List.of(new ScriptWrapper()));
     }
 
     @Nested
@@ -273,6 +315,107 @@ class ExtensionZestUnitTest {
         private void globalOptionIncludeResponsesAs(boolean value) {
             extension.getParam().load(new ZapXmlConfiguration());
             extension.getParam().setIncludeResponses(value);
+        }
+    }
+
+    @Nested
+    class GetChainScript extends TestUtils {
+
+        @BeforeEach
+        void setup() {
+            mockMessages(new ExtensionZest());
+            var extLoader =
+                    mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
+            Control.initSingletonForTesting(mock(Model.class), extLoader);
+            given(extLoader.getExtension(ExtensionZest.NAME)).willReturn(extension);
+            given(extLoader.getExtension(ExtensionZest.class)).willReturn(extension);
+        }
+
+        @Test
+        void shouldThrowForNullScriptsList() {
+            IllegalArgumentException e =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> extension.getChainScript(null, "runName"));
+            assertThat(e.getMessage(), containsString("must not be null or empty"));
+        }
+
+        @Test
+        void shouldThrowForEmptyScriptsList() {
+            IllegalArgumentException e =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> extension.getChainScript(List.of(), "runName"));
+            assertThat(e.getMessage(), containsString("must not be null or empty"));
+        }
+
+        @Test
+        void shouldThrowWhenScriptNotZestScriptWrapper() {
+            ScriptWrapper plainWrapper = mock(ScriptWrapper.class);
+            given(plainWrapper.getName()).willReturn("plain");
+
+            IllegalArgumentException e =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> extension.getChainScript(List.of(plainWrapper), "runName"));
+            assertThat(e.getMessage(), containsString("ZestScriptWrapper"));
+            assertThat(e.getMessage(), containsString("plain"));
+        }
+
+        @Test
+        void shouldReturnChainedWrapperForValidChain() {
+            // Given (first script must have ZestClientLaunch when chain has 2+ scripts)
+            ZestScriptWrapper wrapper1 = createZestWrapperWithClientLaunch("script1", 1);
+            ZestScriptWrapper wrapper2 = createZestWrapper("script2", 2);
+
+            // When
+            ScriptWrapper result = extension.getChainScript(List.of(wrapper1, wrapper2), "chain");
+
+            // Then
+            assertThat(result, is(notNullValue()));
+            assertThat(result, is(instanceOf(ZestScriptWrapper.class)));
+            assertThat(
+                    ((ZestScriptWrapper) result).getChainProvenance().isPresent(),
+                    is(equalTo(true)));
+            ZestScript chained = ((ZestScriptWrapper) result).getZestScript();
+            assertThat(chained.getTitle(), is(equalTo("chain")));
+            assertThat(chained.getDescription(), is(equalTo("")));
+        }
+
+        private ZestScriptWrapper createZestWrapper(String name, int statementCount) {
+            ZestScript script = new ZestScript();
+            script.setTitle(name);
+            script.setDescription("Test: " + name);
+            script.setType(ZestScript.Type.StandAlone);
+            for (int i = 0; i < statementCount; i++) {
+                script.add(new ZestComment("Statement " + (i + 1)));
+            }
+            return wrapZestScript(script, name);
+        }
+
+        private ZestScriptWrapper createZestWrapperWithClientLaunch(
+                String name, int statementCount) {
+            ZestScript script = new ZestScript();
+            script.setTitle(name);
+            script.setDescription("Test: " + name);
+            script.setType(ZestScript.Type.StandAlone);
+            script.add(new ZestClientLaunch("browser", "firefox", "http://example.com"));
+            for (int i = 1; i < statementCount; i++) {
+                script.add(new ZestComment("Statement " + (i + 1)));
+            }
+            return wrapZestScript(script, name);
+        }
+
+        private static ZestScriptWrapper wrapZestScript(ZestScript script, String name) {
+            String json = ZestJSON.toString(script);
+            ScriptWrapper sw = new ScriptWrapper();
+            sw.setName(name);
+            sw.setContents(json);
+            ScriptType scriptType =
+                    mock(ScriptType.class, withSettings().strictness(Strictness.LENIENT));
+            given(scriptType.getName()).willReturn(ExtensionScript.TYPE_STANDALONE);
+            sw.setType(scriptType);
+            return new ZestScriptWrapper(sw);
         }
     }
 }

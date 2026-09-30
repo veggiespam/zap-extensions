@@ -53,6 +53,7 @@ public class ForbiddenBypassScanRule extends AbstractAppPlugin {
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A01_BROKEN_AC,
                                 CommonAlertTag.OWASP_2021_A01_BROKEN_AC,
                                 CommonAlertTag.OWASP_2017_A05_BROKEN_AC,
                                 CommonAlertTag.WSTG_V42_ATHN_04_AUTH_BYPASS));
@@ -201,6 +202,11 @@ public class ForbiddenBypassScanRule extends AbstractAppPlugin {
     @Override
     public Map<String, String> getAlertTags() {
         return ALERT_TAGS;
+    }
+
+    @Override
+    public int getCweId() {
+        return 348; // CWE-348: Use of Less Trusted Source
     }
 
     @Override

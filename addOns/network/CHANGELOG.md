@@ -5,6 +5,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- Allow other add-ons to know if an outbound proxy is enabled.
+- Provide own gzip/deflate content encodings.
+
+### Changed
+- Update dependencies.
+- Update CVE link to avoid redirect.
+- Update browser background requests.
+- Change default log level of HTTP authenticator to error to avoid flooding the logs with warnings caused by negotiation errors.
+
+### Fixed
+- Preserve existing host header name case when normalizing (Issue 9428).
+
+## [0.29.0] - 2026-08-07
+### Added
+- Option to support client certificates programmatically.
+- Add option to control how browser background requests should be handled, default to hide.
+
+### Changed
+- Improve server exception handling.
+- Update dependencies.
+
+### Fixed
+- Correct the generation of server certificates for domain names with more than 64 characters.
+
+## [0.28.0] - 2026-05-21
+### Changed
+- Update dependencies (Issue 9337).
+
+## [0.27.0] - 2026-05-06
+### Changed
+- Update dependencies.
+- Include the Authority Key Identifier in generated server certificates per RFC 5280 (Issue 9301).
+
+## [0.26.0] - 2026-03-19
+### Added
+- Method to expose if proxy enabled.
+
+## [0.25.0] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Update dependencies.
+
+## [0.24.0] - 2025-11-25
+### Added
+- Use UTF-8 charset for `application/json` when none specified on newer ZAP versions (Issue 6656).
+
+### Changed
+- Update dependencies.
+- Reset warned invalid content-type values on newer ZAP versions (Issue 9082).
+- Updated user agents.
+
+### Fixed
+- Skip decoding of Brotli encoded empty bodies.
+
+## [0.23.0] - 2025-09-02
+### Added
+- NetworkUtils class.
+
+### Changed
+- Use only positive serial numbers for the Root CA certificate (Issue 8984).
+
+### Fixed
+- Correctly inform about unknown proxy host on all OSes.
+
+## [0.22.0] - 2025-06-20
 ### Fixed
 - A typo in the help with regard to Transparent Proxying.
 
@@ -234,6 +300,14 @@ would not be cleared when reusing the same message.
   - Options panel to manage the root CA certificate and issued certificates.
   - API endpoints to configure the validity of the root CA certificate and issued certificates ([Issue 4673](https://github.com/zaproxy/zaproxy/issues/4673)).
 
+[0.29.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.29.0
+[0.28.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.28.0
+[0.27.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.27.0
+[0.26.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.26.0
+[0.25.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.25.0
+[0.24.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.24.0
+[0.23.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.23.0
+[0.22.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.22.0
 [0.21.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.21.0
 [0.20.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.20.0
 [0.19.0]: https://github.com/zaproxy/zap-extensions/releases/network-v0.19.0

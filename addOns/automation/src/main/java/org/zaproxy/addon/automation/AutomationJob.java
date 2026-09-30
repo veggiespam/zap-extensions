@@ -64,6 +64,7 @@ public abstract class AutomationJob implements Comparable<AutomationJob> {
     private long timeStarted;
     private long timeFinished;
     private boolean enabled = true;
+    private boolean alwaysRun = false;
 
     public enum Order {
         RUN_FIRST,
@@ -133,6 +134,14 @@ public abstract class AutomationJob implements Comparable<AutomationJob> {
         this.enabled = enabled;
     }
 
+    public boolean isAlwaysRun() {
+        return alwaysRun;
+    }
+
+    public void setAlwaysRun(boolean alwaysRun) {
+        this.alwaysRun = alwaysRun;
+    }
+
     public int addDefaultTests(AutomationProgress progress) {
         return ZERO_TESTS;
     }
@@ -152,6 +161,34 @@ public abstract class AutomationJob implements Comparable<AutomationJob> {
      * @see #planStarted
      */
     public void planFinished() {}
+
+    /** Will return true for long running jobs. */
+    public boolean isLongRunningJob() {
+        return false;
+    }
+
+    /**
+     * Returns a unique identifier for this long running job instance.
+     *
+     * @return the job id, or {@code null} if the job has not yet started and obtained an id, or if
+     *     it is not a long running job.
+     */
+    public String getLongRunningJobId() {
+        return null;
+    }
+
+    /**
+     * Returns the progress of a long running job as a percentage (0-100). Non long running jobs
+     * will return -1.
+     *
+     * @return the progress percentage
+     */
+    public int getLongRunningJobProgress() {
+        return -1;
+    }
+
+    /** Called to stop any running jobs early. Must be implemented by long running jobs. */
+    public void stop() {}
 
     public abstract void runJob(AutomationEnvironment env, AutomationProgress progress);
 

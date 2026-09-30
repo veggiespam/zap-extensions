@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.parosproxy.paros.CommandLine;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
@@ -36,11 +37,16 @@ import org.zaproxy.addon.automation.AutomationEventPublisher;
 import org.zaproxy.addon.automation.AutomationPlan;
 import org.zaproxy.addon.automation.ExtensionAutomation;
 import org.zaproxy.zap.ZAP;
+import org.zaproxy.zap.authentication.ScriptBasedAuthenticationMethodType;
 import org.zaproxy.zap.eventBus.Event;
 import org.zaproxy.zap.eventBus.EventConsumer;
 import org.zaproxy.zap.extension.script.ExtensionScript;
 import org.zaproxy.zap.extension.script.ScriptEventListener;
 import org.zaproxy.zap.extension.script.ScriptWrapper;
+import org.zaproxy.zap.extension.scripts.ExtensionScriptsUI;
+import org.zaproxy.zap.extension.scripts.diagnostics.ScriptDiagnosticSource;
+import org.zaproxy.zap.extension.scripts.diagnostics.ScriptDiagnosticSource.RunFailureDiagnostic;
+import org.zaproxy.zap.extension.scripts.internal.db.ScriptRunRecorder;
 
 public class ExtensionScriptAutomation extends ExtensionAdaptor {
 
@@ -50,7 +56,7 @@ public class ExtensionScriptAutomation extends ExtensionAdaptor {
     private ScriptJob job;
 
     private static final List<Class<? extends Extension>> DEPENDENCIES =
-            List.of(ExtensionScript.class, ExtensionAutomation.class);
+            List.of(ExtensionScript.class, ExtensionScriptsUI.class, ExtensionAutomation.class);
 
     private ExtensionAutomation extAuto;
     private ExtensionScript extensionScript;
@@ -162,20 +168,55 @@ public class ExtensionScriptAutomation extends ExtensionAdaptor {
 
         @Override
         public void scriptError(ScriptWrapper script) {
-            if (ExtensionScript.TYPE_STANDALONE.equals(script.getTypeName())) {
+            if (ExtensionScript.TYPE_STANDALONE.equals(script.getTypeName())
+                    || ScriptBasedAuthenticationMethodType.SCRIPT_TYPE_AUTH.equals(
+                            script.getTypeName())) {
                 // Errors of stand alone scripts are handled directly by the job.
+                // Authentication script errors are handled as auth failures.
                 return;
             }
 
             synchronized (runningPlans) {
                 runningPlans.forEach(
-                        plan ->
-                                plan.getProgress()
-                                        .error(
-                                                Constant.messages.getString(
-                                                        "scripts.automation.error.script",
-                                                        script.getName(),
-                                                        script.getLastErrorDetails())));
+                        plan -> {
+                            String message =
+                                    Constant.messages.getString(
+                                            "scripts.automation.error.script",
+                                            script.getName(),
+                                            script.getLastErrorDetails());
+                            plan.getProgress().error(message);
+                            String screenshotBase64 = null;
+                            if (script instanceof ScriptDiagnosticSource source) {
+                                screenshotBase64 =
+                                        source.getRunDiagnostics()
+                                                .failure()
+                                                .map(RunFailureDiagnostic::screenshotBase64)
+                                                .orElse(null);
+                            }
+                            String outputDetail =
+                                    StringUtils.defaultString(
+                                            ScriptRunFailureDetail
+                                                    .compactScriptOutputDetailForPersistence(
+                                                            script));
+                            ScriptRunRecorder.recordFailedRun(
+                                    message,
+                                    List.of(
+                                            new ScriptRunRecorder.RunScript(
+                                                    script.getName(),
+                                                    script.getTypeName(),
+                                                    List.of(
+                                                            new ScriptRunRecorder.RunStep(
+                                                                    -1,
+                                                                    "",
+                                                                    List.of(
+                                                                            new ScriptRunRecorder
+                                                                                    .StepOutput(
+                                                                                    0,
+                                                                                    ScriptRunRecorder
+                                                                                            .OUTPUT_KIND_ERROR,
+                                                                                    outputDetail)),
+                                                                    screenshotBase64)))));
+                        });
             }
         }
 

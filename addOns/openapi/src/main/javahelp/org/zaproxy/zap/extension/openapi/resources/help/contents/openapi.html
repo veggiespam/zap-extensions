@@ -8,7 +8,7 @@ OpenAPI Support
 </HEAD>
 <BODY>
 <H1>OpenAPI Support</H1>
-This add-on allows you to spider and import OpenAPI (Swagger) definitions, versions 1.2, 2.0, and 3.0.
+This add-on allows you to spider and import OpenAPI (Swagger) definitions, versions 1.2, 2.0, 3.0, and 3.1.
 <br>
 <strong>Note:</strong> Generation of XML content is currently not supported.
 <br><br>
@@ -23,6 +23,11 @@ A menu item is added to the Import menu:
 </ul>
 The dialogue allows overriding the server URL present in the OpenAPI definition (or specify one if not present) through the Target URL field.
 The import progress is shown in the progress tab.
+
+<H3>Max Messages</H3>
+The dialogue allows users to limit the number of messages imported.
+A value of <code>0</code> (the default) imports all messages.
+Note that redirects are followed when importing, so this is a soft limit and the number of messages stored may exceed the value set.
 
 <H3>Context</H3>
 The dialogues also allow selecting a Context, optionally. If a context is selected,
@@ -51,10 +56,11 @@ Following some examples, overriding:
 <H2>API</H2>
 The following operations are added to the API:
 <ul>
-<li>ACTION importFile (file, target, contextId, userId)</li>
-<li>ACTION importUrl (url, hostOverride, contextId, userId)</li>
+<li>ACTION importFile (file, target, contextId, userId, maxMessages)</li>
+<li>ACTION importUrl (url, hostOverride, contextId, userId, maxMessages)</li>
 </ul>
 Both <code>target</code> and <code>hostOverride</code> support the <code>Target URL</code> format explained earlier.
+The optional <code>maxMessages</code> parameter limits the number of messages imported; omit or use <code>0</code> to import all.
 
 The definitions will be imported synchronously and any warnings will be returned.
 
@@ -112,6 +118,18 @@ The add-on maintains the following statistics:
 <ul>
     <li>openapi.urls.added : The total number of URLs added when importing OpenAPI definitions</li>
 </ul>
+
+<H2>Scripts</H2>
+The following scripts are included with the add-on:
+
+<H3 id="id-100043">Swagger Secret & Vulnerability Detector</H3>
+This is an active script scan rule. It attempts to find exposed OpenAPI documentation that leaks sensitive secrets such
+as API keys, OAuth client secrets, access tokens, or that runs vulnerable versions of Swagger UI.
+<p>
+    Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/openapi/src/main/zapHomeFiles/scripts/scripts/active/SwaggerSecretDetector.js">SwaggerSecretDetector.js</a>
+    <br>
+    Alert ID: <a href="https://www.zaproxy.org/docs/alerts/100043/">100043</a>.
+
 
 </BODY>
 </HTML>

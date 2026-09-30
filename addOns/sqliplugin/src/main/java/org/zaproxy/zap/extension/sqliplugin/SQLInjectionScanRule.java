@@ -73,8 +73,12 @@ public class SQLInjectionScanRule extends AbstractAppParamPlugin {
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.API_2023_API10_UNSAFE_CONSUMPTION,
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
-                                CommonAlertTag.OWASP_2017_A01_INJECTION));
+                                CommonAlertTag.OWASP_2017_A01_INJECTION,
+                                CommonAlertTag.WSTG_V42_INPV_05_SQLI,
+                                CommonAlertTag.TEST_TIMING));
         alertTags.put(PolicyTag.PENTEST.getTag(), "");
         ALERT_TAGS = Collections.unmodifiableMap(alertTags);
     }
@@ -789,7 +793,7 @@ public class SQLInjectionScanRule extends AbstractAppParamPlugin {
                                             parameter);
 
                                     // Alert the vulnerability to the main core
-                                    raiseAlert(title, parameter, reqPayload, info, tempMsg);
+                                    raiseAlert(title, parameter, reqPayload, info, tempMsg, true);
 
                                     // Close the boundary/where iteration
                                     injectable = true;
@@ -876,7 +880,7 @@ public class SQLInjectionScanRule extends AbstractAppParamPlugin {
                                         reqPayload,
                                         parameter);
 
-                                raiseAlert(title, parameter, reqPayload, info, tempMsg);
+                                raiseAlert(title, parameter, reqPayload, info, tempMsg, true);
 
                                 // Close the boundary/where iteration
                                 injectable = true;
@@ -970,7 +974,7 @@ public class SQLInjectionScanRule extends AbstractAppParamPlugin {
                                             reqPayload,
                                             parameter);
 
-                                    raiseAlert(title, parameter, reqPayload, info, tempMsg);
+                                    raiseAlert(title, parameter, reqPayload, info, tempMsg, false);
 
                                     // Close the boundary/where iteration
                                     injectable = true;
@@ -1042,7 +1046,8 @@ public class SQLInjectionScanRule extends AbstractAppParamPlugin {
                                         parameter,
                                         engine.getExploitPayload(),
                                         info,
-                                        engine.getExploitMessage());
+                                        engine.getExploitMessage(),
+                                        true);
 
                                 // Close the boundary/where iteration
                                 injectable = true;
@@ -1091,7 +1096,8 @@ public class SQLInjectionScanRule extends AbstractAppParamPlugin {
             String parameter,
             String payload,
             String otherInfo,
-            HttpMessage message) {
+            HttpMessage message,
+            boolean feedbackBased) {
         newAlert()
                 .setConfidence(Alert.CONFIDENCE_MEDIUM)
                 .setName(Constant.messages.getString(ALERT_MESSAGE_PREFIX + "name", subTitle))
@@ -1099,12 +1105,23 @@ public class SQLInjectionScanRule extends AbstractAppParamPlugin {
                 .setAttack(payload)
                 .setOtherInfo(otherInfo)
                 .setMessage(message)
+                .setTags(getNeededAlertTags(feedbackBased))
                 .raise();
     }
 
     @Override
     public Map<String, String> getAlertTags() {
         return ALERT_TAGS;
+    }
+
+    private Map<String, String> getNeededAlertTags(boolean feedbackBased) {
+        if (feedbackBased) {
+            Map<String, String> alertTags = new HashMap<>();
+            alertTags.putAll(getAlertTags());
+            alertTags.remove(CommonAlertTag.TEST_TIMING.getTag());
+            return alertTags;
+        }
+        return getAlertTags();
     }
 
     /**

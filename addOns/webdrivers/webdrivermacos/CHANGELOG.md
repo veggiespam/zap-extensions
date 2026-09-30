@@ -6,6 +6,336 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 
+## [226] - 2026-09-29
+### Changed
+- Update ChromeDriver to 154.0.8037.92.
+
+## [225] - 2026-09-22
+### Changed
+- Update ChromeDriver to 154.0.8037.57.
+
+## [224] - 2026-09-18
+### Changed
+- Update ChromeDriver to 153.0.8010.52.
+
+## [223] - 2026-09-15
+### Changed
+- Update ChromeDriver to 153.0.8010.47.
+
+## [222] - 2026-09-08
+### Changed
+- Update ChromeDriver to 153.0.8010.36.
+
+## [221] - 2026-09-03
+### Changed
+- Update ChromeDriver to 152.0.7977.82.
+
+## [220] - 2026-09-01
+### Changed
+- Update ChromeDriver to 152.0.7977.75.
+
+## [219] - 2026-08-25
+### Changed
+- Update ChromeDriver to 152.0.7977.64.
+
+## [218] - 2026-08-20
+### Changed
+- Update ChromeDriver to 151.0.7922.173.
+
+## [217] - 2026-08-18
+### Changed
+- Update ChromeDriver to 151.0.7922.169.
+
+## [216] - 2026-08-12
+### Changed
+- Update ChromeDriver to 151.0.7922.137.
+
+## [215] - 2026-08-07
+### Changed
+- Update ChromeDriver to 151.0.7922.108.
+
+## [214] - 2026-08-04
+### Changed
+- Update ChromeDriver to 151.0.7922.75.
+
+## [213] - 2026-07-29
+### Changed
+- Update ChromeDriver to 151.0.7922.71.
+
+## [212] - 2026-07-21
+### Changed
+- Update ChromeDriver to 150.0.7871.181.
+
+## [211] - 2026-07-20
+### Changed
+- Update geckodriver to 0.37.1.
+
+## [210] - 2026-07-16
+### Changed
+- Update ChromeDriver to 150.0.7871.128.
+
+## [209] - 2026-07-14
+### Changed
+- Update ChromeDriver to 150.0.7871.124.
+
+## [208] - 2026-07-08
+### Changed
+- Update ChromeDriver to 150.0.7871.114.
+
+## [207] - 2026-07-07
+### Changed
+- Update ChromeDriver to 150.0.7871.100.
+
+## [206] - 2026-07-02
+### Changed
+- Update ChromeDriver to 150.0.7871.46.
+
+## [205] - 2026-06-25
+### Changed
+- Update ChromeDriver to 149.0.7827.200.
+
+## [204] - 2026-06-23
+### Changed
+- Update ChromeDriver to 149.0.7827.196.
+
+## [203] - 2026-06-16
+### Changed
+- Update ChromeDriver to 149.0.7827.155.
+
+## [202] - 2026-06-11
+### Changed
+- Update ChromeDriver to 149.0.7827.114.
+
+## [201] - 2026-06-08
+### Changed
+- Update ChromeDriver to 149.0.7827.102.
+
+## [200] - 2026-06-03
+### Changed
+- Update geckodriver to 0.37.0.
+
+## [199] - 2026-06-02
+### Changed
+- Update ChromeDriver to 149.0.7827.53.
+
+## [198] - 2026-05-27
+### Changed
+- Update ChromeDriver to 148.0.7778.215.
+
+## [197] - 2026-05-19
+### Changed
+- Update ChromeDriver to 148.0.7778.178.
+
+## [196] - 2026-05-12
+### Changed
+- Update ChromeDriver to 148.0.7778.167.
+
+## [195] - 2026-05-05
+### Changed
+- Update ChromeDriver to 148.0.7778.96.
+
+## [194] - 2026-04-28
+### Changed
+- Update ChromeDriver to 147.0.7727.137.
+
+## [193] - 2026-04-22
+### Changed
+- Update ChromeDriver to 147.0.7727.116.
+
+## [192] - 2026-04-15
+### Changed
+- Update ChromeDriver to 147.0.7727.101.
+
+## [191] - 2026-04-08
+### Changed
+- Update ChromeDriver to 147.0.7727.56.
+
+## [190] - 2026-03-23
+### Changed
+- Update ChromeDriver to 146.0.7680.165.
+
+## [189] - 2026-03-18
+### Changed
+- Update ChromeDriver to 146.0.7680.153.
+
+## [188] - 2026-03-14
+### Changed
+- Update ChromeDriver to 146.0.7680.80.
+
+## [187] - 2026-03-12
+### Changed
+- Update ChromeDriver to 146.0.7680.76.
+
+## [186] - 2026-03-10
+### Changed
+- Update ChromeDriver to 146.0.7680.72.
+
+## [185] - 2026-03-04
+### Changed
+- Roll back ChromeDriver to 145.0.7632.160.
+
+## [184] - 2026-02-25
+### Changed
+- Update ChromeDriver to 146.0.7680.31.
+
+## [183] - 2026-02-23
+### Changed
+- Update ChromeDriver to 145.0.7632.117.
+
+## [182] - 2026-02-18
+### Changed
+- Update ChromeDriver to 145.0.7632.77.
+
+## [181] - 2026-02-13
+### Changed
+- Update ChromeDriver to 145.0.7632.76.
+
+## [180] - 2026-02-12
+### Changed
+- Update ChromeDriver to 145.0.7632.67.
+
+## [179] - 2026-02-11
+### Changed
+- Update ChromeDriver to 145.0.7632.46.
+
+## [178] - 2026-02-03
+### Changed
+- Update ChromeDriver to 144.0.7559.133.
+
+## [177] - 2026-02-02
+### Changed
+- Roll back ChromeDriver to 144.0.7559.109.
+
+## [176] - 2026-01-28
+### Changed
+- Update ChromeDriver to 145.0.7632.26.
+
+## [175] - 2026-01-27
+### Changed
+- Update ChromeDriver to 144.0.7559.109.
+
+## [174] - 2026-01-21
+### Changed
+- Update ChromeDriver to 144.0.7559.96.
+
+## [173] - 2026-01-20
+### Changed
+- Update ChromeDriver to 144.0.7559.59.
+
+## [172] - 2026-01-06
+### Changed
+- Update ChromeDriver to 143.0.7499.192.
+
+## [171] - 2025-12-18
+### Changed
+- Update ChromeDriver to 143.0.7499.169.
+
+## [170] - 2025-12-16
+### Changed
+- Update ChromeDriver to 143.0.7499.146.
+
+## [169] - 2025-12-10
+### Changed
+- Update ChromeDriver to 143.0.7499.42.
+- Update minimum ZAP version to 2.17.0.
+
+## [168] - 2025-12-02
+### Changed
+- Update ChromeDriver to 143.0.7499.40.
+- Change case of macOS (Issue 9157).
+
+## [167] - 2025-11-17
+### Changed
+- Update ChromeDriver to 142.0.7444.175.
+
+## [166] - 2025-11-11
+### Changed
+- Update ChromeDriver to 142.0.7444.162.
+
+## [165] - 2025-11-05
+### Changed
+- Update ChromeDriver to 142.0.7444.61.
+
+## [164] - 2025-10-28
+### Changed
+- Update ChromeDriver to 142.0.7444.59.
+
+## [163] - 2025-10-21
+### Changed
+- Update ChromeDriver to 141.0.7390.122.
+
+## [162] - 2025-10-14
+### Changed
+- Update ChromeDriver to 141.0.7390.78.
+
+## [161] - 2025-10-09
+### Changed
+- Update ChromeDriver to 141.0.7390.76.
+
+## [160] - 2025-10-07
+### Changed
+- Update ChromeDriver to 141.0.7390.65.
+
+## [159] - 2025-09-30
+### Changed
+- Update ChromeDriver to 141.0.7390.54.
+
+## [158] - 2025-09-23
+### Changed
+- Update ChromeDriver to 140.0.7339.207.
+
+## [157] - 2025-09-18
+### Changed
+- Update ChromeDriver to 140.0.7339.185.
+
+## [156] - 2025-09-09
+### Changed
+- Update ChromeDriver to 140.0.7339.82.
+
+## [155] - 2025-09-02
+### Changed
+- Update ChromeDriver to 140.0.7339.80.
+
+## [154] - 2025-08-26
+### Changed
+- Update ChromeDriver to 139.0.7258.154.
+
+## [153] - 2025-08-19
+### Changed
+- Update ChromeDriver to 139.0.7258.138.
+
+## [152] - 2025-08-12
+### Changed
+- Update ChromeDriver to 139.0.7258.68.
+
+## [151] - 2025-08-05
+### Changed
+- Update ChromeDriver to 139.0.7258.66.
+
+## [150] - 2025-07-29
+### Changed
+- Update ChromeDriver to 138.0.7204.183.
+
+## [149] - 2025-07-22
+### Changed
+- Update ChromeDriver to 138.0.7204.168.
+
+## [148] - 2025-07-15
+### Changed
+- Update ChromeDriver to 138.0.7204.157.
+
+## [147] - 2025-07-08
+### Changed
+- Update ChromeDriver to 138.0.7204.94.
+
+## [146] - 2025-06-30
+### Changed
+- Update ChromeDriver to 138.0.7204.92.
+
+## [145] - 2025-06-24
+### Changed
+- Update ChromeDriver to 138.0.7204.49.
+
 ## [144] - 2025-06-17
 ### Changed
 - Update ChromeDriver to 137.0.7151.119.
@@ -605,6 +935,88 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First release: Firefox v0.13.0 Chrome v2.27
 
+[226]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v226
+[225]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v225
+[224]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v224
+[223]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v223
+[222]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v222
+[221]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v221
+[220]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v220
+[219]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v219
+[218]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v218
+[217]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v217
+[216]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v216
+[215]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v215
+[214]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v214
+[213]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v213
+[212]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v212
+[211]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v211
+[210]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v210
+[209]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v209
+[208]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v208
+[207]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v207
+[206]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v206
+[205]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v205
+[204]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v204
+[203]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v203
+[202]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v202
+[201]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v201
+[200]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v200
+[199]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v199
+[198]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v198
+[197]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v197
+[196]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v196
+[195]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v195
+[194]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v194
+[193]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v193
+[192]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v192
+[191]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v191
+[190]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v190
+[189]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v189
+[188]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v188
+[187]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v187
+[186]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v186
+[185]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v185
+[184]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v184
+[183]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v183
+[182]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v182
+[181]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v181
+[180]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v180
+[179]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v179
+[178]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v178
+[177]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v177
+[176]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v176
+[175]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v175
+[174]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v174
+[173]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v173
+[172]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v172
+[171]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v171
+[170]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v170
+[169]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v169
+[168]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v168
+[167]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v167
+[166]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v166
+[165]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v165
+[164]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v164
+[163]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v163
+[162]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v162
+[161]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v161
+[160]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v160
+[159]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v159
+[158]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v158
+[157]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v157
+[156]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v156
+[155]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v155
+[154]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v154
+[153]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v153
+[152]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v152
+[151]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v151
+[150]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v150
+[149]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v149
+[148]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v148
+[147]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v147
+[146]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v146
+[145]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v145
 [144]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v144
 [143]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v143
 [142]: https://github.com/zaproxy/zap-extensions/releases/webdrivermacos-v142

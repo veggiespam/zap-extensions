@@ -21,35 +21,61 @@ package org.zaproxy.addon.commonlib;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /** A standard set of alert tags. */
 public enum CommonAlertTag {
+    // OWASP Top 10 2025
+    OWASP_2025_A01_BROKEN_AC(
+            "OWASP_2025_A01", "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"),
+    OWASP_2025_A02_SEC_MISCONFIG(
+            "OWASP_2025_A02", "https://owasp.org/Top10/2025/A02_2025-Security_Misconfiguration/"),
+    OWASP_2025_A03_SUPPLY_CHAIN(
+            "OWASP_2025_A03",
+            "https://owasp.org/Top10/2025/A03_2025-Software_Supply_Chain_Failures/"),
+    OWASP_2025_A04_CRYPTO_FAIL(
+            "OWASP_2025_A04", "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"),
+    OWASP_2025_A05_INJECTION("OWASP_2025_A05", "https://owasp.org/Top10/2025/A05_2025-Injection/"),
+    OWASP_2025_A06_INSECURE_DESIGN(
+            "OWASP_2025_A06", "https://owasp.org/Top10/2025/A06_2025-Insecure_Design/"),
+    OWASP_2025_A07_AUTH_FAIL(
+            "OWASP_2025_A07", "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"),
+    OWASP_2025_A08_INTEGRITY_FAIL(
+            "OWASP_2025_A08",
+            "https://owasp.org/Top10/2025/A08_2025-Software_or_Data_Integrity_Failures/"),
+    OWASP_2025_A09_LOGGING_ALERTING(
+            "OWASP_2025_A09",
+            "https://owasp.org/Top10/2025/A09_2025-Security_Logging_and_Alerting_Failures/"),
+    OWASP_2025_A10_EXCEPTIONAL_CONDITIONS(
+            "OWASP_2025_A10",
+            "https://owasp.org/Top10/2025/A10_2025-Mishandling_of_Exceptional_Conditions/"),
+
     // OWASP Top 10 2021
     OWASP_2021_A01_BROKEN_AC(
-            "OWASP_2021_A01", "https://owasp.org/Top10/A01_2021-Broken_Access_Control/"),
+            "OWASP_2021_A01", "https://owasp.org/Top10/2021/A01_2021-Broken_Access_Control/"),
     OWASP_2021_A02_CRYPO_FAIL(
-            "OWASP_2021_A02", "https://owasp.org/Top10/A02_2021-Cryptographic_Failures/"),
-    OWASP_2021_A03_INJECTION("OWASP_2021_A03", "https://owasp.org/Top10/A03_2021-Injection/"),
+            "OWASP_2021_A02", "https://owasp.org/Top10/2021/A02_2021-Cryptographic_Failures/"),
+    OWASP_2021_A03_INJECTION("OWASP_2021_A03", "https://owasp.org/Top10/2021/A03_2021-Injection/"),
     OWASP_2021_A04_INSECURE_DESIGN(
-            "OWASP_2021_A04", "https://owasp.org/Top10/A04_2021-Insecure_Design/"),
+            "OWASP_2021_A04", "https://owasp.org/Top10/2021/A04_2021-Insecure_Design/"),
     OWASP_2021_A05_SEC_MISCONFIG(
-            "OWASP_2021_A05", "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"),
+            "OWASP_2021_A05", "https://owasp.org/Top10/2021/A05_2021-Security_Misconfiguration/"),
     OWASP_2021_A06_VULN_COMP(
             "OWASP_2021_A06",
-            "https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/"),
+            "https://owasp.org/Top10/2021/A06_2021-Vulnerable_and_Outdated_Components/"),
     OWASP_2021_A07_AUTH_FAIL(
             "OWASP_2021_A07",
-            "https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/"),
+            "https://owasp.org/Top10/2021/A07_2021-Identification_and_Authentication_Failures/"),
     OWASP_2021_A08_INTEGRITY_FAIL(
             "OWASP_2021_A08",
-            "https://owasp.org/Top10/A08_2021-Software_and_Data_Integrity_Failures/"),
+            "https://owasp.org/Top10/2021/A08_2021-Software_and_Data_Integrity_Failures/"),
     OWASP_2021_A09_LOGGING_FAIL(
             "OWASP_2021_A09",
-            "https://owasp.org/Top10/A09_2021-Security_Logging_and_Monitoring_Failures/"),
+            "https://owasp.org/Top10/2021/A09_2021-Security_Logging_and_Monitoring_Failures/"),
     OWASP_2021_A10_SSRF(
             "OWASP_2021_A10",
-            "https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/"),
+            "https://owasp.org/Top10/2021/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/"),
 
     // OWASP Top 10 2017
     OWASP_2017_A01_INJECTION(
@@ -374,6 +400,39 @@ public enum CommonAlertTag {
     WSTG_V42_APIT_01_GRAPHQL(
             "WSTG-v42-APIT-01",
             "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/12-API_Testing/01-Testing_GraphQL"),
+
+    // OWASP API Security Top 10 2023
+    API_2023_API1_BROKEN_OBJECT_LEVEL_AUTHZ(
+            "API_2023_API1",
+            "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"),
+    API_2023_API2_BROKEN_AUTH(
+            "API_2023_API2",
+            "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/"),
+    API_2023_API3_BROKEN_OBJECT_PROPERTY_LEVEL_AUTHZ(
+            "API_2023_API3",
+            "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/"),
+    API_2023_API4_UNRESTRICTED_RESOURCE_CONSUMPTION(
+            "API_2023_API4",
+            "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/"),
+    API_2023_API5_BROKEN_FUNCTION_LEVEL_AUTHZ(
+            "API_2023_API5",
+            "https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/"),
+    API_2023_API6_UNRESTRICTED_SENSITIVE_BUSINESS_FLOWS(
+            "API_2023_API6",
+            "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/"),
+    API_2023_API7_SSRF(
+            "API_2023_API7",
+            "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/"),
+    API_2023_API8_SEC_MISCONFIG(
+            "API_2023_API8",
+            "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/"),
+    API_2023_API9_IMPROPER_INVENTORY(
+            "API_2023_API9",
+            "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/"),
+    API_2023_API10_UNSAFE_CONSUMPTION(
+            "API_2023_API10",
+            "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/"),
+
     /**
      * This Alert Tag is used to indicate (Ex: via Example Alerts) alerts (rules) which support user
      * defined payloads via Custom Payloads.
@@ -387,7 +446,34 @@ public enum CommonAlertTag {
      *
      * @since 1.22.0
      */
-    TEST_TIMING("TEST_TIMING", "");
+    TEST_TIMING("TEST_TIMING", ""),
+
+    /**
+     * Indicates that the scan rule has been mapped to the PCI DSS standard.
+     *
+     * @since 1.34.0
+     */
+    PCI_DSS(
+            "PCI_DSS",
+            "https://www.zaproxy.org/docs/desktop/addons/common-library/alerttags/#compliance"),
+
+    /**
+     * Indicates that the scan rule has been mapped to the HIPAA standard.
+     *
+     * @since 1.34.0
+     */
+    HIPAA(
+            "HIPAA",
+            "https://www.zaproxy.org/docs/desktop/addons/common-library/alerttags/#compliance"),
+
+    /**
+     * Indicates that the scan rule often raises "systemic" or site wide issues.
+     *
+     * @since 1.38.0
+     */
+    SYSTEMIC(
+            "SYSTEMIC",
+            "https://www.zaproxy.org/docs/desktop/addons/common-library/alerttags/#systemic");
 
     private String tag;
     private String value;
@@ -444,6 +530,6 @@ public enum CommonAlertTag {
     }
 
     private static String createCveLink(String cve) {
-        return "https://nvd.nist.gov/vuln/detail/" + cve;
+        return "https://nvd.nist.gov/vuln/detail/" + cve.toLowerCase(Locale.ROOT);
     }
 }

@@ -57,6 +57,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import javax.net.ssl.X509TrustManager;
 import javax.swing.GroupLayout;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -93,6 +94,7 @@ import org.parosproxy.paros.view.View;
 import org.zaproxy.addon.network.LocalServersOptions.ServersChangedListener;
 import org.zaproxy.addon.network.common.HttpProxy;
 import org.zaproxy.addon.network.internal.ContentEncodingsHandler;
+import org.zaproxy.addon.network.internal.DefaultCharsetProvider;
 import org.zaproxy.addon.network.internal.TlsUtils;
 import org.zaproxy.addon.network.internal.cert.CertData;
 import org.zaproxy.addon.network.internal.cert.CertificateUtils;
@@ -105,6 +107,7 @@ import org.zaproxy.addon.network.internal.client.ZapAuthenticator;
 import org.zaproxy.addon.network.internal.client.ZapProxySelector;
 import org.zaproxy.addon.network.internal.client.apachev5.HttpSenderApache;
 import org.zaproxy.addon.network.internal.handlers.PassThroughHandler;
+import org.zaproxy.addon.network.internal.handlers.TlsConfig;
 import org.zaproxy.addon.network.internal.ratelimit.RateLimitExtensionHelper;
 import org.zaproxy.addon.network.internal.ratelimit.RateLimitOptions;
 import org.zaproxy.addon.network.internal.server.AliasChecker;
@@ -114,6 +117,7 @@ import org.zaproxy.addon.network.internal.server.http.LocalServerConfig;
 import org.zaproxy.addon.network.internal.server.http.LocalServerHandler;
 import org.zaproxy.addon.network.internal.server.http.MainProxyHandler;
 import org.zaproxy.addon.network.internal.server.http.MainServerHandler;
+import org.zaproxy.addon.network.internal.server.http.handlers.BrowserRequestHandler;
 import org.zaproxy.addon.network.internal.server.http.handlers.CloseOnRecursiveRequestHandler;
 import org.zaproxy.addon.network.internal.server.http.handlers.ConnectReceivedHandler;
 import org.zaproxy.addon.network.internal.server.http.handlers.DecodeResponseHandler;
@@ -190,6 +194,7 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
     private HttpSender proxyHttpSender;
     private HttpSenderHandler httpSenderHandler;
     private PassThroughHandler passThroughHandler;
+    private BrowserRequestHandler browserRequestHandler;
     private AliasChecker aliasChecker;
     private Map<String, LocalServer> localServers;
     private ExecutorService blockingServerExecutor;
@@ -220,9 +225,12 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
                         "org.bouncycastle.jsse.provider.ProvTlsServer"),
                 Level.WARN);
 
-        // Do not WARN by default on invalid/rejected cookies.
+        // Do not WARN by default on failed negotiation or invalid/rejected cookies.
         setLogLevel(
-                List.of("org.apache.hc.client5.http.protocol.ResponseProcessCookies"), Level.ERROR);
+                List.of(
+                        "org.apache.hc.client5.http.impl.auth.HttpAuthenticator",
+                        "org.apache.hc.client5.http.protocol.ResponseProcessCookies"),
+                Level.ERROR);
 
         // Force initialisation.
         TlsUtils.getSupportedTlsProtocols();
@@ -254,6 +262,8 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
         } catch (Exception e) {
             LOGGER.error("An error occurred while creating the sender:", e);
         }
+
+        HttpMessage.setCharsetProvider(new DefaultCharsetProvider());
     }
 
     private static void setLogLevel(List<String> classnames, Level level) {
@@ -331,6 +341,27 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
 
     public void setHttpProxyEnabled(boolean enabled) {
         getConnectionOptions().setHttpProxyEnabled(enabled);
+    }
+
+    /**
+     * Tells whether or not the HTTP proxy (outbound proxy chain) is enabled.
+     *
+     * @return {@code true} if the HTTP proxy is enabled, {@code false} otherwise.
+     * @since 0.26.0
+     */
+    public boolean isHttpProxyEnabled() {
+        return getConnectionOptions().isHttpProxyEnabled();
+    }
+
+    /**
+     * Tells whether or not an outbound proxy (HTTP or SOCKS) is enabled.
+     *
+     * @return {@code true} if a proxy is enabled, {@code false} otherwise.
+     * @since 0.30.0
+     */
+    public boolean isProxyEnabled() {
+        return getConnectionOptions().isHttpProxyEnabled()
+                || getConnectionOptions().isSocksProxyEnabled();
     }
 
     ClientCertificatesOptions getClientCertificatesOptions() {
@@ -540,13 +571,15 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
         boolean addApiHandler = config.isServeZapApi();
         HttpSender httpSender = config.getHttpSender();
         if (httpSender != null) {
-            List<HttpMessageHandler> handlers = new ArrayList<>(addApiHandler ? 7 : 6);
+            List<HttpMessageHandler> handlers = new ArrayList<>(addApiHandler ? 8 : 7);
             handlers.add(ConnectReceivedHandler.getSetAndOverrideInstance());
             handlers.add(RemoveAcceptEncodingHandler.getEnabledInstance());
             handlers.add(DecodeResponseHandler.getEnabledInstance());
             if (addApiHandler) {
                 handlers.add(ZapApiHandler.getEnabledInstance());
             }
+            handlers.add(browserRequestHandler);
+
             handlers.add(config.getHttpMessageHandler());
             handlers.add(CloseOnRecursiveRequestHandler.getInstance());
             handlers.add(new HttpSenderHandler(httpSender));
@@ -555,20 +588,29 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
                             new MainProxyHandler(
                                     blockingServerExecutor, legacyProxyListenerHandler, handlers);
         } else {
-            List<HttpMessageHandler> handlers = new ArrayList<>(addApiHandler ? 3 : 2);
+            List<HttpMessageHandler> handlers = new ArrayList<>(addApiHandler ? 4 : 3);
             handlers.add(ConnectReceivedHandler.getSetAndOverrideInstance());
             if (addApiHandler) {
                 handlers.add(ZapApiHandler.getEnabledInstance());
             }
+            handlers.add(browserRequestHandler);
+
             handlers.add(config.getHttpMessageHandler());
             mainServerHandler = () -> new MainServerHandler(blockingServerExecutor, handlers);
+        }
+
+        TlsConfig tlsConfig = null;
+        X509TrustManager trustManager = config.getTrustManager();
+        if (trustManager != null) {
+            tlsConfig = TlsConfig.withClientAuth(trustManager);
         }
 
         return new HttpServer(
                 getMainEventLoopGroup(),
                 getMainEventExecutorGroup(),
                 serverCertificateService,
-                mainServerHandler);
+                mainServerHandler,
+                tlsConfig);
     }
 
     @Override
@@ -619,6 +661,9 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
                 };
 
         passThroughHandler = new PassThroughHandler(this::shouldPassThrough);
+        browserRequestHandler =
+                new BrowserRequestHandler(
+                        localServersOptions::getBrowserRequestAction, proxyHttpSender);
 
         extensionHook.addApiImplementor(new LegacyProxiesApi(this));
 
@@ -908,6 +953,7 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
                 serverCertificateService,
                 legacyProxyListenerHandler,
                 passThroughHandler,
+                browserRequestHandler,
                 legacyNoCacheRequestHandler,
                 httpSenderHandler,
                 new LocalServerConfig(config, aliasChecker),
@@ -1634,7 +1680,9 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
         }
 
         @Override
-        public void sessionAboutToChange(Session session) {}
+        public void sessionAboutToChange(Session session) {
+            HttpMessage.resetWarnedContentTypeValues();
+        }
 
         @Override
         public void sessionScopeChanged(Session session) {}

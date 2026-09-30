@@ -20,6 +20,8 @@
 package org.zaproxy.zap.extension.pscanrules;
 
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
@@ -58,6 +60,7 @@ public class UserControlledHTMLAttributesScanRule extends PluginPassiveScanner
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A01_INJECTION));
         alertTags.put(PolicyTag.PENTEST.getTag(), "");
@@ -146,8 +149,8 @@ public class UserControlledHTMLAttributesScanRule extends PluginPassiveScanner
         if (attrValue.indexOf("://") > 0) {
             URL url;
             try {
-                url = new URL(attrValue);
-            } catch (MalformedURLException e) {
+                url = new URI(attrValue).toURL();
+            } catch (URISyntaxException | MalformedURLException e) {
                 return;
             }
             // get protocol
@@ -190,7 +193,12 @@ public class UserControlledHTMLAttributesScanRule extends PluginPassiveScanner
                     continue;
                 }
 
+                if (isShortValue(paramValue)) {
+                    continue;
+                }
+
                 for (String s : attrValue.split("[;=,]")) {
+                    s = s.trim();
                     if (s.equals(paramValue)) {
                         buildAlert(
                                         msg.getRequestHeader().getURI().toString(),
@@ -204,10 +212,7 @@ public class UserControlledHTMLAttributesScanRule extends PluginPassiveScanner
                 }
             }
 
-            // False Positive Reduction
-            // I want the value length to be greater than 1 to avoid all the false positives
-            // we're seeing when the input is limited to a single character.
-            if (paramValue.length() > 1) {
+            if (!isShortValue(paramValue)) {
                 // See if the user-input can control the start of the attribute data.
                 if (attrValue.startsWith(paramValue)
                         || paramValue.equalsIgnoreCase(protocol)
@@ -251,6 +256,10 @@ public class UserControlledHTMLAttributesScanRule extends PluginPassiveScanner
         return contentType.indexOf("text/html") != -1
                 || contentType.indexOf("application/xhtml+xml") != -1
                 || contentType.indexOf("application/xhtml") != -1;
+    }
+
+    private static boolean isShortValue(String paramValue) {
+        return paramValue.length() <= 1;
     }
 
     private AlertBuilder buildAlert(

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import javax.script.ScriptException;
 import org.apache.commons.httpclient.URI;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.network.HttpHeader;
@@ -60,13 +61,19 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
 
     private static final String PROXY_ADDRESS = "127.0.0.1";
 
-    private static final String USERNAME = "Username";
-    private static final String PASSWORD = "Password";
+    private static final String OLD_USERNAME = "Username";
+    private static final String OLD_PASSWORD = "Password";
+
+    public static final String USERNAME = "username";
+    public static final String PASSWORD = "password";
 
     private final String totpVar;
 
     private ZestScriptWrapper script = null;
     private AuthenticationHelper helper;
+
+    private boolean autoCloseProxy;
+    private Server proxyServer;
 
     public ZestAuthenticationRunner(
             ExtensionZest extension, ExtensionNetwork extensionNetwork, ZestScriptWrapper script) {
@@ -76,6 +83,7 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
                 script.getZestScript().getParameters().getTokenStart()
                         + TOTP_VAR_NAME
                         + script.getZestScript().getParameters().getTokenEnd();
+        autoCloseProxy = true;
     }
 
     @Override
@@ -91,7 +99,10 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
     }
 
     private static boolean isCredentialParameter(String variableName) {
-        return USERNAME.equals(variableName) || PASSWORD.equals(variableName);
+        return USERNAME.equals(variableName)
+                || PASSWORD.equals(variableName)
+                || OLD_USERNAME.equals(variableName)
+                || OLD_PASSWORD.equals(variableName);
     }
 
     @Override
@@ -127,10 +138,9 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
             Map<String, String> paramsValues,
             GenericAuthenticationCredentials credentials)
             throws ScriptException {
-
+        closeProxy();
         this.helper = helper;
 
-        Server proxyServer = null;
         try {
             if (hasClientStatements()) {
                 proxyServer =
@@ -147,8 +157,7 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
                 this.setProxy(PROXY_ADDRESS, port);
             }
 
-            paramsValues.put(USERNAME, credentials.getParam(USERNAME));
-            paramsValues.put(PASSWORD, credentials.getParam(PASSWORD));
+            copyCredentials(credentials, paramsValues);
 
             this.run(script.getZestScript(), paramsValues);
 
@@ -174,13 +183,62 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
         } catch (Exception e) {
             throw new ScriptException(e);
         } finally {
-            if (proxyServer != null) {
-                try {
-                    proxyServer.close();
-                } catch (IOException e) {
-                    LOGGER.debug("An error occurred while stopping the proxy.", e);
-                }
+            if (autoCloseProxy) {
+                closeProxy();
             }
+        }
+    }
+
+    public static void copyCredentials(
+            GenericAuthenticationCredentials credentials, Map<String, String> paramsValues) {
+        if (!StringUtils.isEmpty(credentials.getParam(OLD_USERNAME))
+                || !StringUtils.isEmpty(credentials.getParam(OLD_PASSWORD))) {
+            LOGGER.warn(
+                    "Use of {} and {} credential parameters is deprecated, use lowercase names instead.",
+                    OLD_USERNAME,
+                    OLD_PASSWORD);
+            copyValue(credentials, OLD_USERNAME, paramsValues);
+            copyValue(credentials, OLD_PASSWORD, paramsValues);
+        }
+
+        copyValue(credentials, USERNAME, paramsValues);
+        copyValue(credentials, PASSWORD, paramsValues);
+    }
+
+    private static void copyValue(
+            GenericAuthenticationCredentials credentials, String name, Map<String, String> params) {
+        params.put(name, credentials.getParam(name));
+    }
+
+    /**
+     * Sets whether or not the proxy created for the authentication should be automatically closed
+     * after the authentication, true by default.
+     *
+     * <p>Allows to use the browser after the authentication has finished, callers should close the
+     * proxy once no longer needed.
+     *
+     * @param autoCloseProxy {@code true} to auto close the proxy, {@code false} otherwise.
+     * @since 48.9.0
+     * @see #closeProxy()
+     */
+    public void setAutoCloseProxy(boolean autoCloseProxy) {
+        this.autoCloseProxy = autoCloseProxy;
+    }
+
+    /**
+     * Closes the proxy.
+     *
+     * @since 48.9.0
+     * @see #setAutoCloseProxy(boolean)
+     */
+    public void closeProxy() {
+        if (proxyServer != null) {
+            try {
+                proxyServer.close();
+            } catch (IOException e) {
+                LOGGER.debug("An error occurred while stopping the proxy.", e);
+            }
+            proxyServer = null;
         }
     }
 

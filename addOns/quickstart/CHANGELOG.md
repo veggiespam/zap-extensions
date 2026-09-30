@@ -4,7 +4,47 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Changed
+- Default modern spider browser to Firefox headless.
 
+### Fixed
+- Persist the default browsers by ID instead of by (translatable) name, so the setting is restored correctly when ZAP is not running in English.
+
+## [59] - 2026-07-13
+### Added
+- Allow to choose and open the browser directly from the tool bar.
+
+### Changed
+- Depend on newer version of Selenium add-on.
+
+## [58] - 2026-07-06
+### Changed
+- Maintenance changes.
+- Default to Client Spider for modern apps.
+
+## [57] - 2026-06-26
+### Added
+- Option to select modern spider.
+
+## [56] - 2026-05-06
+### Added
+- Add Scan Policy option to the Automated Scan panel.
+
+## [55] - 2026-03-09
+### Fixed
+- Attacking domain level URLs with a trailing slash.
+
+## [54] - 2026-03-02
+### Fixed
+- Address exception when using configurations in the Automation Framework plan in command line mode.
+
+## [53] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+## [52] - 2025-07-10
+### Added
+- Add icon for Edge browser.
 
 ## [51] - 2025-01-10
 ### Added
@@ -282,6 +322,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
 
+[59]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v59
+[58]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v58
+[57]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v57
+[56]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v56
+[55]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v55
+[54]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v54
+[53]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v53
+[52]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v52
 [51]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v51
 [50]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v50
 [49]: https://github.com/zaproxy/zap-extensions/releases/quickstart-v49

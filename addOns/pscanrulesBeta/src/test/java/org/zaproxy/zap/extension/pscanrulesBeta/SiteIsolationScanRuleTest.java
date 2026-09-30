@@ -52,6 +52,10 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-1"));
+        assertThat(
+                alertsRaised.get(0).getName(),
+                equalTo("Cross-Origin-Resource-Policy Header Missing or Invalid"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CorpHeaderScanRule.HEADER));
@@ -165,6 +169,7 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-1"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CorpHeaderScanRule.HEADER));
@@ -188,6 +193,7 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-1"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CorpHeaderScanRule.HEADER));
@@ -211,6 +217,7 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-1"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CorpHeaderScanRule.HEADER));
@@ -234,6 +241,7 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-1"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CorpHeaderScanRule.HEADER));
@@ -313,6 +321,10 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-2"));
+        assertThat(
+                alertsRaised.get(0).getName(),
+                equalTo("Cross-Origin-Embedder-Policy Header Missing or Invalid"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CoepHeaderScanRule.HEADER));
@@ -329,6 +341,10 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-2"));
+        assertThat(
+                alertsRaised.get(0).getName(),
+                equalTo("Cross-Origin-Embedder-Policy Header Missing or Invalid"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CoepHeaderScanRule.HEADER));
@@ -382,6 +398,10 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-3"));
+        assertThat(
+                alertsRaised.get(0).getName(),
+                equalTo("Cross-Origin-Opener-Policy Header Missing or Invalid"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CoopHeaderScanRule.HEADER));
@@ -406,6 +426,10 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
 
         // Then
         assertThat(alertsRaised, hasSize(1));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("90004-3"));
+        assertThat(
+                alertsRaised.get(0).getName(),
+                equalTo("Cross-Origin-Opener-Policy Header Missing or Invalid"));
         assertThat(
                 alertsRaised.get(0).getParam(),
                 equalTo(SiteIsolationScanRule.CoopHeaderScanRule.HEADER));
@@ -475,7 +499,10 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
         // Given / When
         Map<String, String> tags = rule.getAlertTags();
         // Then
-        assertThat(tags.size(), is(equalTo(4)));
+        assertThat(tags.size(), is(equalTo(6)));
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A06_INSECURE_DESIGN.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A04_INSECURE_DESIGN.getTag()),
                 is(equalTo(true)));
@@ -485,11 +512,17 @@ class SiteIsolationScanRuleTest extends PassiveScannerTest<SiteIsolationScanRule
         assertThat(tags.containsKey(PolicyTag.PENTEST.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_STD.getTag()), is(equalTo(true)));
         assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A06_INSECURE_DESIGN.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A06_INSECURE_DESIGN.getValue())));
+        assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A04_INSECURE_DESIGN.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A04_INSECURE_DESIGN.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2017_A03_DATA_EXPOSED.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2017_A03_DATA_EXPOSED.getValue())));
+        assertThat(
+                tags.get(CommonAlertTag.SYSTEMIC.getTag()),
+                is(equalTo(CommonAlertTag.SYSTEMIC.getValue())));
     }
 
     @Test

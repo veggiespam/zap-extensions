@@ -24,15 +24,14 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.httpclient.URI;
@@ -57,6 +56,7 @@ import org.zaproxy.zap.authentication.UsernamePasswordAuthenticationCredentials;
 import org.zaproxy.zap.extension.users.ExtensionUserManagement;
 import org.zaproxy.zap.model.Context;
 import org.zaproxy.zap.model.StandardParameterParser;
+import org.zaproxy.zap.model.StructuralNodeModifier;
 import org.zaproxy.zap.users.User;
 
 public class ContextWrapper {
@@ -80,8 +80,9 @@ public class ContextWrapper {
      * Create a ContextWrapper from an existing Context
      *
      * @param context the existing context
+     * @param env the environment
      */
-    public ContextWrapper(Context context) {
+    public ContextWrapper(Context context, AutomationEnvironment env) {
         this.context = context;
         this.data = new Data();
         this.data.setName(context.getName());
@@ -90,7 +91,13 @@ public class ContextWrapper {
         // Contexts dont actually define the starting URL, but we need at least one
         for (String url : context.getIncludeInContextRegexs()) {
             if (url.endsWith(".*")) {
-                this.addUrl(url.substring(0, url.length() - 2));
+                String urlStr = env.replaceVars(url.substring(0, url.length() - 2));
+                try {
+                    new URI(urlStr, true);
+                    this.addUrl(urlStr);
+                } catch (Exception e) {
+                    // Ignore - could well be a more complex regex
+                }
             }
         }
 
@@ -190,16 +197,18 @@ public class ContextWrapper {
                             Constant.messages.getString("automation.error.context.url.deprecated"));
                     break;
                 case "includePaths":
-                    data.setIncludePaths(verifyRegexes(value, "badincludelist", progress));
+                    data.setIncludePaths(
+                            JobUtils.verifyRegexes(value, cdata.getKey().toString(), progress));
                     break;
                 case "excludePaths":
-                    data.setExcludePaths(verifyRegexes(value, "badexcludelist", progress));
+                    data.setExcludePaths(
+                            JobUtils.verifyRegexes(value, cdata.getKey().toString(), progress));
                     break;
                 case "authentication":
                     data.setAuthentication(new AuthenticationData(value, progress));
                     break;
                 case "sessionManagement":
-                    data.setSessionManagement(new SessionManagementData(value, progress));
+                    data.setSessionManagement(new SessionManagementData(value, progress, env));
                     break;
                 case "technology":
                     data.setTechnology(new TechnologyData(value, env, progress));
@@ -303,33 +312,10 @@ public class ContextWrapper {
                 new URI(url, true);
             }
         } catch (URIException e) {
-            progress.error(Constant.messages.getString("automation.error.context.badurl", url));
+            progress.error(
+                    Constant.messages.getString(
+                            "automation.error.context.badurl", url, e.getLocalizedMessage()));
         }
-    }
-
-    private List<String> verifyRegexes(Object value, String key, AutomationProgress progress) {
-        if (!(value instanceof ArrayList<?>)) {
-            progress.error(Constant.messages.getString("automation.error.context." + key, value));
-            return Collections.emptyList();
-        }
-        ArrayList<String> regexes = new ArrayList<>();
-        for (Object regex : (ArrayList<?>) value) {
-            String regexStr = regex.toString();
-            regexes.add(regexStr);
-            try {
-                if (!JobUtils.containsVars(regexStr)) {
-                    // Only validate the regex if it doesnt contain vars
-                    Pattern.compile(regexStr);
-                }
-            } catch (PatternSyntaxException e) {
-                progress.error(
-                        Constant.messages.getString(
-                                "automation.error.context.badregex",
-                                regex.toString(),
-                                e.getMessage()));
-            }
-        }
-        return regexes;
     }
 
     public Context getContext() {
@@ -366,7 +352,9 @@ public class ContextWrapper {
                 new URI(urlWithEnvs, true);
                 this.context.addIncludeInContextRegex(urlWithEnvs + ".*");
             } catch (Exception e) {
-                progress.error(Constant.messages.getString("automation.error.context.badurl", url));
+                progress.error(
+                        Constant.messages.getString(
+                                "automation.error.context.badurl", url, e.getLocalizedMessage()));
             }
         }
         List<String> includePaths = getData().getIncludePaths();
@@ -609,12 +597,16 @@ public class ContextWrapper {
         }
     }
 
+    @Getter
+    @Setter
     public static class StructureData {
 
         private List<String> structuralParameters;
+        private List<DataDrivenNodeData> dataDrivenNodes;
 
         public StructureData() {
             structuralParameters = new ArrayList<>();
+            dataDrivenNodes = new ArrayList<>();
         }
 
         StructureData(Context context) {
@@ -625,6 +617,12 @@ public class ContextWrapper {
                 var spp = (StandardParameterParser) urlParamParser;
                 structuralParameters = new ArrayList<>(spp.getStructuralParameters());
             }
+            context.getDataDrivenNodes()
+                    .forEach(
+                            ddn ->
+                                    dataDrivenNodes.add(
+                                            new DataDrivenNodeData(
+                                                    ddn.getName(), ddn.getPattern().toString())));
         }
 
         StructureData(Object data, AutomationProgress progress) {
@@ -652,7 +650,54 @@ public class ContextWrapper {
                         ((List<?>) value)
                                 .stream().map(Object::toString).forEach(structuralParameters::add);
                     }
+                } else if ("dataDrivenNodes".equals(cdata.getKey().toString())) {
+                    Object value = cdata.getValue();
+                    if (!(value instanceof List)) {
+                        progress.error(
+                                Constant.messages.getString(
+                                        "automation.error.context.badddnlist", value));
 
+                    } else {
+                        List<DataDrivenNodeData> ddnList = new ArrayList<>();
+                        for (Object ddn : (List<?>) value) {
+                            if (!(ddn instanceof LinkedHashMap)) {
+                                progress.error(
+                                        Constant.messages.getString(
+                                                "automation.error.env.ddn.bad", ddn));
+                                continue;
+                            }
+                            LinkedHashMap<?, ?> ddnMap = (LinkedHashMap<?, ?>) ddn;
+                            Object nameObj = ddnMap.get("name");
+                            Object regexObj = ddnMap.get("regex");
+                            if (ddnMap.size() != 2
+                                    || !(nameObj instanceof String)
+                                    || !(regexObj instanceof String)) {
+                                progress.error(
+                                        Constant.messages.getString(
+                                                "automation.error.env.ddn.bad", ddn));
+                                continue;
+                            }
+                            String regex = (String) regexObj;
+                            try {
+                                Pattern.compile(regex);
+                            } catch (Exception e) {
+                                progress.error(
+                                        Constant.messages.getString(
+                                                "automation.error.env.ddn.regex.bad", regex));
+                                continue;
+                            }
+                            if (!regex.matches(".*\\(.*\\).*\\(.*\\).*")) {
+                                progress.error(
+                                        Constant.messages.getString(
+                                                "automation.error.env.ddn.regex.format", regex));
+                                continue;
+                            }
+                            ddnList.add(new DataDrivenNodeData((String) nameObj, regex));
+                        }
+                        if (!ddnList.isEmpty()) {
+                            this.setDataDrivenNodes(ddnList);
+                        }
+                    }
                 } else {
                     progress.warn(
                             Constant.messages.getString(
@@ -684,14 +729,24 @@ public class ContextWrapper {
 
             context.setUrlParamParser(urlParamParser);
             urlParamParser.setContext(context);
+
+            context.setDataDrivenNodes(
+                    dataDrivenNodes.stream()
+                            .map(
+                                    ddn ->
+                                            new StructuralNodeModifier(
+                                                    StructuralNodeModifier.Type.DataDrivenNode,
+                                                    Pattern.compile(ddn.getRegex()),
+                                                    ddn.getName()))
+                            .toList());
         }
 
-        public List<String> getStructuralParameters() {
-            return structuralParameters;
-        }
-
-        public void setStructuralParameters(List<String> structuralParameters) {
-            this.structuralParameters = structuralParameters;
+        @Getter
+        @Setter
+        @AllArgsConstructor
+        public static class DataDrivenNodeData {
+            private String name;
+            private String regex;
         }
     }
 }

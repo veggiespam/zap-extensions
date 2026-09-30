@@ -20,25 +20,34 @@
 package org.zaproxy.zap.extension.scripts.automation.ui;
 
 import java.awt.Component;
+import java.awt.Container;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.DefaultListModel;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
+import javax.swing.JLabel;
 import javax.swing.JTextField;
 import javax.swing.text.JTextComponent;
 import org.apache.commons.lang3.StringUtils;
+import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.view.View;
 import org.zaproxy.zap.extension.script.ExtensionScript;
 import org.zaproxy.zap.extension.script.ScriptWrapper;
+import org.zaproxy.zap.extension.scripts.ExtensionScriptsUI;
+import org.zaproxy.zap.extension.scripts.automation.FailureLevel;
 import org.zaproxy.zap.extension.scripts.automation.ScriptJob;
 import org.zaproxy.zap.extension.scripts.automation.ScriptJobParameters;
 import org.zaproxy.zap.extension.scripts.automation.actions.RunScriptAction;
 import org.zaproxy.zap.extension.scripts.automation.actions.ScriptAction;
 import org.zaproxy.zap.utils.DisplayUtils;
-import org.zaproxy.zap.utils.ZapTextArea;
 import org.zaproxy.zap.view.StandardFieldsDialog;
 
 @SuppressWarnings("serial")
@@ -56,6 +65,19 @@ public class ScriptJobDialog extends StandardFieldsDialog {
     public static final String SCRIPT_TARGET_PARAM = "scripts.automation.dialog.target";
     public static final String SCRIPT_IS_INLINE_PARAM = "scripts.automation.dialog.isinline";
     public static final String SCRIPT_INLINE_PARAM = "scripts.automation.dialog.inline";
+    public static final String SCRIPT_CONTEXT_PARAM = "scripts.automation.dialog.context";
+    public static final String SCRIPT_USER_PARAM = "scripts.automation.dialog.user";
+    public static final String SCRIPT_FAILURE_LEVEL_PARAM =
+            "scripts.automation.dialog.failureLevel";
+    private static final String SCRIPT_USE_CHAIN_LABEL = "scripts.automation.dialog.useChain";
+    private static final String SCRIPT_CHAIN_HELP_LABEL = "scripts.automation.dialog.chain.help";
+    private static final String SCRIPT_CHAIN_TAB = "scripts.automation.dialog.tab.chain";
+
+    private static final String[] TAB_LABELS = {
+        "scripts.automation.dialog.tab.script",
+        SCRIPT_CHAIN_TAB,
+        "scripts.automation.dialog.tab.inline"
+    };
 
     private static final String[] ALL_FIELDS = {
         NAME_PARAM,
@@ -66,22 +88,26 @@ public class ScriptJobDialog extends StandardFieldsDialog {
         SCRIPT_INLINE_PARAM,
         SCRIPT_NAME_PARAM,
         SCRIPT_FILE_PARAM,
-        SCRIPT_TARGET_PARAM
-    };
-
-    private static final String[] TAB_LABELS = {
-        "scripts.automation.dialog.tab.script", "scripts.automation.dialog.tab.inline"
+        SCRIPT_TARGET_PARAM,
+        SCRIPT_CONTEXT_PARAM,
+        SCRIPT_USER_PARAM
     };
 
     private ScriptJob job;
 
     private Map<String, String> lastValues = new HashMap<>();
 
+    private JCheckBox useChainCheckBox;
+
+    private ScriptChainPanel chainPanel;
+
+    private final DefaultListModel<String> chainSelection = new DefaultListModel<>();
+
     public ScriptJobDialog(ScriptJob job) {
         super(
                 View.getSingleton().getMainFrame(),
                 TITLE,
-                DisplayUtils.getScaledDimension(400, 375),
+                DisplayUtils.getScaledDimension(400, 400),
                 TAB_LABELS);
         this.job = job;
 
@@ -99,7 +125,12 @@ public class ScriptJobDialog extends StandardFieldsDialog {
                 new ArrayList<>(),
                 this.job.getData().getParameters().getType(),
                 false);
-        this.addFieldListener(SCRIPT_TYPE_PARAM, e -> onScriptTypeChanged());
+        this.addFieldListener(
+                SCRIPT_TYPE_PARAM,
+                e -> {
+                    onScriptTypeChanged();
+                    layoutDialog();
+                });
         List<String> engineList = new ArrayList<>(ScriptAction.getScriptingEngines());
         engineList.add(0, "");
         this.addComboField(
@@ -115,6 +146,40 @@ public class ScriptJobDialog extends StandardFieldsDialog {
                 this.job.getData().getParameters().getName(),
                 true);
         this.addFieldListener(SCRIPT_NAME_PARAM, e -> onScriptNameChanged());
+
+        boolean useChainInitially;
+        List<String> initialChain = this.job.getData().getParameters().getChain();
+        useChainInitially = initialChain != null && !initialChain.isEmpty();
+        if (initialChain != null) {
+            initialChain.forEach(chainSelection::addElement);
+        }
+        chainPanel = new ScriptChainPanel(job, chainSelection);
+        setCustomTabPanel(1, chainPanel);
+        this.addCheckBoxField(0, SCRIPT_USE_CHAIN_LABEL, useChainInitially);
+        useChainCheckBox = (JCheckBox) this.getField(SCRIPT_USE_CHAIN_LABEL);
+        useChainCheckBox.setToolTipText(
+                "<html>"
+                        + Constant.messages.getString(SCRIPT_CHAIN_HELP_LABEL).replace("\n", "<br>")
+                        + "</html>");
+        useChainCheckBox.addActionListener(e -> onUseChainChanged());
+
+        List<String> contextNames = this.job.getEnv().getContextNames();
+        // Add blank option
+        contextNames.add(0, "");
+        this.addComboField(
+                0, SCRIPT_CONTEXT_PARAM, contextNames, this.job.getParameters().getContext());
+
+        List<String> users = job.getEnv().getAllUserNames();
+        // Add blank option
+        users.add(0, "");
+        this.addComboField(
+                0, SCRIPT_USER_PARAM, users, this.job.getData().getParameters().getUser());
+
+        DefaultComboBoxModel<FailureLevel> failureLevelModel =
+                new DefaultComboBoxModel<>(FailureLevel.values());
+        FailureLevel currentLevel = this.job.getData().getParameters().getFailureLevel();
+        failureLevelModel.setSelectedItem(currentLevel != null ? currentLevel : FailureLevel.ERROR);
+        this.addComboField(0, SCRIPT_FAILURE_LEVEL_PARAM, failureLevelModel);
 
         boolean isInline = StringUtils.isNotEmpty(this.job.getData().getParameters().getInline());
         this.addCheckBoxField(0, SCRIPT_IS_INLINE_PARAM, isInline);
@@ -142,10 +207,42 @@ public class ScriptJobDialog extends StandardFieldsDialog {
         this.addPadding(0);
 
         this.addMultilineField(
-                1, SCRIPT_INLINE_PARAM, this.job.getData().getParameters().getInline());
+                2, SCRIPT_INLINE_PARAM, this.job.getData().getParameters().getInline());
+
+        setTabScrollable(TAB_LABELS[0], true);
+        setTabScrollable(TAB_LABELS[1], true);
+        setTabScrollable(TAB_LABELS[2], true);
 
         onScriptActionChanged();
-        onScriptTypeChanged();
+        layoutDialog();
+    }
+
+    /**
+     * Scrollable tabs and {@link #pack()} for final size. Clears the bootstrap preferred size
+     * {@link StandardFieldsDialog} sets on the content pane (required by its constructor).
+     */
+    private void layoutDialog() {
+        Component content = getContentPane();
+        if (content != null) {
+            content.setPreferredSize(null);
+            content.setMinimumSize(null);
+        }
+
+        setResizable(true);
+        revalidate();
+        pack();
+    }
+
+    private void setFieldRowEnabled(String fieldLabel, boolean enabled) {
+        Component field = getField(fieldLabel);
+        field.setEnabled(enabled);
+        Container parent = field.getParent();
+        for (Component component : parent.getComponents()) {
+            if (component instanceof JLabel label && label.getLabelFor() == field) {
+                label.setEnabled(enabled);
+                return;
+            }
+        }
     }
 
     private File getDefaultDirectory() {
@@ -157,6 +254,20 @@ public class ScriptJobDialog extends StandardFieldsDialog {
                 new ScriptJobParameters(this.getStringValue(SCRIPT_ACTION_PARAM)), null);
     }
 
+    private boolean isRunAction() {
+        String action = this.getStringValue(SCRIPT_ACTION_PARAM);
+        return StringUtils.isNotBlank(action) && RunScriptAction.NAME.equalsIgnoreCase(action);
+    }
+
+    private boolean isStandaloneType() {
+        String type = this.getStringValue(SCRIPT_TYPE_PARAM);
+        return StringUtils.isNotBlank(type) && ExtensionScript.TYPE_STANDALONE.equals(type);
+    }
+
+    private boolean isChainUiEnabled() {
+        return isRunAction() && isStandaloneType();
+    }
+
     private void onScriptActionChanged() {
         ScriptAction sa = getScriptAction();
         List<String> scriptTypes = sa.getSupportedScriptTypes();
@@ -165,16 +276,24 @@ public class ScriptJobDialog extends StandardFieldsDialog {
 
         List<String> disabledFields = sa.getDisabledFields();
         for (String fieldName : ALL_FIELDS) {
+            Component field = this.getField(fieldName);
             if (disabledFields.contains(fieldName)) {
-                this.getField(fieldName).setEnabled(false);
-                saveTextField(fieldName);
+                saveFieldValue(fieldName);
+                if (field instanceof JTextComponent) {
+                    this.setFieldValue(fieldName, "");
+                } else if (field instanceof JComboBox) {
+                    ((JComboBox<?>) field).setSelectedIndex(0);
+                }
+                field.setEnabled(false);
             } else {
-                this.getField(fieldName).setEnabled(true);
-                restoreTextField(fieldName);
+                field.setEnabled(true);
+                restoreFieldValue(fieldName);
             }
         }
 
         onScriptTypeChanged();
+        setFieldRowEnabled(SCRIPT_FAILURE_LEVEL_PARAM, isRunAction());
+        updateChainFieldEnabled();
     }
 
     private void onScriptTypeChanged() {
@@ -187,6 +306,41 @@ public class ScriptJobDialog extends StandardFieldsDialog {
         scripts.add(0, "");
         this.setComboFields(
                 SCRIPT_NAME_PARAM, scripts, this.job.getData().getParameters().getName());
+
+        updateChainFieldEnabled();
+    }
+
+    private void onUseChainChanged() {
+        if (!useChainCheckBox.isSelected()) {
+            restoreFieldValue(SCRIPT_NAME_PARAM);
+        }
+        updateChainFieldEnabled();
+    }
+
+    private void updateChainFieldEnabled() {
+        boolean chainUiEnabled = isChainUiEnabled();
+        boolean useChain = chainUiEnabled && useChainCheckBox.isSelected();
+        setFieldRowEnabled(SCRIPT_USE_CHAIN_LABEL, chainUiEnabled);
+        if (!chainUiEnabled && useChainCheckBox.isSelected()) {
+            useChainCheckBox.setSelected(false);
+            restoreFieldValue(SCRIPT_NAME_PARAM);
+        }
+        if (useChain) {
+            chainPanel.loadSourceCatalog();
+        }
+        chainPanel.setEnabled(useChain);
+
+        Component nameField = this.getField(SCRIPT_NAME_PARAM);
+        if (useChain) {
+            nameField.setEnabled(false);
+            if (StringUtils.isNotBlank(this.getStringValue(SCRIPT_NAME_PARAM))) {
+                saveFieldValue(SCRIPT_NAME_PARAM);
+                this.setFieldValue(SCRIPT_NAME_PARAM, "");
+            }
+        } else {
+            nameField.setEnabled(
+                    !getScriptAction().getDisabledFields().contains(SCRIPT_NAME_PARAM));
+        }
     }
 
     private void onScriptNameChanged() {
@@ -201,14 +355,17 @@ public class ScriptJobDialog extends StandardFieldsDialog {
         }
     }
 
-    private void saveTextField(String label) {
+    private void saveFieldValue(String label) {
         Component c = this.getField(label);
-        if (c instanceof JTextComponent || c instanceof ZapTextArea) {
-            this.lastValues.put(label, this.getStringValue(label));
+        if (c instanceof JTextComponent || c instanceof JComboBox) {
+            String value = this.getStringValue(label);
+            if (StringUtils.isNotBlank(value)) {
+                this.lastValues.put(label, value);
+            }
         }
     }
 
-    private void restoreTextField(String label) {
+    private void restoreFieldValue(String label) {
         String value = this.lastValues.get(label);
         if (value != null) {
             this.setFieldValue(label, value);
@@ -218,39 +375,73 @@ public class ScriptJobDialog extends StandardFieldsDialog {
     private void onIsInlineChanged() {
         if (this.getBoolValue(SCRIPT_IS_INLINE_PARAM)) {
             // Save in case this was a test/mistake
-            saveTextField(SCRIPT_FILE_PARAM);
+            saveFieldValue(SCRIPT_FILE_PARAM);
             this.setFieldValue(SCRIPT_FILE_PARAM, "");
             this.getField(SCRIPT_INLINE_PARAM).setEnabled(true);
-            restoreTextField(SCRIPT_INLINE_PARAM);
+            restoreFieldValue(SCRIPT_INLINE_PARAM);
         } else {
             // Save in case this was a test/mistake
-            saveTextField(SCRIPT_INLINE_PARAM);
+            saveFieldValue(SCRIPT_INLINE_PARAM);
             this.setFieldValue(SCRIPT_INLINE_PARAM, "");
             this.getField(SCRIPT_INLINE_PARAM).setEnabled(false);
-            restoreTextField(SCRIPT_FILE_PARAM);
+            restoreFieldValue(SCRIPT_FILE_PARAM);
         }
+    }
+
+    private ScriptJobParameters buildParametersFromFields() {
+        List<String> chain = null;
+        String scriptName = this.getStringValue(SCRIPT_NAME_PARAM);
+        if (isChainUiEnabled() && useChainCheckBox.isSelected() && chainSelection.getSize() > 0) {
+            chain = Collections.list(chainSelection.elements());
+            scriptName = "";
+        }
+        FailureLevel level = null;
+        if (isRunAction()) {
+            Component field = getField(SCRIPT_FAILURE_LEVEL_PARAM);
+            if (field instanceof JComboBox<?> combo) {
+                FailureLevel selected = (FailureLevel) combo.getSelectedItem();
+                if (selected != null && selected != FailureLevel.ERROR) {
+                    level = selected;
+                }
+            }
+        }
+        return new ScriptJobParameters(
+                this.getStringValue(SCRIPT_ACTION_PARAM),
+                this.getStringValue(SCRIPT_TYPE_PARAM),
+                this.getStringValue(SCRIPT_ENGINE_PARAM),
+                scriptName,
+                this.getStringValue(SCRIPT_FILE_PARAM),
+                this.getStringValue(SCRIPT_TARGET_PARAM),
+                this.getStringValue(SCRIPT_INLINE_PARAM),
+                this.getStringValue(SCRIPT_CONTEXT_PARAM),
+                this.getStringValue(SCRIPT_USER_PARAM),
+                chain,
+                level);
     }
 
     @Override
     public void save() {
         this.job.getData().setName(this.getStringValue(NAME_PARAM));
-        this.job.getData().getParameters().setAction(this.getStringValue(SCRIPT_ACTION_PARAM));
-        this.job.getData().getParameters().setType(this.getStringValue(SCRIPT_TYPE_PARAM));
-        this.job.getData().getParameters().setEngine(this.getStringValue(SCRIPT_ENGINE_PARAM));
-        this.job.getData().getParameters().setName(this.getStringValue(SCRIPT_NAME_PARAM));
-        this.job.getData().getParameters().setTarget(this.getStringValue(SCRIPT_TARGET_PARAM));
-        this.job.getData().getParameters().setInline(this.getStringValue(SCRIPT_INLINE_PARAM));
+
+        ScriptJobParameters params = buildParametersFromFields();
+        ScriptJobParameters jobParams = this.job.getData().getParameters();
+        jobParams.copyFrom(params);
+        if (isChainUiEnabled() && useChainCheckBox.isSelected()) {
+            jobParams.setChain(params.getChain());
+        } else {
+            jobParams.setChain(null);
+        }
+        if (isRunAction()) {
+            jobParams.setFailureLevel(params.getFailureLevel());
+        }
 
         ScriptAction sa = getScriptAction();
         if (sa.getDisabledFields().contains(SCRIPT_FILE_PARAM)) {
-            this.job.getData().getParameters().setSource(null);
+            jobParams.setSource(null);
         } else {
             File f = new File(this.getStringValue(SCRIPT_FILE_PARAM));
             if (f.exists()) {
-                this.job
-                        .getData()
-                        .getParameters()
-                        .setSource(this.getStringValue(SCRIPT_FILE_PARAM));
+                jobParams.setSource(this.getStringValue(SCRIPT_FILE_PARAM));
             }
         }
         this.job.resetAndSetChanged();
@@ -263,15 +454,7 @@ public class ScriptJobDialog extends StandardFieldsDialog {
             // Always unset this as the text field cannot be edited
             this.setFieldValue(SCRIPT_FILE_PARAM, null);
         }
-        ScriptJobParameters params =
-                new ScriptJobParameters(
-                        this.getStringValue(SCRIPT_ACTION_PARAM),
-                        this.getStringValue(SCRIPT_TYPE_PARAM),
-                        this.getStringValue(SCRIPT_ENGINE_PARAM),
-                        this.getStringValue(SCRIPT_NAME_PARAM),
-                        this.getStringValue(SCRIPT_FILE_PARAM),
-                        this.getStringValue(SCRIPT_TARGET_PARAM),
-                        this.getStringValue(SCRIPT_INLINE_PARAM));
+        ScriptJobParameters params = buildParametersFromFields();
         sa = ScriptJob.createScriptAction(params, null);
         List<String> issues = sa.verifyParameters(this.getStringValue(NAME_PARAM), params, null);
         if (issues.isEmpty()) {
@@ -283,7 +466,7 @@ public class ScriptJobDialog extends StandardFieldsDialog {
 
     private void onScriptTypeTarget(String scriptType) {
         if (RunScriptAction.NAME.equals(getScriptAction().getName())) {
-            if (ExtensionScript.TYPE_TARGETED.equals(scriptType)) {
+            if (ExtensionScriptsUI.TYPE_TARGETED.equals(scriptType)) {
                 this.getField(SCRIPT_TARGET_PARAM).setEnabled(true);
                 this.getField(SCRIPT_ENGINE_PARAM).setEnabled(true);
             } else {

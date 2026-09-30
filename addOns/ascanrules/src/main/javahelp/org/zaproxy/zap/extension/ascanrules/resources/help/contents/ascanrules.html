@@ -60,21 +60,27 @@ Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90019/">90019</a>.
 
-<H2 id="id-90020">Command Injection</H2>
+<H2 id="id-90020">Remote OS Command Injection</H2>
 
-This rule submits *NIX and Windows OS commands as URL parameter values to determine whether or not the web application is passing unchecked
+This rule injects *NIX and Windows OS commands to determine whether or not the web application is passing unchecked
 user input directly to the underlying OS. The injection strings consist of meta-characters that may be interpreted by the OS
-as join commands along with a payload that should generate output in the response if the application is vulnerable. If the content of a response body
-matches the payload, the scanner raises an alert and returns immediately. In the event that none of the error-based matching attempts
-return output in the response, the scanner will attempt a blind injection attack by submitting sleep instructions as the payload and comparing the elapsed time between sending the request
-and receiving the response against a heuristic time-delay lower limit. If the elapsed time is greater than this limit, an alert is raised with medium confidence
-and the scanner returns immediately.
+as join commands along with a payload that should generate output in the response if the application is vulnerable.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/CommandInjectionScanRule.java">CommandInjectionScanRule.java</a>
+<br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90020/">90020</a>.
+
+<H2 id="id-90037">Remote OS Command Injection (Time Based)</H2>
+
+This rule injects *NIX and Windows OS commands to determine whether or not the web application is passing unchecked
+user input directly to the underlying OS. The rule will attempt blind injection attack(s) by submitting sleep instructions as the payload and comparing the elapsed time between sending the request
+and receiving the response against a heuristic time-delay lower limit.
 <br>
 Post 2.5.0 you can change the length of time used for the blind injection attack by changing the <code>rules.common.sleep</code> parameter via the Options 'Rule configuration' panel.
 <p>
-Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/CommandInjectionScaRule.java">CommandInjectionScaRule.java</a>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/CommandInjectionTimingScanRule.java">CommandInjectionTimingScanRule.java</a>
 <br>
-Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90020/">90020</a>.
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90037/">90037</a>.
 
 <H2 id="id-40012">Cross Site Scripting (Reflected)</H2>
 
@@ -136,6 +142,13 @@ Files are only reported if they contain the text "Error Log for" unless a LOW al
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/ElmahScanRule.java">ElmahScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40028/">40028</a>.
+
+<H2 id="id-40044">Exponential Entity Expansion (Billion Laughs Attack)</H2>
+This rule attempts to identify the "Billion Laughs" vulnerability in servers that accept XML or YAML files.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/ExponentialEntityExpansionScanRule.java">ExponentialEntityExpansionScanRule.java</a>
+<br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40044/">40044</a>.
 
 <H2 id="id-20019">External Redirect</H2>
 
@@ -219,10 +232,26 @@ Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40035/">40035</a>.
 
+<H2 id="id-10106">HTTP Only Site</H2>
+This active scan rule checks whether an HTTP site is served under HTTPS.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/HttpOnlySiteScanRule.java">HttpOnlySiteScanRule.java</a>
+<br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10106/">10106</a>.
+
+<H2 id="id-10047">HTTPS Content Available via HTTP</H2>
+This active scan rule attempts to access content that was originally accessed via HTTPS (SSL/TLS) via HTTP.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/HttpsAsHttpScanRule.java">HttpsAsHttpScanRule.java</a>
+<br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10047/">10047</a>.
+
 <H2 id="id-40043">Log4Shell (CVE-2021-44228 and CVE-2021-45046)</H2>
-This rule attempts to discover the Log4Shell (<a href="https://nvd.nist.gov/vuln/detail/CVE-2021-44228">CVE-2021-44228</a> and <a href="https://nvd.nist.gov/vuln/detail/CVE-2021-45046">CVE-2021-45046</a>) vulnerabilities.
+This rule attempts to discover the Log4Shell (<a href="https://nvd.nist.gov/vuln/detail/cve-2021-44228">CVE-2021-44228</a> and <a href="https://nvd.nist.gov/vuln/detail/cve-2021-45046">CVE-2021-45046</a>) vulnerabilities.
 It relies on the OAST add-on to generate out-of-band payloads and verify DNS interactions.
 We recommend that this scan rule is used with header injection enabled for maximum coverage.
+<p>
+See also: <a href="https://www.zaproxy.org/docs/desktop/addons/oast-support/#alerts">OAST</a>.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/Log4ShellScanRule.java">Log4ShellScanRule.java</a>
 <br>
@@ -263,6 +292,18 @@ Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/6/">6</a>.
 
+<H2 id="id-40048">Remote Code Execution (React2Shell)</H2>
+This rule identifies servers running vulnerable versions of React Server Components with Next.js, which will allow remote attackers to execute arbitrary code.
+<p>
+The rule is based on the PoC detailed on <a href="https://www.slcyber.io/research/high-fidelity-detection-mechanism-for-rsc-next-js-rce-cve-2025-55182-cve-2025-66478">https://www.slcyber.io/research/high-fidelity-detection-mechanism-for-rsc-next-js-rce-cve-2025-55182-cve-2025-66478</a>.
+<p>
+It verifies that the server is running vulnerable React Server Components with Next.js, and that the remote code execution (RCE) vulnerability is present without causing any damage.
+It forces an error via a malformed multipart request and checks for the presence of a string which confirms RCE is possible.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/React2ShellScanRule.java">React2ShellScanRule.java</a>
+<br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40048/">40048</a>.
+
 <H2 id="id-20018">Remote Code Execution - CVE-2012-1823</H2>
 Detect CVE-2012-1823 to perform Remote Code Execution on a PHP-CGI based web server.
 <p>
@@ -298,10 +339,24 @@ Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90035/">90035</a>.
 
 <H2 id="id-90036">Server Side Template Injection (Blind)</H2>
 This rule goes one step further than the SSTI scan rule and attempts to find places where the impact of the user input is not immediately obvious, such as when used by an admin panel, report output, invoice, etc.
+It leverages the OAST add-on for out-of-band interactions.
+<p>
+See also: <a href="https://www.zaproxy.org/docs/desktop/addons/oast-support/#alerts">OAST</a>.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SstiBlindScanRule.java">SstiBlindScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90036/">90036</a>.
+
+<H2 id="id-10048">ShellShock - CVE-2014-6271</H2>
+
+This rule performs 2 attacks to detect servers vulnerable to CVE-2014-6271 aka ShellShock.<br>
+The first is a simple reflected attack and the second is a time based attack.<br>
+<br>
+Post 2.5.0 you can change the length of time used for the attack by changing the <code>rules.common.sleep</code> parameter via the Options 'Rule configuration' panel.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/ShellShockScanRule.java">ShellShockScanRule.java</a>
+<br>
+Alert ID: <a href="https://www.zaproxy.org/docs/alerts/10048/">10048</a>.
 
 <H2 id="id-20017">Source Code Disclosure - CVE-2012-1823</H2>
 Exploit CVE-2012-1823 to disclose server-side PHP source code on a PHP-CGI based web server.<br>
@@ -361,14 +416,14 @@ The rule tests only for time-based SQL injection vulnerabilities.<br>
 <br>
 Post 2.5.0 you can change the length of time used for the attack by changing the <code>rules.common.sleep</code> parameter via the Options 'Rule configuration' panel.
 <p>
-Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionHypersonicScanRule.java">SqlInjectionHypersonicScanRule.java</a>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionHypersonicTimingScanRule.java">SqlInjectionHypersonicTimingScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40020/">40020</a>.
 
-<H2 id="id-40027">SQL Injection - MsSQL</H2>
+<H2 id="id-40027">SQL Injection - MsSQL (Time Based)</H2>
 This active scan rule attempts to inject MsSQL specific sleep commands into parameter values and analyzes the server's response time to see if the sleep is effectively executed on the server (indicating a successful SQL injection attack).
 <p>
-Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionMsSqlScanRule.java">SqlInjectionMsSqlScanRule.java</a>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionMsSqlTimingScanRule.java">SqlInjectionMsSqlTimingScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40027/">40027</a>.
 
@@ -386,7 +441,7 @@ The rule tests only for time-based SQL injection vulnerabilities.<br>
 <br>
 Post 2.5.0 you can change the length of time used for the attack by changing the <code>rules.common.sleep</code> parameter via the Options 'Rule configuration' panel.
 <p>
-Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionMySqlScanRule.java">SqlInjectionMySqlScanRule.java</a>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionMySqlTimingScanRule.java">SqlInjectionMySqlTimingScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40019/">40019</a>.
 
@@ -402,9 +457,11 @@ to minimise load on the web server, application server, and database, in order t
 load delays rather than by SQL injection delays. <br>
 The scan rule tests only for time-based SQL injection vulnerabilities.<br>
 <br>
-Note that this rule does not currently allow you to change the length of time used for the timing attacks due to the way the delay is caused. 
+The scan rule tests only for time-based SQL injection vulnerabilities.<br>
 <p>
-Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionOracleScanRule.java">SqlInjectionOracleScanRule.java</a>
+Post 2.5.0 you can change the length of time used for the attack by changing the <code>rules.common.sleep</code> parameter via the Options 'Rule configuration' panel.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionOracleTimingScanRule.java">SqlInjectionOracleTimingScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40021/">40021</a>.
 
@@ -422,16 +479,9 @@ The rule tests only for time-based SQL injection vulnerabilities.<br>
 <br>
 Post 2.5.0 you can change the length of time used for the attack by changing the <code>rules.common.sleep</code> parameter via the Options 'Rule configuration' panel.
 <p>
-Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionPostgreScanRule.java">SqlInjectionPostgreScanRule.java</a>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionPostgreSqlTimingScanRule.java">SqlInjectionPostgreSqlTimingScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40022/">40022</a>.
-
-<H2 id="id-40024">SQL Injection - SQLite</H2>
-This active scan rule attempts to inject SQLite specific commands into parameter values and analyzes the server's responses to see if the commands were effectively executed on the server (indicating a successful SQL injection attack).
-<p>
-Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/SqlInjectionSqLiteScanRule.java">SqlInjectionSqLiteScanRule.java</a>
-<br>
-Alert ID: <a href="https://www.zaproxy.org/docs/alerts/40024/">40024</a>.
 
 <H2 id="id-40029">Trace.axd Information Leak</H2>
 Tests to see if Trace Viewer (trace.axd) is available. Although this component is convenient for developers and 
@@ -460,7 +510,10 @@ an attacker can find out how the XML data is structured, or access data that he 
 to. He may even be able to elevate his privileges on the web site if the XML data is being used for 
 authentication (such as an XML based user file) or authorization." This rule attempts to identify such 
 weaknesses.
+<p><strong>Note:</strong> If the Custom Payloads add-on is installed you can add your own error strings (payloads) in the Custom Payloads options panel. 
+They will also be searched for in responses as they're scanned.
 <p>
+The Custom Payloads category for this rule is: <code>XPath-Errors</code>.<br>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/XpathInjectionScanRule.java">XpathInjectionScanRule.java</a>
 <br>
 Alert ID: <a href="https://www.zaproxy.org/docs/alerts/90021/">90021</a>.
@@ -482,6 +535,8 @@ internal or tertiary systems, etc. The number of tags which are tested individua
 This scan rule will only run if the OAST add-on is installed and available.
 It is also recommended that you test that the Callbacks service in the OAST add-on is correctly configured for your target site.
 If the target system cannot connect to the Callback Address then some XXE vulnerabilities will not be detected.
+<p>
+See also: <a href="https://www.zaproxy.org/docs/desktop/addons/oast-support/#alerts">OAST</a>.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrules/src/main/java/org/zaproxy/zap/extension/ascanrules/XxeScanRule.java">XxeScanRule.java</a>
 <br>

@@ -34,6 +34,7 @@ import org.parosproxy.paros.network.HttpMalformedHeaderException;
 import org.parosproxy.paros.network.HttpMessage;
 import org.zaproxy.addon.dev.api.openapi.simpleAuth.OpenApiSimpleAuthDir;
 import org.zaproxy.addon.dev.api.openapi.simpleUnauth.OpenApiSimpleUnauthDir;
+import org.zaproxy.addon.dev.auth.basicHttp.BasicHttpDir;
 import org.zaproxy.addon.dev.auth.jsonMultipleCookies.JsonMultipleCookiesDir;
 import org.zaproxy.addon.dev.auth.nonStdJsonBearer.NonStdJsonBearerDir;
 import org.zaproxy.addon.dev.auth.passswordAddedNoSubmit.PasswordAddedNoSubmitDir;
@@ -47,8 +48,13 @@ import org.zaproxy.addon.dev.auth.simpleJsonBearerDiffCookies.SimpleJsonBearerDi
 import org.zaproxy.addon.dev.auth.simpleJsonBearerJsCookie.SimpleJsonBearerJsCookieDir;
 import org.zaproxy.addon.dev.auth.simpleJsonCookie.SimpleJsonCookieDir;
 import org.zaproxy.addon.dev.auth.sso1.SSO1RootDir;
+import org.zaproxy.addon.dev.auth.sso2.SSO2RootDir;
+import org.zaproxy.addon.dev.auth.ssoMs.SSOMSRootDir;
+import org.zaproxy.addon.dev.auth.ssoMsPopup.SSOMSPopupRootDir;
 import org.zaproxy.addon.dev.auth.uuidLogin.UuidLoginRootDir;
 import org.zaproxy.addon.dev.csrf.basic.BasicCsrfDir;
+import org.zaproxy.addon.dev.full.basicVulnAuth.BasicVulnAuthDir;
+import org.zaproxy.addon.dev.rnd.SimpleDir;
 import org.zaproxy.addon.dev.seq.performance.PerformanceDir;
 import org.zaproxy.addon.network.ExtensionNetwork;
 import org.zaproxy.addon.network.server.HttpMessageHandler;
@@ -81,6 +87,7 @@ public class TestProxyServer {
         root = new TestDirectory(this, "");
 
         TestDirectory authDir = new TestDirectory(this, "auth");
+        authDir.addDirectory(new BasicHttpDir(this, "basic-http"));
         authDir.addDirectory(new SimpleJsonDir(this, "simple-json"));
         authDir.addDirectory(new SimpleJsonDir(this, "simple-json-blocking-ui"));
         authDir.addDirectory(new SimpleJsonDir(this, "simple-json-blocking-ui-scroll-fields"));
@@ -99,6 +106,9 @@ public class TestProxyServer {
         authDir.addDirectory(new PasswordAddedNoSubmitDir(this, "password-added-nosubmit"));
         authDir.addDirectory(new JsonMultipleCookiesDir(this, "json-multiple-cookies"));
         authDir.addDirectory(new SSO1RootDir(this, "sso1"));
+        authDir.addDirectory(new SSO2RootDir(this, "sso2"));
+        authDir.addDirectory(new SSOMSRootDir(this, "sso-ms"));
+        authDir.addDirectory(new SSOMSPopupRootDir(this, "sso-ms-popup"));
         authDir.addDirectory(new UuidLoginRootDir(this, "uuid-login"));
 
         TestDirectory apiDir = new TestDirectory(this, "api");
@@ -122,10 +132,18 @@ public class TestProxyServer {
         TestDirectory seqDir = new TestDirectory(this, "seq");
         seqDir.addDirectory(new PerformanceDir(this, "performance"));
 
+        TestDirectory fullDir = new TestDirectory(this, "full");
+        fullDir.addDirectory(new BasicVulnAuthDir(this, "basic-vuln-auth"));
+
+        TestDirectory rndDir = new TestDirectory(this, "rnd");
+        rndDir.addDirectory(new SimpleDir(this));
+
         root.addDirectory(authDir);
         root.addDirectory(apiDir);
         root.addDirectory(csrfDir);
+        root.addDirectory(fullDir);
         root.addDirectory(htmlDir);
+        root.addDirectory(rndDir);
         root.addDirectory(seqDir);
     }
 

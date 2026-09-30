@@ -128,8 +128,11 @@ class Log4ShellScanRuleUnitTest extends ActiveScannerTest<Log4ShellScanRule> {
         // Then
         assertThat(cwe, is(equalTo(117)));
         assertThat(wasc, is(equalTo(20)));
-        assertThat(tags.size(), is(equalTo(8)));
+        assertThat(tags.size(), is(equalTo(11)));
 
+        assertThat(
+                tags.containsKey(CommonAlertTag.OWASP_2025_A03_SUPPLY_CHAIN.getTag()),
+                is(equalTo(true)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A06_VULN_COMP.getTag()),
                 is(equalTo(true)));
@@ -139,11 +142,16 @@ class Log4ShellScanRuleUnitTest extends ActiveScannerTest<Log4ShellScanRule> {
         assertThat(
                 tags.containsKey(CommonAlertTag.WSTG_V42_INPV_11_CODE_INJ.getTag()),
                 is(equalTo(true)));
+        assertThat(tags.containsKey(CommonAlertTag.HIPAA.getTag()), is(equalTo(true)));
+        assertThat(tags.containsKey(CommonAlertTag.PCI_DSS.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.QA_FULL.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(PolicyTag.PENTEST.getTag()), is(equalTo(true)));
         assertThat(tags.containsKey(ExtensionOast.OAST_ALERT_TAG_KEY), is(equalTo(true)));
         assertThat(tags.containsKey(Log4ShellScanRule.CVE_44228), is(equalTo(true)));
         assertThat(tags.containsKey(Log4ShellScanRule.CVE_45046), is(equalTo(true)));
+        assertThat(
+                tags.get(CommonAlertTag.OWASP_2025_A03_SUPPLY_CHAIN.getTag()),
+                is(equalTo(CommonAlertTag.OWASP_2025_A03_SUPPLY_CHAIN.getValue())));
         assertThat(
                 tags.get(CommonAlertTag.OWASP_2021_A06_VULN_COMP.getTag()),
                 is(equalTo(CommonAlertTag.OWASP_2021_A06_VULN_COMP.getValue())));
@@ -154,8 +162,20 @@ class Log4ShellScanRuleUnitTest extends ActiveScannerTest<Log4ShellScanRule> {
                 tags.get(CommonAlertTag.WSTG_V42_INPV_11_CODE_INJ.getTag()),
                 is(equalTo(CommonAlertTag.WSTG_V42_INPV_11_CODE_INJ.getValue())));
         assertThat(
+                tags.get(CommonAlertTag.HIPAA.getTag()),
+                is(equalTo(CommonAlertTag.HIPAA.getValue())));
+        assertThat(
+                tags.get(CommonAlertTag.PCI_DSS.getTag()),
+                is(equalTo(CommonAlertTag.PCI_DSS.getValue())));
+        assertThat(
                 tags.get(ExtensionOast.OAST_ALERT_TAG_KEY),
                 is(equalTo(ExtensionOast.OAST_ALERT_TAG_VALUE)));
+        assertThat(
+                tags.get(Log4ShellScanRule.CVE_44228),
+                is(equalTo("https://nvd.nist.gov/vuln/detail/cve-2021-44228")));
+        assertThat(
+                tags.get(Log4ShellScanRule.CVE_45046),
+                is(equalTo("https://nvd.nist.gov/vuln/detail/cve-2021-45046")));
     }
 
     @Test
@@ -167,21 +187,15 @@ class Log4ShellScanRuleUnitTest extends ActiveScannerTest<Log4ShellScanRule> {
         // Then
         assertThat(alerts.size(), is(equalTo(2)));
         assertThat(alert1.getAlertRef(), is(equalTo("40043-1")));
-        assertThat(alert1.getTags().size(), is(equalTo(8)));
+        assertThat(alert1.getTags().size(), is(equalTo(11)));
         assertThat(alert1.getTags(), hasKey("CWE-117"));
         assertThat(alert1.getTags().containsKey("CVE-2021-44228"), is(equalTo(true)));
         assertThat(alert1.getName(), is(equalTo("Log4Shell (CVE-2021-44228)")));
         assertThat(alert2.getAlertRef(), is(equalTo("40043-2")));
         assertThat(alert2.getTags().containsKey("CVE-2021-45046"), is(equalTo(true)));
-        assertThat(alert2.getTags().size(), is(equalTo(8)));
+        assertThat(alert2.getTags().size(), is(equalTo(11)));
         assertThat(alert2.getTags(), hasKey("CWE-117"));
         assertThat(alert2.getName(), is(equalTo("Log4Shell (CVE-2021-45046)")));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 
     private static class Log4ShellServerHandler extends NanoServerHandler {

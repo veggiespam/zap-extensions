@@ -21,14 +21,18 @@ package org.zaproxy.addon.exim.har;
 
 import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.HarReaderException;
+import de.sstoehr.harreader.model.Har;
 import de.sstoehr.harreader.model.HarEntry;
+import de.sstoehr.harreader.model.HarEntry.HarEntryBuilder;
 import de.sstoehr.harreader.model.HarLog;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.httpclient.URI;
+import org.apache.commons.lang3.Strings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -39,17 +43,17 @@ import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.network.HttpHeader;
 import org.parosproxy.paros.network.HttpMalformedHeaderException;
 import org.parosproxy.paros.network.HttpMessage;
+import org.parosproxy.paros.network.HttpSender;
 import org.zaproxy.addon.commonlib.ui.ProgressPaneListener;
 import org.zaproxy.addon.exim.ExtensionExim;
+import org.zaproxy.zap.network.HttpRedirectionValidator;
+import org.zaproxy.zap.network.HttpRequestConfig;
 import org.zaproxy.zap.utils.Stats;
 import org.zaproxy.zap.utils.ThreadUtils;
 
 public class HarImporter {
 
     private static final Logger LOGGER = LogManager.getLogger(HarImporter.class);
-    private static final String STATS_HAR_FILE = "import.har.file";
-    private static final String STATS_HAR_FILE_MSG = "import.har.file.message";
-    private static final String STATS_HAR_FILE_MSG_ERROR = "import.har.file.message.errors";
     // The following list is ordered to hopefully match quickly
     private static final List<String> ACCEPTED_VERSIONS =
             List.of(
@@ -69,43 +73,114 @@ public class HarImporter {
                             || vers.equalsIgnoreCase("http/3")
                             || vers.equalsIgnoreCase("http/3.0");
 
-    protected static final String STATS_HAR_FILE_ERROR = "import.har.file.errors";
+    private static final String STATS_HAR = ExtensionExim.STATS_PREFIX + "import.har.%s";
+
+    enum DataSource {
+        FILE("file"),
+        STRING("string");
+
+        private final String type;
+
+        DataSource(String type) {
+            this.type = type;
+        }
+
+        void successful() {
+            incCounter(STATS_HAR);
+        }
+
+        void messageSuccessful() {
+            incCounter(STATS_HAR + ".message");
+        }
+
+        void messageError() {
+            incCounter(STATS_HAR + ".message.errors");
+        }
+
+        void error() {
+            incCounter(STATS_HAR + ".errors");
+        }
+
+        private void incCounter(String key) {
+            Stats.incCounter(key.formatted(type));
+        }
+    }
 
     private static ExtensionHistory extHistory;
 
+    private final DataSource dataSource;
+    private final boolean sendRequests;
+    private final int maxMessages;
     private ProgressPaneListener progressListener;
+    private SendContext sendContext;
     private boolean success;
 
+    public HarImporter(String data) {
+        this(data, false, 0);
+    }
+
+    public HarImporter(String data, boolean sendRequests, int maxMessages) {
+        this.dataSource = DataSource.STRING;
+        this.sendRequests = sendRequests;
+        this.maxMessages = maxMessages;
+        importData(reader -> reader.readFromString(data));
+    }
+
     public HarImporter(File file) {
-        this(file, null);
+        this(file, null, false, 0);
     }
 
     public HarImporter(File file, ProgressPaneListener listener) {
+        this(file, listener, false, 0);
+    }
+
+    public HarImporter(
+            File file, ProgressPaneListener listener, boolean sendRequests, int maxMessages) {
+        dataSource = DataSource.FILE;
         this.progressListener = listener;
-        HarLog log = null;
+        this.sendRequests = sendRequests;
+        this.maxMessages = maxMessages;
+        importData(reader -> reader.readFromFile(file));
+    }
+
+    private void importData(HarProvider provider) {
         try {
-            log = new HarReader().readFromFile(file).getLog();
+            HarLog log = provider.from(new HarReader()).log();
             importHarLog(log);
         } catch (HarReaderException e) {
-            LOGGER.warn("Failed to read HAR file: {}\n{}", file.getAbsolutePath(), e.getMessage());
-            Stats.incCounter(ExtensionExim.STATS_PREFIX + STATS_HAR_FILE_ERROR);
+            LOGGER.warn("Failed to read HAR data: {}", e.getMessage());
+            dataSource.error();
             success = false;
+        } finally {
             completed();
-            return;
         }
-        completed();
     }
 
     public HarImporter(HarLog harLog, ProgressPaneListener listener) {
+        this(harLog, listener, false, 0);
+    }
+
+    public HarImporter(
+            HarLog harLog, ProgressPaneListener listener, boolean sendRequests, int maxMessages) {
+        dataSource = DataSource.FILE;
         this.progressListener = listener;
+        this.sendRequests = sendRequests;
+        this.maxMessages = maxMessages;
         importHarLog(harLog);
         completed();
     }
 
     private void importHarLog(HarLog log) {
         processMessages(log);
-        Stats.incCounter(ExtensionExim.STATS_PREFIX + STATS_HAR_FILE);
+        dataSource.successful();
         success = true;
+    }
+
+    private SendContext getSendContext() {
+        if (sendContext == null) {
+            sendContext = SendContext.create();
+        }
+        return sendContext;
     }
 
     private void processMessages(HarLog log) {
@@ -113,19 +188,14 @@ public class HarImporter {
             return;
         }
 
-        List<HttpMessage> messages = null;
-
-        try {
-            messages = getHttpMessages(log);
-        } catch (HttpMalformedHeaderException e) {
-            LOGGER.warn("Failed to process HAR entries. {}", e.getMessage());
-            LOGGER.debug(e, e);
-            Stats.incCounter(ExtensionExim.STATS_PREFIX + STATS_HAR_FILE_ERROR);
-            completed();
-            return;
-        }
+        List<HarEntry> entries = preProcessHarEntries(log, sendRequests);
         int count = 0;
-        for (HttpMessage msg : messages) {
+        int imported = 0;
+        for (HarEntry entry : entries) {
+            if (maxMessages > 0 && imported >= maxMessages) {
+                break;
+            }
+            HttpMessage msg = sendRequests ? getSendContext().send(entry) : getHttpMessage(entry);
             if (msg == null) {
                 updateProgress(
                         ++count, Constant.messages.getString("exim.progress.invalidmessage"));
@@ -133,74 +203,113 @@ public class HarImporter {
             }
             persistMessage(msg);
             updateProgress(++count, msg.getRequestHeader().getURI().toString());
+            imported++;
         }
     }
 
-    private static HarLog preProcessHarLog(HarLog log) {
-        List<HarEntry> entries =
-                log.getEntries().stream()
-                        .filter(HarImporter::entryIsNotLocalPrivate)
-                        .filter(HarImporter::entryHasUsableHttpVersion)
-                        .collect(Collectors.toList());
-        log.setEntries(entries);
-        return log;
+    private static HttpRequestConfig createRequestConfig(AtomicBoolean requestValid) {
+        return HttpRequestConfig.builder()
+                .setRedirectionValidator(
+                        new HttpRedirectionValidator() {
+                            @Override
+                            public void notifyMessageReceived(HttpMessage msg) {}
+
+                            @Override
+                            public boolean isValid(URI redirection) {
+                                requestValid.set(isValidForCurrentMode(redirection));
+                                return requestValid.get();
+                            }
+                        })
+                .build();
     }
 
-    private static boolean entryHasUsableHttpVersion(HarEntry entry) {
-        // Handle missing httpVersion (set http/1.1)
-        preProcessHttpVersion(
-                entry,
-                CHECK_MISSING.test(entry.getRequest().getHttpVersion()),
-                HttpHeader.HTTP11,
-                false);
-        preProcessHttpVersion(
-                entry,
-                CHECK_MISSING.test(entry.getResponse().getHttpVersion()),
-                HttpHeader.HTTP11,
-                true);
-        // Handle http/3 (set http/2)
-        preProcessHttpVersion(
-                entry, CHECK_H3.test(entry.getRequest().getHttpVersion()), HttpHeader.HTTP2, false);
-        preProcessHttpVersion(
-                entry, CHECK_H3.test(entry.getResponse().getHttpVersion()), HttpHeader.HTTP2, true);
+    record SendContext(HttpSender sender, HttpRequestConfig config, AtomicBoolean requestValid) {
 
-        if (!containsIgnoreCase(ACCEPTED_VERSIONS, entry.getRequest().getHttpVersion())
-                || !containsIgnoreCase(ACCEPTED_VERSIONS, entry.getResponse().getHttpVersion())) {
+        static SendContext create() {
+            AtomicBoolean requestValid = new AtomicBoolean(true);
+            return new SendContext(
+                    new HttpSender(HttpSender.MANUAL_REQUEST_INITIATOR),
+                    createRequestConfig(requestValid),
+                    requestValid);
+        }
+
+        HttpMessage send(HarEntry entry) {
+            try {
+                HttpMessage message = HarUtils.createHttpMessage(entry.request());
+                URI uri = message.getRequestHeader().getURI();
+                if (!isValidForCurrentMode(uri)) {
+                    return null;
+                }
+                requestValid.set(true);
+                sender.sendAndReceive(message, config);
+                if (!requestValid.get()) {
+                    return null;
+                }
+                return message;
+            } catch (IOException e) {
+                LOGGER.warn("Failed to send HAR request: {}", e.getMessage());
+                LOGGER.debug(e, e);
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Tells whether or not the given {@code uri} is valid for the current {@link Control.Mode}.
+     *
+     * <p>Not valid in {@code safe} mode, or in {@code protect} mode when out of scope.
+     */
+    private static boolean isValidForCurrentMode(URI uri) {
+        return switch (Control.getSingleton().getMode()) {
+            case safe -> false;
+            case protect -> Model.getSingleton().getSession().isInScope(uri.toString());
+            default -> true;
+        };
+    }
+
+    private static List<HarEntry> preProcessHarEntries(HarLog log, boolean sendRequests) {
+        return log.entries().stream()
+                .filter(HarImporter::entryIsNotLocalPrivate)
+                .map(HarImporter::correctHttpVersions)
+                .filter(entry -> entryHasUsableHttpVersion(entry, sendRequests))
+                .toList();
+    }
+
+    private static boolean entryHasUsableHttpVersion(HarEntry entry, boolean sendRequests) {
+        if (!containsIgnoreCase(ACCEPTED_VERSIONS, entry.request().httpVersion())
+                || (!sendRequests
+                        && !containsIgnoreCase(
+                                ACCEPTED_VERSIONS, entry.response().httpVersion()))) {
             LOGGER.warn(
                     "Message with unsupported HTTP version (Req version: {}, Resp version: {}) will be dropped: {}",
-                    entry.getRequest().getHttpVersion(),
-                    entry.getResponse().getHttpVersion(),
-                    entry.getRequest().getUrl());
+                    entry.request().httpVersion(),
+                    entry.response().httpVersion(),
+                    entry.request().url());
             return false;
         }
         return true;
     }
 
     private static boolean entryIsNotLocalPrivate(HarEntry entry) {
-        String url = entry.getRequest().getUrl();
-        if (StringUtils.startsWithIgnoreCase(url, "about")
-                || StringUtils.startsWithIgnoreCase(url, "chrome")
-                || StringUtils.startsWithIgnoreCase(url, "edge")) {
+        String url = entry.request().url();
+        if (Strings.CI.startsWith(url, "about")
+                || Strings.CI.startsWith(url, "chrome")
+                || Strings.CI.startsWith(url, "edge")) {
             LOGGER.debug("Skipping local private entry: {}", url);
             return false;
         }
         return true;
     }
 
-    protected static List<HttpMessage> getHttpMessages(HarLog log)
-            throws HttpMalformedHeaderException {
-        preProcessHarLog(log);
-
+    protected static List<HttpMessage> getHttpMessages(HarLog log) {
         List<HttpMessage> result = new ArrayList<>();
-        List<HarEntry> entries = log.getEntries();
-        for (HarEntry entry : entries) {
+        for (HarEntry entry : preProcessHarEntries(log, false)) {
             result.add(getHttpMessage(entry));
         }
         return result;
     }
 
-    private static HttpMessage getHttpMessage(HarEntry harEntry)
-            throws HttpMalformedHeaderException {
+    private static HttpMessage getHttpMessage(HarEntry harEntry) {
         try {
             return HarUtils.createHttpMessage(harEntry);
         } catch (HttpMalformedHeaderException headerEx) {
@@ -215,25 +324,65 @@ public class HarImporter {
         return checkList.stream().anyMatch(e -> e.equalsIgnoreCase(candidate));
     }
 
-    private static void preProcessHttpVersion(
-            HarEntry entry, boolean condition, String vers, boolean response) {
+    private static HarEntry correctHttpVersions(HarEntry entry) {
+        HarEntryBuilder builder = entry.toBuilder();
+        // Handle missing httpVersion (set http/1.1)
+        boolean changed =
+                preProcessHttpVersion(
+                        entry,
+                        builder,
+                        CHECK_MISSING.test(entry.request().httpVersion()),
+                        HttpHeader.HTTP11,
+                        false);
+        changed |=
+                preProcessHttpVersion(
+                        entry,
+                        builder,
+                        CHECK_MISSING.test(entry.response().httpVersion()),
+                        HttpHeader.HTTP11,
+                        true);
+        // Handle http/3 (set http/2)
+        changed |=
+                preProcessHttpVersion(
+                        entry,
+                        builder,
+                        CHECK_H3.test(entry.request().httpVersion()),
+                        HttpHeader.HTTP2,
+                        false);
+        changed |=
+                preProcessHttpVersion(
+                        entry,
+                        builder,
+                        CHECK_H3.test(entry.response().httpVersion()),
+                        HttpHeader.HTTP2,
+                        true);
+
+        return changed ? builder.build() : entry;
+    }
+
+    private static boolean preProcessHttpVersion(
+            HarEntry entry,
+            HarEntryBuilder builder,
+            boolean condition,
+            String vers,
+            boolean response) {
         if (condition) {
             if (response) {
-                entry.getResponse().setHttpVersion(vers);
+                builder.response(entry.response().toBuilder().httpVersion(vers).build());
             } else {
-                entry.getRequest().setHttpVersion(vers);
+                builder.request(entry.request().toBuilder().httpVersion(vers).build());
             }
             LOGGER.info(
                     "Setting {} version to {} for {}",
                     response ? "response" : "request",
-                    response
-                            ? entry.getResponse().getHttpVersion()
-                            : entry.getRequest().getHttpVersion(),
-                    entry.getRequest().getUrl());
+                    vers,
+                    entry.request().url());
+            return true;
         }
+        return false;
     }
 
-    private static void persistMessage(HttpMessage message) {
+    private void persistMessage(HttpMessage message) {
         HistoryReference historyRef;
 
         try {
@@ -242,10 +391,10 @@ public class HarImporter {
                             Model.getSingleton().getSession(),
                             HistoryReference.TYPE_ZAP_USER,
                             message);
-            Stats.incCounter(ExtensionExim.STATS_PREFIX + STATS_HAR_FILE_MSG);
+            dataSource.messageSuccessful();
         } catch (Exception e) {
             LOGGER.warn(e.getMessage());
-            Stats.incCounter(ExtensionExim.STATS_PREFIX + STATS_HAR_FILE_MSG_ERROR);
+            dataSource.messageError();
             return;
         }
 
@@ -285,5 +434,9 @@ public class HarImporter {
         if (progressListener != null) {
             progressListener.completed();
         }
+    }
+
+    private interface HarProvider {
+        Har from(HarReader data) throws HarReaderException;
     }
 }

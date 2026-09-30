@@ -300,7 +300,7 @@ public class ExtensionWebSocket extends ExtensionAdaptor
      *   <li>adds a WebSocket tab to the status panel (information window containing e.g.: the
      *       History tab)
      *   <li>adds a WebSocket specific options panel
-     *   <li>sets up context menu for WebSockets panel with 'Break' & 'Exclude'
+     *   <li>sets up context menu for WebSockets panel with 'Break' &amp; 'Exclude'
      * </ul>
      */
     @Override
@@ -495,9 +495,13 @@ public class ExtensionWebSocket extends ExtensionAdaptor
         if (webSocketPassiveScannerManager != null) {
             webSocketPassiveScannerManager.shutdownThread();
             extensionScript.removeScriptType(websocketPassiveScanScriptType);
+            webSocketPassiveScannerManager = null;
         }
 
-        eventPublisher.shutdown();
+        if (eventPublisher != null) {
+            eventPublisher.shutdown();
+            eventPublisher = null;
+        }
     }
 
     @Override

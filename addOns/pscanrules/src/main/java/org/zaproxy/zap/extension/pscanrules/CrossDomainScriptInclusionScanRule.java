@@ -52,7 +52,11 @@ public class CrossDomainScriptInclusionScanRule extends PluginPassiveScanner
 
     static {
         Map<String, String> alertTags =
-                new HashMap<>(CommonAlertTag.toMap(CommonAlertTag.OWASP_2021_A08_INTEGRITY_FAIL));
+                new HashMap<>(
+                        CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A08_INTEGRITY_FAIL,
+                                CommonAlertTag.OWASP_2021_A08_INTEGRITY_FAIL,
+                                CommonAlertTag.SYSTEMIC));
         alertTags.put(PolicyTag.PENTEST.getTag(), "");
         alertTags.put(PolicyTag.DEV_STD.getTag(), "");
         alertTags.put(PolicyTag.QA_STD.getTag(), "");

@@ -22,6 +22,7 @@ env:                                   # The environment, mandatory
           loggedOutRegex:              # String, regex pattern for determining if logged out
           pollFrequency:               # Int, the poll frequency, only for 'poll' verification
           pollUnits:                   # String, the poll units, one of 'requests', 'seconds', only for 'poll' verification
+          pollMethod:                  # String, the poll HTTP method (e.g. GET), only for 'poll' verification. Post 2.17.0.
           pollUrl:                     # String, the URL to poll, only for 'poll' verification
           pollPostData:                # String, post dat to include in the poll, only for 'poll' verification
           pollAdditionalHeaders:       # List of additional headers for poll request, only for 'poll' verification
@@ -29,25 +30,30 @@ env:                                   # The environment, mandatory
             value:                     # The header value
       sessionManagement:
         method:                        # String, one of 'cookie', 'http', 'script'
-        parameters:                    # List of 0 or more parameters - may include any required for scripts
+        parameters:                    # List of parameters - may include any required for scripts
           script:                      # String, path to script, only for 'script' session management
           scriptEngine:                # String, the name of the script engine to use, only for 'script' session management
       technology:
         exclude:                       # List of tech to exclude, as per https://www.zaproxy.org/techtags/ (just use last names)
         include:                       # List of tech to include, should only be used when targeting specific techs, the exclude takes precedence when configuring the context.
       structure:
-        structuralParameters:          # List of names of structural parameters.
+        structuralParameters:          # List of names of structural parameters
+        dataDrivenNodes:               # List of data driven nodes
+        - name:                        # String, name of the data driven node
+          regex:                       # String, regex of the data driven node, must contain 2 or 3 regex groups
       users:                           # List of one or more users available to use for authentication
       - name:                          # String, the name to be used by the jobs
         credentials:                   # List of user credentials - may include any required for scripts, vars supported
           username:                    # String, the username to use when authenticating
           password:                    # String, the password to use when authenticating
-  vars:                                # List of 0 or more variables, can be used in urls and selected other parameters
+  vars:                                # List of variables, can be used in urls and selected other parameters
+  configs:                             # List of generic config parameters, as per the ZAP "-config" cmd line option
   parameters:
     failOnError: true                  # If set exit on an error         
     failOnWarning: false               # If set exit on a warning
     continueOnFailure: false           # Continue running all jobs, even if one fails
     progressToStdout: true             # If set will write job progress to stdout
+    maxDuration: 0                     # The max time, in seconds, the plan is allowed to run, default: 0 unlimited
   proxy:                               # Optional upstream proxy settings
     hostname:                          # String, the proxy host
     port:                              # Int, the proxy port
@@ -62,7 +68,7 @@ jobs:
       maxScanDurationInMins:               # Int: The max time in minutes the active scanner will be allowed to run for, default: 0 unlimited
       maxAlertsPerRule:                    # Int: Maximum number of alerts to raise per rule, default: 0 unlimited
       defaultPolicy:                       # String: The name of the default scan policy to use, default: Default Policy
-      handleAntiCSRFTokens:                # Bool: If set then automatically handle anti CSRF tokens, default: false
+      handleAntiCSRFTokens:                # Bool: If set then automatically handle anti CSRF tokens, default: true
       injectPluginIdInHeader:              # Bool: If set then the relevant rule ID will be injected into the X-ZAP-Scan-ID header of each request, default: false
       threadPerHost:                       # Int: The max number of threads per host, default: 2 * Number of available processor cores
     inputVectors:                          # The input vectors used during the active scan.
@@ -87,6 +93,7 @@ jobs:
         enabled:                           # Bool: If enabled. Default: false
         encodeCookieValues:                # Bool: If cookie values should be encoded. Default: false
       scripts:                             # Bool: If Input Vector scripts should be used. Default: true
+    excludePaths:                          # An optional list of regexes to exclude
 
   - type: activeScan-policy            # Defines a new active scan policy which can be used by later activeScan related jobs
     parameters:
@@ -94,6 +101,11 @@ jobs:
     policyDefinition:                  # The policy definition
       defaultStrength:                 # String: The default Attack Strength for all rules, one of Low, Medium, High, Insane (not recommended), default: Medium
       defaultThreshold:                # String: The default Alert Threshold for all rules, one of Off, Low, Medium, High, default: Medium
+      alertTags:                       # Add rules by alert tags; overrides default settings but not rules explicitly listed under "rules"
+        include: []                    # List of alert tags to include, regex supported
+        exclude: []                    # List of alert tags to exclude from the include list, regex supported
+        strength:                      # String: The Attack Strength for this set of rules, one of Low, Medium, High, Insane, default: Medium
+        threshold:                     # String: The Alert Threshold for this set of rules, one of Off, Low, Medium, High, default: Medium
       rules:                           # A list of one or more active scan rules and associated settings which override the defaults
       - id:                            # Int: The rule id as per https://www.zaproxy.org/docs/alerts/
         name:                          # Comment: The name of the rule for documentation purposes - this is not required or actually used
@@ -122,13 +134,14 @@ jobs:
     parameters:
       context:                         # String: Name of the context to attack, default: first context
       user:                            # String: An optional user to use for authentication, must be defined in the env
+      url:                             # String: The subtree to active scan, default: all URLs of the context
       policy:                          # String: Name of the scan policy to be used, default: Default Policy
       maxRuleDurationInMins:           # Int: The max time in minutes any individual rule will be allowed to run for, default: 0 unlimited
       maxScanDurationInMins:           # Int: The max time in minutes the active scanner will be allowed to run for, default: 0 unlimited
       addQueryParam:                   # Bool: If set will add an extra query parameter to requests that do not have one, default: false
       defaultPolicy:                   # String: The name of the default scan policy to use, default: Default Policy
       delayInMs:                       # Int: The delay in milliseconds between each request, use to reduce the strain on the target, default 0
-      handleAntiCSRFTokens:            # Bool: If set then automatically handle anti CSRF tokens, default: false
+      handleAntiCSRFTokens:            # Bool: If set then automatically handle anti CSRF tokens, default: true
       injectPluginIdInHeader:          # Bool: If set then the relevant rule Id will be injected into the X-ZAP-Scan-ID header of each request, default: false
       scanHeadersAllRequests:          # Bool: If set then the headers of requests that do not include any parameters will be scanned, default: false
       threadPerHost:                   # Int: The max number of threads per host, default: 2 * Number of available processor cores
@@ -136,6 +149,11 @@ jobs:
     policyDefinition:                  # The policy definition - only used if the 'policy' is not set
       defaultStrength:                 # String: The default Attack Strength for all rules, one of Low, Medium, High, Insane (not recommended), default: Medium
       defaultThreshold:                # String: The default Alert Threshold for all rules, one of Off, Low, Medium, High, default: Medium
+      alertTags:                       # Add rules by alert tags; overrides default settings but not rules explicitly listed under "rules"
+        include: []                    # List of alert tags to include, regex supported
+        exclude: []                    # List of alert tags to exclude from the include list, regex supported
+        strength:                      # String: The Attack Strength for this set of rules, one of Low, Medium, High, Insane, default: Medium
+        threshold:                     # String: The Alert Threshold for this set of rules, one of Off, Low, Medium, High, default: Medium
       rules:                           # A list of one or more active scan rules and associated settings which override the defaults
       - id:                            # Int: The rule id as per https://www.zaproxy.org/docs/alerts/
         name:                          # Comment: The name of the rule for documentation purposes - this is not required or actually used

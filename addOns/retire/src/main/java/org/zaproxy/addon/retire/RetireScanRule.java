@@ -19,7 +19,6 @@
  */
 package org.zaproxy.addon.retire;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -49,6 +48,7 @@ public class RetireScanRule extends PluginPassiveScanner {
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A03_SUPPLY_CHAIN,
                                 CommonAlertTag.OWASP_2021_A06_VULN_COMP,
                                 CommonAlertTag.OWASP_2017_A09_VULN_COMP));
         alertTags.put(PolicyTag.PENTEST.getTag(), "");
@@ -58,6 +58,15 @@ public class RetireScanRule extends PluginPassiveScanner {
     }
 
     private Repo repo;
+
+    /**
+     * Constructs a {@code RetireScanRule} with the given {@code Repo}.
+     *
+     * @param repo the {@link Repo} instance
+     */
+    public RetireScanRule(Repo repo) {
+        this.repo = repo;
+    }
 
     @Override
     public String getName() {
@@ -77,9 +86,6 @@ public class RetireScanRule extends PluginPassiveScanner {
     public void scanHttpResponseReceive(HttpMessage msg, int id, Source source) {
         Repo scanRepo = getRepo();
         if (!getHelper().isPage200(msg) || scanRepo == null) {
-            if (scanRepo == null) {
-                LOGGER.error("\tThe Retire.js repository was null.");
-            }
             return;
         }
         String uri = msg.getRequestHeader().getURI().toString();
@@ -142,8 +148,7 @@ public class RetireScanRule extends PluginPassiveScanner {
 
     @Override
     public PluginPassiveScanner copy() {
-        RetireScanRule scanRule = new RetireScanRule();
-        scanRule.setRepo(this.getRepo());
+        RetireScanRule scanRule = new RetireScanRule(this.repo);
         scanRule.setConfig(this.getConfig());
         return scanRule;
     }
@@ -176,18 +181,6 @@ public class RetireScanRule extends PluginPassiveScanner {
     }
 
     protected Repo getRepo() {
-        if (repo == null) {
-            try {
-                this.repo = new Repo(COLLECTION_PATH);
-            } catch (IOException e) {
-                LOGGER.warn("Failed to open the Retire.js collection JSON file.", e);
-            }
-        }
         return repo;
-    }
-
-    // This method supports unit tests
-    void setRepo(Repo repo) {
-        this.repo = repo;
     }
 }

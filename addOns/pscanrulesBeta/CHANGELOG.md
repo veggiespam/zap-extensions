@@ -4,6 +4,45 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+
+## [50] - 2026-04-14
+### Changed
+- The scan rules now have new tags for the OWASP Top 10 2025.
+- The Content Cacheability scan rule now includes alert tags for the 2021 and 2017 Top 10s.
+- Depends on an updated version of the Common Library add-on.
+
+## [49] - 2026-02-17
+### Changed
+- Insufficient Site Isolation Against Spectre Vulnerability alerts to have unique alert names.
+
+## [48] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+
+### Removed
+- The following scan rules were removed, having been promoted to Beta:
+  - In Page Banner Information Leak
+  - Java Serialization Object
+  - Sub Resource Integrity Attribute Missing
+
+## [47] - 2025-11-04
+### Added
+- SYSTEMIC tag to selected rules.
+
+### Changed
+- Depends on an updated version of the Common Library add-on.
+- Reduced usage of error level logging.
+
+## [46] - 2025-09-18
+### Changed
+- Update alert references to latest locations to fix 404s and resolve redirections.
+
+## [45] - 2025-09-10
+### Changed
+- Add alert references to Content Cacheability scan rule alerts (Issue 7100).
+
+## [44] - 2025-06-20
 ### Changed
 - Dropped period from extension name used in the GUI.
 - Depends on an updated version of the Common Library add-on.
@@ -288,20 +327,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 18 - 2018-01-19
 
-- Minor code changes to address deprecation.<br/>
-- At HIGH threshold only perform CSRF checks for in scope messages (Issue 1354).<br/>
-- Exclude JavaScript response types from the InformationDisclosureDebugErrors scanner unless threshold is Low (Issue 4210).<br/>
+- Minor code changes to address deprecation.
+- At HIGH threshold only perform CSRF checks for in scope messages (Issue 1354).
+- Exclude JavaScript response types from the InformationDisclosureDebugErrors scanner unless threshold is Low (Issue 4210).
 
 ## 17 - 2017-11-24
 
-- Minor changes to InsecureJFSViewStatePassiveScanner (check response contains JSF viewstate or if it's server stored).<br/>
-- Improve the domain matching in CookieLooselyScopedScanner.<br/>
-- Issue 3449: CSRFcountermeasures passive scanner now raises alerts on a per-form basis on pages with multiple forms.<br/>
-- Issue 3937: Update ServletParameterPollutionScanner reference.<br/>
+- Minor changes to InsecureJFSViewStatePassiveScanner (check response contains JSF viewstate or if it's server stored).
+- Improve the domain matching in CookieLooselyScopedScanner.
+- Issue 3449: CSRFcountermeasures passive scanner now raises alerts on a per-form basis on pages with multiple forms.
+- Issue 3937: Update ServletParameterPollutionScanner reference.
 
 ## 16 - 2017-04-25
 
-- Added some keywords to the list of suspicious comments. <br/>
+- Added some keywords to the list of suspicious comments.
 
 ## 15 - 2017-01-18
 
@@ -364,6 +403,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Updated to support new addon format
 
+[50]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v50
+[49]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v49
+[48]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v48
+[47]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v47
+[46]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v46
+[45]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v45
+[44]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v44
 [43]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v43
 [42]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v42
 [41]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v41

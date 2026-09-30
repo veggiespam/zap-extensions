@@ -63,9 +63,12 @@ public class CsrfTokenScanRule extends AbstractAppPlugin implements CommonActive
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A02_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG,
                                 CommonAlertTag.OWASP_2017_A06_SEC_MISCONFIG,
-                                CommonAlertTag.WSTG_V42_SESS_05_CSRF));
+                                CommonAlertTag.WSTG_V42_SESS_05_CSRF,
+                                CommonAlertTag.SYSTEMIC));
+        alertTags.put(PolicyTag.QA_CICD.getTag(), "");
         alertTags.put(PolicyTag.QA_STD.getTag(), "");
         alertTags.put(PolicyTag.QA_FULL.getTag(), "");
         alertTags.put(PolicyTag.PENTEST.getTag(), "");
@@ -243,7 +246,7 @@ public class CsrfTokenScanRule extends AbstractAppPlugin implements CommonActive
                 formIdx++;
             }
         } catch (IOException e) {
-            LOGGER.error(e);
+            LOGGER.debug(e, e);
         }
     }
 

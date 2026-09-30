@@ -18,7 +18,7 @@ zapAddOn {
                     version.set(">=0.3.0")
                 }
                 register("commonlib") {
-                    version.set(">= 1.29.0 & < 2.0.0")
+                    version.set(">= 1.43.0 & < 2.0.0")
                 }
             }
         }
@@ -31,7 +31,7 @@ zapAddOn {
                 dependencies {
                     addOns {
                         register("automation") {
-                            version.set(">=0.31.0")
+                            version.set(">=0.59.0")
                         }
                     }
                 }
@@ -59,7 +59,7 @@ dependencies {
     zapAddOn("database")
     zapAddOn("network")
 
-    implementation("io.kaitai:kaitai-struct-runtime:0.10")
+    implementation(libs.spider.kaitaiStructRuntime)
 
     testImplementation(project(":testutils"))
     testImplementation(libs.log4j.core)

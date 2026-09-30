@@ -33,13 +33,17 @@ import org.parosproxy.paros.view.View;
 import org.zaproxy.addon.commonlib.ExtensionCommonlib;
 import org.zaproxy.addon.commonlib.ui.ProgressPanel;
 import org.zaproxy.addon.commonlib.ui.ZapSortedMenu;
+import org.zaproxy.addon.exim.har.HarExporter;
+import org.zaproxy.addon.exim.har.HarImporterType;
 import org.zaproxy.addon.exim.har.MenuImportHar;
 import org.zaproxy.addon.exim.har.PopupMenuItemSaveHarMessage;
 import org.zaproxy.addon.exim.log.MenuItemImportLogs;
 import org.zaproxy.addon.exim.pcap.MenuItemImportPcap;
 import org.zaproxy.addon.exim.sites.MenuPruneSites;
 import org.zaproxy.addon.exim.sites.MenuSaveSites;
+import org.zaproxy.addon.exim.sites.YamlExporter;
 import org.zaproxy.addon.exim.urls.MenuItemImportUrls;
+import org.zaproxy.addon.exim.urls.UrlExporter;
 
 public class ExtensionExim extends ExtensionAdaptor {
 
@@ -65,8 +69,8 @@ public class ExtensionExim extends ExtensionAdaptor {
     @Override
     public void init() {
         super.init();
-
         importer = new Importer();
+        this.registerImporterType(new HarImporterType());
     }
 
     @Override
@@ -74,6 +78,10 @@ public class ExtensionExim extends ExtensionAdaptor {
         super.initModel(model);
 
         exporter = new Exporter(model);
+
+        registerExporterType(new HarExporter());
+        registerExporterType(new UrlExporter());
+        registerExporterType(new YamlExporter());
     }
 
     @Override
@@ -179,6 +187,51 @@ public class ExtensionExim extends ExtensionAdaptor {
     }
 
     /**
+     * Registers an exporter type.
+     *
+     * @param exporterType the exporter type with id and name.
+     * @since 0.18.0
+     */
+    public void registerExporterType(ExporterType exporterType) {
+        Exporter.register(exporterType);
+    }
+
+    /**
+     * Unregisters the exporter type for the given type ID.
+     *
+     * @param typeId the export type identifier.
+     * @since 0.18.0
+     */
+    public void unregisterExporterType(String typeId) {
+        Exporter.unregister(typeId);
+    }
+
+    /**
+     * Registers a source exporter for the given source.
+     *
+     * <p>Only one exporter can be registered per source; a subsequent call replaces the previous
+     * registration.
+     *
+     * @param source the source the exporter handles.
+     * @param sourceExporter the exporter.
+     * @since 0.19.0
+     */
+    public void registerSourceExporter(
+            ExporterOptions.Source source, SourceExporter sourceExporter) {
+        Exporter.registerSourceExporter(source, sourceExporter);
+    }
+
+    /**
+     * Unregisters the source exporter for the given source.
+     *
+     * @param source the source whose exporter should be removed.
+     * @since 0.19.0
+     */
+    public void unregisterSourceExporter(ExporterOptions.Source source) {
+        Exporter.unregisterSourceExporter(source);
+    }
+
+    /**
      * Gets the importer.
      *
      * @return the importer, never {@code null}.
@@ -186,6 +239,26 @@ public class ExtensionExim extends ExtensionAdaptor {
      */
     public Importer getImporter() {
         return importer;
+    }
+
+    /**
+     * Registers an importer type.
+     *
+     * @param importerType the importer type with id and name.
+     * @since 0.18.0
+     */
+    public void registerImporterType(ImporterType importerType) {
+        Importer.register(importerType);
+    }
+
+    /**
+     * Unregisters the importer type for the given type ID.
+     *
+     * @param typeId the import type identifier.
+     * @since 0.18.0
+     */
+    public void unregisterImporterType(String typeId) {
+        Importer.unregister(typeId);
     }
 
     public static void updateOutput(String messageKey, String filePath) {

@@ -40,6 +40,7 @@ import org.parosproxy.paros.network.HttpMessage;
 import org.zaproxy.addon.commonlib.AbstractAppFilePluginUnitTest;
 import org.zaproxy.addon.commonlib.CommonAlertTag;
 import org.zaproxy.addon.commonlib.PolicyTag;
+import org.zaproxy.zap.testutils.UrlValidationError.Cause;
 
 /** Unit test for {@link EnvFileScanRule}. */
 class EnvFileScanRuleUnitTest extends AbstractAppFilePluginUnitTest<EnvFileScanRule> {
@@ -77,6 +78,11 @@ class EnvFileScanRuleUnitTest extends AbstractAppFilePluginUnitTest<EnvFileScanR
     @Override
     protected void setUpMessages() {
         mockMessages(new ExtensionAscanRules());
+    }
+
+    @Override
+    public boolean isAllowedUrlValidationError(Cause cause, String reference, Object detail) {
+        return cause == Cause.META_REFRESH && reference.startsWith("https://www.google.com/search");
     }
 
     @Override
@@ -228,7 +234,7 @@ class EnvFileScanRuleUnitTest extends AbstractAppFilePluginUnitTest<EnvFileScanR
         // Given / When
         Map<String, String> tags = ((EnvFileScanRule) rule).getAlertTags();
         // Then
-        assertThat(tags.size(), is(equalTo(5)));
+        assertThat(tags.size(), is(equalTo(6)));
         assertThat(
                 tags.containsKey(CommonAlertTag.OWASP_2021_A05_SEC_MISCONFIG.getTag()),
                 is(equalTo(true)));
@@ -267,11 +273,5 @@ class EnvFileScanRuleUnitTest extends AbstractAppFilePluginUnitTest<EnvFileScanR
         assertThat(authAlert.getRisk(), is(equalTo(Alert.RISK_INFO)));
         assertThat(authAlert.getConfidence(), is(equalTo(Alert.CONFIDENCE_LOW)));
         assertThat(authAlert.getAlertRef(), is(equalTo("40034-2")));
-    }
-
-    @Test
-    @Override
-    public void shouldHaveValidReferences() {
-        super.shouldHaveValidReferences();
     }
 }

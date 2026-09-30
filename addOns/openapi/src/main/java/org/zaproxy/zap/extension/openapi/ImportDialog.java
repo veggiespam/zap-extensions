@@ -23,9 +23,6 @@ import java.awt.Font;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
@@ -44,6 +41,8 @@ import org.parosproxy.paros.extension.AbstractDialog;
 import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.view.View;
+import org.zaproxy.addon.commonlib.UriUtils;
+import org.zaproxy.addon.commonlib.ZapUriException;
 import org.zaproxy.zap.extension.openapi.OpenApiExceptions.EmptyDefinitionException;
 import org.zaproxy.zap.extension.openapi.OpenApiExceptions.InvalidDefinitionException;
 import org.zaproxy.zap.extension.openapi.OpenApiExceptions.InvalidUrlException;
@@ -54,6 +53,7 @@ import org.zaproxy.zap.users.User;
 import org.zaproxy.zap.utils.FontUtils;
 import org.zaproxy.zap.utils.ThreadUtils;
 import org.zaproxy.zap.utils.ZapHtmlLabel;
+import org.zaproxy.zap.utils.ZapNumberSpinner;
 import org.zaproxy.zap.view.LayoutHelper;
 
 @SuppressWarnings("serial")
@@ -64,6 +64,7 @@ public class ImportDialog extends AbstractDialog {
 
     private JTextField fieldDefinition;
     private JTextField fieldTarget;
+    private ZapNumberSpinner fieldMaxMessages;
     private JComboBox<String> contextsComboBox;
     private JComboBox<String> usersComboBox;
     private ContextsChangedListenerImpl contextsChangedListener;
@@ -118,6 +119,13 @@ public class ImportDialog extends AbstractDialog {
                     getUsersComboBox(),
                     LayoutHelper.getGBC(1, fieldsRow, 2, 0.5, new Insets(4, 4, 0, 0)));
         }
+        fieldsRow++;
+        fieldsPanel.add(
+                new JLabel(Constant.messages.getString(MESSAGE_PREFIX + "labelMaxMessages")),
+                LayoutHelper.getGBC(0, fieldsRow, 1, 0.5, new Insets(4, 0, 0, 4)));
+        fieldsPanel.add(
+                getMaxMessagesField(),
+                LayoutHelper.getGBC(1, fieldsRow, 2, 0.5, new Insets(4, 4, 0, 0)));
 
         int row = 0;
         add(fieldsPanel, LayoutHelper.getGBC(0, row, 2, 1.0, new Insets(8, 8, 4, 8)));
@@ -179,6 +187,13 @@ public class ImportDialog extends AbstractDialog {
         return fieldTarget;
     }
 
+    private ZapNumberSpinner getMaxMessagesField() {
+        if (fieldMaxMessages == null) {
+            fieldMaxMessages = new ZapNumberSpinner(0, 0, Integer.MAX_VALUE);
+        }
+        return fieldMaxMessages;
+    }
+
     private int getSelectedContextId() {
         if (contextsComboBox.getSelectedItem() == null) {
             return -1;
@@ -227,6 +242,7 @@ public class ImportDialog extends AbstractDialog {
     void clearFields() {
         getDefinitionField().setText("");
         getTargetField().setText("");
+        getMaxMessagesField().changeToDefaultValue();
     }
 
     public void unload() {
@@ -315,6 +331,7 @@ public class ImportDialog extends AbstractDialog {
         getImportButton().setEnabled(!show);
         getDefinitionField().setEnabled(!show);
         getTargetField().setEnabled(!show);
+        getMaxMessagesField().setEnabled(!show);
         getChooseFileButton().setEnabled(!show);
         getContextsComboBox().setEnabled(!show);
     }
@@ -332,17 +349,21 @@ public class ImportDialog extends AbstractDialog {
             return false;
         }
 
+        int maxMessages = getMaxMessagesField().getValue();
         try {
-            new URL(definitionLocation).toURI();
+            UriUtils.isValid(definitionLocation);
             var uri = new URI(definitionLocation, true);
-            return extOpenApi.importOpenApiDefinition(
-                            uri,
-                            getTargetField().getText(),
-                            true,
-                            getSelectedContextId(),
-                            getSelectedUser())
+            return extOpenApi
+                            .importOpenApiDefinitionV2(
+                                    uri,
+                                    getTargetField().getText(),
+                                    true,
+                                    getSelectedContextId(),
+                                    getSelectedUser(),
+                                    maxMessages)
+                            .getErrors()
                     == null;
-        } catch (URIException | MalformedURLException | URISyntaxException ignored) {
+        } catch (ZapUriException | URIException ignored) {
             // Not a valid URI, try to import as a file
         } catch (InvalidUrlException e) {
             ThreadUtils.invokeAndWaitHandled(
@@ -370,8 +391,15 @@ public class ImportDialog extends AbstractDialog {
             return false;
         }
         try {
-            return extOpenApi.importOpenApiDefinition(
-                            file, getTargetField().getText(), true, getSelectedContextId())
+            return extOpenApi
+                            .importOpenApiDefinitionV2(
+                                    file,
+                                    getTargetField().getText(),
+                                    true,
+                                    getSelectedContextId(),
+                                    getSelectedUser(),
+                                    maxMessages)
+                            .getErrors()
                     == null;
         } catch (InvalidUrlException e) {
             ThreadUtils.invokeAndWaitHandled(

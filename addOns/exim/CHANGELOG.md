@@ -4,7 +4,47 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Changed
+- Maintenance changes.
 
+## [0.22.0] - 2026-08-12
+### Added
+- Option to send requests when importing a HAR file, including via the Automation Framework and API.
+- Allow users to limit the number of HAR messages to import (`maxMessages`). Ex: If testing authentication, access, etc.
+
+## [0.21.0] - 2026-07-06
+### Added
+- Allow to import HAR data directly through the API.
+
+## [0.20.0] - 2026-05-07
+### Changed
+- Source exporters to report the number of items exported.
+
+## [0.19.0] - 2026-04-14
+### Added
+- Support for add-on provided source exporters, allowing add-ons to provide new data sources for the export job (e.g. the Client Map via the Client Side Integration add-on).
+
+### Fixed
+- Save the context when saving the export job.
+
+## [0.18.0] - 2026-03-31
+### Added
+- Support for plugable exporters and importers.
+
+## [0.17.0] - 2026-03-02
+### Changed
+- Use the context when exporting the Sites Tree through the Automation Framework job.
+
+## [0.16.0] - 2025-12-15
+### Changed
+- Update minimum ZAP version to 2.17.0.
+- Update dependencies.
+- Depend on newer version of Common Library add-on.
+
+## [0.15.0] - 2025-09-02
+### Changed
+- Update dependency.
+- Use always the same newlines (LF) when exporting HAR files.
 
 ## [0.14.0] - 2025-03-25
 ### Changed
@@ -126,6 +166,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - First release.
 
+[0.22.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.22.0
+[0.21.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.21.0
+[0.20.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.20.0
+[0.19.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.19.0
+[0.18.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.18.0
+[0.17.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.17.0
+[0.16.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.16.0
+[0.15.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.15.0
 [0.14.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.14.0
 [0.13.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.13.0
 [0.12.0]: https://github.com/zaproxy/zap-extensions/releases/exim-v0.12.0
